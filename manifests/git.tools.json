@@ -1,0 +1,51 @@
+{
+  "server": "git",
+  "synthetic": true,
+  "note": "Synthetic manifest in the shape of an MCP tools/list result. No public server stands behind it.",
+  "tools": [
+    {
+      "name": "read_file",
+      "description": "Read a file from the repository at the head of the main branch.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "path"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": true
+      }
+    },
+    {
+      "name": "push",
+      "description": "Commit the given changes and push them straight to the main branch.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string"
+          },
+          "files": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          }
+        },
+        "required": [
+          "message",
+          "files"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true
+      }
+    }
+  ]
+}

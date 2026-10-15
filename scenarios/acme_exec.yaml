@@ -1,0 +1,73 @@
+# An executive assistant that sends a daily digest. Everything here is synthetic.
+#
+# The planted risk: the assistant never reads the inbox itself. It delegates that
+# to a reader agent, and the reader's results come back into the assistant's
+# context (rule 6). The assistant also reads the CRM and can send email to
+# anyone, so one hostile inbound email has untrusted text, private data and a
+# way out all in one context: the lethal trifecta, at both agents.
+#
+# The obvious fixes do not work here. The digest runs unattended and needs
+# mail.send, so neither revoking it nor putting a person in front of it is
+# acceptable. What works is quarantining what the reader returns.
+scenario: acme_exec
+title: Acme executive office
+order: 2
+description: Executive assistant with an inbox reader and an unattended daily digest
+
+servers:
+  - id: srv:mail
+    name: Mail
+    manifest: manifests/mail.tools.json
+    synthetic: true
+  - id: srv:crm
+    name: CRM
+    manifest: manifests/crm.tools.json
+    synthetic: true
+
+tools:
+  - id: tool:mail.read_inbox
+    reads: [src:inbound-email]
+  - id: tool:mail.send
+    writes: [res:outbound-email]
+  - id: tool:crm.search_contacts
+    reads: [src:crm-records]
+  - id: tool:crm.get_account
+    reads: [src:crm-records]
+
+data_sources:
+  - {id: src:inbound-email, name: Inbound email, trust: untrusted}
+  - {id: src:crm-records, name: CRM records, trust: private}
+
+resources:
+  - {id: res:outbound-email, name: Outbound email, impact: medium, external: true}
+
+agents:
+  - id: agent:exec-assistant
+    name: Executive assistant
+    owner: office-of-the-ceo
+    can_call:
+      - tool:crm.search_contacts
+      - tool:crm.get_account
+      - tool:mail.send
+    delegates_to: [agent:inbox-reader]
+  - id: agent:inbox-reader
+    name: Inbox reader
+    owner: office-of-the-ceo
+    can_call: [tool:mail.read_inbox]
+
+workflows:
+  - id: wf:daily-digest
+    name: Daily digest
+    description: Every morning, summarise the inbox against the CRM and email the summary to the executive.
+    run_by: agent:exec-assistant
+    mode: autonomous                     # nobody is awake to approve a send at 6 am
+    needs: [tool:mail.send]
+    reads: [src:inbound-email, src:crm-records]
+
+expect:
+  injection: []
+  trifecta: [agent:exec-assistant, agent:inbox-reader]
+  best_fix_kind: quarantine_delegation
+  rejected:
+    - {kind: revoke_call, reason_contains: "wf:daily-digest"}
+    - {kind: gate_call, reason_contains: "wf:daily-digest"}

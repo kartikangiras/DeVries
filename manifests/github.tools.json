@@ -1,0 +1,66 @@
+{
+  "server": "github",
+  "synthetic": true,
+  "note": "Synthetic manifest in the shape of an MCP tools/list result. No public server stands behind it.",
+  "tools": [
+    {
+      "name": "list_issues",
+      "description": "List open issues in the repository, newest first, with title, author and labels.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "label": {
+            "type": "string"
+          },
+          "limit": {
+            "type": "integer"
+          }
+        }
+      },
+      "annotations": {
+        "readOnlyHint": true
+      }
+    },
+    {
+      "name": "get_issue",
+      "description": "Return one issue in full: its title, its body as the reporter wrote it, and every comment.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "number": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "number"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": true
+      }
+    },
+    {
+      "name": "add_comment",
+      "description": "Post a comment on an issue in the team's private tracker.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "number": {
+            "type": "integer"
+          },
+          "body": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "number",
+          "body"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false
+      }
+    }
+  ]
+}

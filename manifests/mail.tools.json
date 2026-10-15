@@ -1,0 +1,30 @@
+{
+  "server": "mail",
+  "synthetic": true,
+  "note": "Synthetic manifest in the shape of an MCP tools/list result. No public server stands behind it.",
+  "tools": [
+    {
+      "name": "read_inbox",
+      "description": "Return the newest messages in the mailbox, with sender, subject and full body text.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {"limit": {"type": "integer"}, "unread_only": {"type": "boolean"}}
+      },
+      "annotations": {"readOnlyHint": true}
+    },
+    {
+      "name": "send",
+      "description": "Send an email from the mailbox owner to any address, inside or outside the company.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "to": {"type": "array", "items": {"type": "string"}},
+          "subject": {"type": "string"},
+          "body": {"type": "string"}
+        },
+        "required": ["to", "subject", "body"]
+      },
+      "annotations": {"readOnlyHint": false, "destructiveHint": false, "openWorldHint": true}
+    }
+  ]
+}

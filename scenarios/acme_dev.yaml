@@ -1,0 +1,116 @@
+# A small engineering team's agents. Everything here is synthetic.
+#
+# A planner takes bug reports. It delegates reading them to a triage agent and
+# fixing them to a coder, who can push to the main branch. Bug reports come from
+# anyone, so what the triage agent reads returns to the planner (rule 6) and
+# passes down to the coder (rule 4): six hops from an issue to a push. The coder
+# can also fetch any URL, which is a second way in and the only way out, and it
+# reads CI secrets, so every agent in the delegation tree is a trifecta agent.
+# That is the over-approximation working as designed: any of them could be told
+# to leak, because any of them can reach the one tool that leaves.
+#
+# It takes two fixes. A gate on the push closes both injections: the fix-bug
+# workflow is supervised, so a person can approve each push, while revoking the
+# push would break it. Then the HTTP tool, which no workflow needs, is revoked,
+# and with the only way out gone all three trifectas close at once.
+#
+# The release bot shares no delegation with the others, and no agent hands it
+# anything. It is here for stored taint (rule 7): the main branch feeds the
+# repository, so what the coder pushes is what the release bot later reads and
+# deploys. That makes two more injections, issues and web to production, eleven
+# and nine hops long, and the same gate on the push closes them too.
+scenario: acme_dev
+title: Acme dev team
+order: 3
+description: A planner that hands bug reports to a triage agent and to a coder who can push
+
+servers:
+  - {id: srv:github, name: GitHub, manifest: manifests/github.tools.json, synthetic: true}
+  - {id: srv:git, name: Git, manifest: manifests/git.tools.json, synthetic: true}
+  - {id: srv:ci, name: CI, manifest: manifests/ci.tools.json, synthetic: true}
+  - {id: srv:http, name: HTTP, manifest: manifests/http.tools.json, synthetic: true}
+
+tools:
+  - id: tool:github.list_issues
+    reads: [src:github-issues]
+  - id: tool:github.get_issue
+    reads: [src:github-issues]
+  - id: tool:github.add_comment
+    writes: [res:issue-thread]
+  - id: tool:git.read_file
+    reads: [src:repository]
+  - id: tool:git.push
+    writes: [res:main-branch]
+  - id: tool:ci.read_secret
+    reads: [src:ci-secrets]
+  - id: tool:ci.deploy
+    writes: [res:production]
+  - id: tool:http.request                # reads whatever a URL returns, and can send anything anywhere
+    reads: [src:public-web]
+    writes: [res:internet]
+    capability: exfil
+
+data_sources:
+  - {id: src:github-issues, name: GitHub issues, trust: untrusted}
+  - {id: src:public-web, name: Public web, trust: untrusted}
+  - {id: src:ci-secrets, name: CI secrets, trust: private}
+  - {id: src:repository, name: Repository, trust: internal}
+
+resources:
+  # stored taint: whatever lands on main is what every later read of the repository returns
+  - {id: res:main-branch, name: Main branch, impact: high, external: false, feeds: [src:repository]}
+  - {id: res:production, name: Production, impact: high, external: false}
+  - {id: res:internet, name: The internet, impact: low, external: true}
+  - {id: res:issue-thread, name: Issue thread, impact: low, external: false}
+
+agents:
+  - id: agent:planner
+    name: Planner
+    owner: platform
+    delegates_to: [agent:triage, agent:coder]
+  - id: agent:triage
+    name: Triage agent
+    owner: platform
+    can_call: [tool:github.list_issues, tool:github.get_issue, tool:github.add_comment]
+  - id: agent:coder
+    name: Coder
+    owner: platform
+    can_call: [tool:git.read_file, tool:git.push, tool:ci.read_secret, tool:http.request]
+  - id: agent:release-bot
+    name: Release bot
+    owner: platform
+    can_call: [tool:git.read_file, tool:ci.deploy]
+
+workflows:
+  - id: wf:issue-triage
+    name: Issue triage
+    description: Read each new issue, label it and reply in its thread.
+    run_by: agent:triage
+    mode: autonomous
+    needs: [tool:github.get_issue, tool:github.add_comment]
+    reads: [src:github-issues]
+  - id: wf:fix-bug
+    name: Fix a bug
+    description: Turn a triaged issue into a change on the main branch, tested with the CI credentials.
+    run_by: agent:planner
+    mode: supervised                     # an engineer reviews what lands on main
+    needs: [tool:git.push, tool:ci.read_secret]
+    reads: [src:github-issues, src:repository, src:ci-secrets]    # the tests run with the CI credentials
+  - id: wf:release
+    name: Release
+    description: Deploy the head of the main branch.
+    run_by: agent:release-bot
+    mode: supervised
+    needs: [tool:ci.deploy]
+    reads: [src:repository]
+
+expect:
+  injection:
+    - [src:github-issues, res:main-branch]
+    - [src:github-issues, res:production]
+    - [src:public-web, res:main-branch]
+    - [src:public-web, res:production]
+  trifecta: [agent:coder, agent:planner, agent:triage]
+  best_fix_kind: gate_call
+  rejected:
+    - {kind: revoke_call, reason_contains: "wf:fix-bug"}

@@ -1,0 +1,69 @@
+# A customer support desk with a refunds helper. Everything here is synthetic.
+#
+# The planted risk: the support bot reads customer tickets, which anyone can
+# write, and can issue refunds on its own. One hostile ticket is enough.
+scenario: acme_support
+title: Acme support desk
+order: 1
+description: Customer support desk with a refunds helper
+
+servers:
+  - id: srv:helpdesk
+    name: Helpdesk
+    manifest: manifests/helpdesk.tools.json
+    synthetic: true
+  - id: srv:payments
+    name: Payments
+    manifest: manifests/payments.tools.json
+    synthetic: true
+
+tools:                                   # facts a manifest can't express
+  - id: tool:helpdesk.get_ticket
+    reads: [src:customer-tickets]
+  - id: tool:helpdesk.list_tickets
+    reads: [src:customer-tickets]
+  - id: tool:helpdesk.reply
+    writes: [res:customer-email]
+  - id: tool:helpdesk.add_internal_note
+    writes: [res:ticket-notes]
+  - id: tool:payments.get_payment
+    reads: [src:payment-records]
+  - id: tool:payments.issue_refund
+    writes: [res:payments-api]
+    capability: write                    # manual label beats every other source
+
+data_sources:
+  - {id: src:customer-tickets, name: Customer tickets, trust: untrusted}
+  - {id: src:payment-records, name: Payment records, trust: internal}
+
+resources:
+  - {id: res:payments-api, name: Payments API, impact: high, external: false}
+  - {id: res:customer-email, name: Customer email, impact: medium, external: true}
+  - {id: res:ticket-notes, name: Internal ticket notes, impact: low, external: false}
+
+agents:
+  - id: agent:support-bot
+    name: Support bot
+    owner: support
+    can_call:
+      - tool:helpdesk.get_ticket
+      - tool:helpdesk.reply
+      - tool:helpdesk.add_internal_note
+      - tool:payments.get_payment
+      - tool:payments.issue_refund
+    delegates_to: []
+
+workflows:
+  - id: wf:refund-request
+    name: Refund request
+    description: A customer asks for a refund in a ticket and the bot issues it.
+    run_by: agent:support-bot
+    mode: supervised                     # a person already reviews refunds, so a gate is acceptable
+    needs: [tool:payments.issue_refund]
+    reads: [src:customer-tickets]        # becomes NEEDS_DATA
+
+expect:                                  # golden oracle
+  injection: [[src:customer-tickets, res:payments-api]]
+  trifecta: []
+  best_fix_kind: gate_call               # mitigation oracle, checked from Day 2
+  rejected: [{kind: revoke_call, reason_contains: "wf:refund-request"}]

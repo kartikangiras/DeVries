@@ -1,0 +1,31 @@
+{
+  "server": "payments",
+  "synthetic": true,
+  "note": "Synthetic manifest in the shape of an MCP tools/list result. No public server stands behind it.",
+  "tools": [
+    {
+      "name": "get_payment",
+      "description": "Look up one payment by id: amount, currency, status and the order it belongs to.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {"payment_id": {"type": "string"}},
+        "required": ["payment_id"]
+      },
+      "annotations": {"readOnlyHint": true}
+    },
+    {
+      "name": "issue_refund",
+      "description": "Refund a payment, in full or in part, to the original payment method.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "payment_id": {"type": "string"},
+          "amount": {"type": "number"},
+          "reason": {"type": "string"}
+        },
+        "required": ["payment_id", "amount"]
+      },
+      "annotations": {"readOnlyHint": false, "destructiveHint": true}
+    }
+  ]
+}

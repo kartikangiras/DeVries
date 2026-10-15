@@ -1,0 +1,27 @@
+{
+  "server": "crm",
+  "synthetic": true,
+  "note": "Synthetic manifest in the shape of an MCP tools/list result. No public server stands behind it.",
+  "tools": [
+    {
+      "name": "search_contacts",
+      "description": "Search customer contacts by name, company or email. Returns names, roles, phone numbers and email addresses.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {"query": {"type": "string"}, "limit": {"type": "integer"}},
+        "required": ["query"]
+      },
+      "annotations": {"readOnlyHint": true}
+    },
+    {
+      "name": "get_account",
+      "description": "Return one customer account: contract value, renewal date, open opportunities and notes from the account team.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {"account_id": {"type": "string"}},
+        "required": ["account_id"]
+      },
+      "annotations": {"readOnlyHint": true}
+    }
+  ]
+}
