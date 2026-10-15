@@ -1,0 +1,126 @@
+/*
+ * Revision 2 of the app: the overview picture, the tabs that replaced three places in the nav, the
+ * queries drawer, the change-to-your-config panel under the approval bar, the import page, and the
+ * OWASP class on a finding. Same measurements and tokens as app.css (Manthan's, see ui/THIRD_PARTY_NOTICES.md).
+ */
+
+/* ---- the overview: counts, then the three columns with ribbons between them */
+.ov-counts { display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 8px 18px; margin: 0; padding: 14px 18px; border: 1px solid var(--chart-line); border-radius: 14px; }
+.ov-counts div { display: flex; flex-direction: column; gap: 2px; }
+.ov-counts dd { font: 500 24px/1 var(--mono); letter-spacing: -0.03em; font-variant-numeric: tabular-nums; color: var(--ink-strong); }
+.ov-counts dt { font: 400 10.5px var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--chart-ash); }
+.ov-counts div.hot dd { color: var(--chart-hot); }
+.overview { padding: 12px 10px 6px; border: 1px solid var(--chart-line); border-radius: 18px; }
+.overview svg { display: block; width: 100%; height: auto; font-family: var(--sans); overflow: visible; }
+.ov-caption { font: 400 10.5px var(--mono); letter-spacing: 0.1em; fill: var(--chart-ash); }
+.ov-fold { font: 400 10.5px var(--mono); fill: var(--chart-ash); }
+.ov-ribbon .hit { fill: none; stroke: transparent; stroke-width: 18; }
+.ov-ribbon .line { fill: none; stroke: var(--chart-hot); stroke-linecap: round; opacity: 0.55; transition: opacity 200ms var(--ease-out-quart), stroke-width 200ms var(--ease-out-quart); }
+.ov-ribbon.trifecta .line { stroke: var(--chart-bone); }
+.ov-ribbon.lit .line { opacity: 1; }
+.ov-ribbon.dim .line { opacity: 0.14; }
+.ov-ribbon { cursor: pointer; }
+.ov-node { transition: opacity 200ms var(--ease-out-quart); }
+.ov-node.dim { opacity: 0.35; }
+.ov-node circle { fill: var(--chart-hot); stroke: var(--bg); stroke-width: 2.5; }
+.ov-node.action circle { fill: var(--bg); stroke: var(--chart-hot); stroke-width: 2; }
+.ov-node.agent rect { fill: var(--chart-tile); stroke: var(--chart-line-strong); stroke-width: 1; }
+.ov-node.agent.worst rect { stroke: var(--chart-hot); }
+.ov-name { font: 500 12.5px var(--sans); fill: var(--ink-strong); }
+.ov-sub { font: 400 10.5px var(--mono); fill: var(--chart-ash); }
+.ov-node.agent.worst .ov-sub { fill: var(--chart-hot); }
+
+/* ---- tabs inside pages (open/done, runs/fixes) sit under the header, flush left */
+.page > .tabs, .ledger > .tabs { margin-top: -12px; }
+
+/* ---- the OWASP class on a row and in the strip */
+.owasp { padding: 2px 8px; font: 400 10.5px var(--mono); letter-spacing: 0.06em; color: var(--ink-muted); border: 1px solid var(--rule); border-radius: 999px; white-space: nowrap; }
+.strip .owasp { margin-left: 8px; }
+
+/* ---- the hops, folded */
+.hops-fold summary { display: flex; align-items: baseline; gap: 14px; cursor: pointer; list-style: none; }
+.hops-fold summary::-webkit-details-marker { display: none; }
+.hops-fold summary .eyebrow::before { content: "+ "; color: var(--ink-faint); }
+.hops-fold[open] summary .eyebrow::before { content: "− "; }
+.hops-fold .fold-count { font-size: 11.5px; color: var(--ink-faint); }
+.hops-fold .hops { margin-top: 14px; }
+.takeaway a { color: var(--ink); }
+
+/* ---- the queries drawer */
+.drawer-scrim { position: fixed; inset: 0; z-index: 40; background: rgb(0 0 0 / 0.45); animation: fade-up 180ms var(--ease-out-quart) both; }
+.drawer { position: absolute; top: 0; right: 0; bottom: 0; width: min(1180px, 96vw); display: flex; flex-direction: column; background: var(--bg); border-left: 1px solid var(--rule); box-shadow: -24px 0 60px rgb(0 0 0 / 0.45); animation: drawer-in 260ms var(--ease-out-quart) both; }
+@keyframes drawer-in { from { transform: translateX(24px); opacity: 0; } to { transform: none; opacity: 1; } }
+.drawer-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; padding: 22px 28px 14px; border-bottom: 1px solid var(--rule-soft); }
+.drawer-head h2 { margin-top: 6px; font: 500 18px/1.2 var(--mono); letter-spacing: -0.01em; color: var(--ink-strong); }
+.drawer-close { display: inline-flex; padding: 8px; border-radius: var(--radius-sm); color: var(--ink-faint); }
+.drawer-close:hover { background: var(--surface); color: var(--ink-strong); }
+.drawer .catalog { flex: 1; min-height: 0; }
+
+/* ---- the change to your config, under the approval line */
+.approval { flex-direction: column; align-items: stretch; gap: 0; }
+.approval-top { display: flex; align-items: center; justify-content: space-between; gap: 28px; }
+.approval-seeline { margin-top: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.approval-see { font: 400 11.5px var(--mono); color: var(--accent); }
+.approval-see:hover { text-decoration: underline; }
+.approval-draft { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--rule); display: flex; flex-direction: column; gap: 10px; max-height: 46vh; overflow: auto; }
+.draft-head { display: flex; align-items: baseline; gap: 14px; }
+.draft-path { font: 400 11.5px var(--mono); color: var(--ink-muted); overflow-wrap: anywhere; }
+.draft-diff { max-height: 280px; margin: 0; padding: 12px 14px; overflow: auto; font: 400 12px/1.6 var(--mono); color: var(--ink-muted); background: var(--bg); border: 1px solid var(--rule-soft); border-radius: 6px; white-space: pre; }
+.draft-diff .add { color: var(--accent); }
+.draft-diff .del { color: var(--danger); }
+.draft-diff .hunk { color: var(--ink-faint); }
+.draft-edit { width: 100%; min-height: 220px; padding: 12px 14px; font: 400 12px/1.6 var(--mono); color: var(--ink-strong); background: var(--bg); border: 1px solid var(--rule); border-radius: 6px; resize: vertical; }
+.draft-edit:focus { border-color: var(--accent); outline: none; }
+.draft-note { max-width: 100ch; font-size: 12.5px; line-height: 1.55; color: var(--ink-muted); }
+.draft-write { font-size: 12.5px; color: var(--ink); }
+.draft-write code { color: var(--ink-muted); }
+.draft-write input { margin-right: 4px; accent-color: var(--accent); }
+.policy summary { font: 400 11.5px var(--mono); color: var(--ink-muted); cursor: pointer; }
+.policy pre { margin-top: 8px; }
+
+/* ---- the import page */
+.import { display: flex; flex-direction: column; gap: 18px; }
+.import-field { display: flex; flex-direction: column; gap: 8px; }
+.import-field.short { min-width: 220px; }
+.import textarea, .import input[type="text"], .import select { width: 100%; padding: 10px 12px; font: 400 13px/1.55 var(--mono); color: var(--ink-strong); background: var(--surface); border: 1px solid var(--rule); border-radius: var(--radius-sm); }
+.import select { font-family: var(--sans); appearance: none; -webkit-appearance: none; }
+.import textarea:focus, .import input:focus, .import select:focus { border-color: var(--accent); outline: none; }
+.import-row { display: flex; align-items: flex-end; flex-wrap: wrap; gap: 16px; }
+.import .toggle { align-self: flex-start; }
+.switch-import button .switch-name { color: var(--accent); }
+
+@media (max-width: 860px) {
+  .drawer { width: 100vw; }
+  .approval-top { flex-direction: column; align-items: stretch; gap: 12px; }
+  .ov-counts { grid-template-columns: repeat(3, 1fr); }
+}
+
+/* ---- revision 3: the nav in groups, the finding as a workflow, the analysis block */
+.nav-group { display: flex; flex-direction: column; gap: 2px; margin-bottom: 14px; }
+.nav-group-label { padding: 0 12px 6px; font: 400 10px var(--mono); letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-ghost); }
+.workflow { display: flex; align-items: stretch; gap: 0; padding: 0 36px; border-bottom: 1px solid var(--rule); background: var(--bg); }
+.workflow-step { display: flex; align-items: center; gap: 10px; padding: 12px 18px 11px 0; margin-right: 22px; border: 0; border-bottom: 2px solid transparent; background: none; color: var(--ink-muted); text-align: left; cursor: pointer; transition: color 160ms var(--ease-out-quart), border-color 160ms var(--ease-out-quart); }
+.workflow-step:hover { color: var(--ink-strong); }
+.workflow-step.on { color: var(--ink-strong); border-bottom-color: var(--accent); }
+.workflow-step.aside { margin-left: auto; margin-right: 0; }
+.workflow-n { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; font: 500 11px var(--mono); color: var(--ink-faint); border: 1px solid var(--rule); border-radius: 50%; }
+.workflow-step.on .workflow-n { color: var(--accent-ink); background: var(--accent); border-color: var(--accent); }
+.workflow-text { display: flex; flex-direction: column; gap: 1px; }
+.workflow-label { font: 500 13px var(--sans); }
+.workflow-sub { font: 400 10.5px var(--mono); color: var(--ink-faint); white-space: nowrap; }
+.workflow-step.on .workflow-sub { color: var(--ink-muted); }
+.analysis-rows { display: flex; flex-direction: column; gap: 10px; padding-left: 0; list-style: none; }
+.analysis-rows li { position: relative; padding-left: 18px; font-size: 13.5px; line-height: 1.55; color: var(--ink-muted); }
+.analysis-rows li::before { content: ""; position: absolute; left: 0; top: 9px; width: 7px; height: 7px; border-radius: 50%; background: var(--accent); }
+.analysis-rows strong { font-weight: 500; color: var(--ink-strong); }
+.step-next { margin-top: 8px; font: 500 13px var(--sans); }
+.step-next .link { color: var(--accent); }
+.link-plain { padding: 0; border: 0; background: none; color: inherit; font: inherit; cursor: pointer; text-align: left; }
+.link-plain:hover { text-decoration: underline; }
+.verdict.on { background: var(--accent-tint); outline: 1px solid var(--accent-line); border-radius: 8px; }
+.cut-block .cut-note { margin: 0; }
+.servers .table td { vertical-align: top; }
+@media (max-width: 860px) {
+  .workflow { padding: 0 16px; overflow-x: auto; }
+  .workflow-sub { display: none; }
+}
