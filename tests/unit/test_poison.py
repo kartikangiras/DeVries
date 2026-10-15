@@ -3,9 +3,9 @@
 import json
 import textwrap
 
-from cistern.analysis import findings
-from cistern.ingest.manifests import poison_flags
-from cistern.ingest.scenario_loader import load_scenario
+from devries.analysis import findings
+from devries.ingest.manifests import poison_flags
+from devries.ingest.scenario_loader import load_scenario
 
 CLEAN = [
     "Read a ticket by id and return its fields.",

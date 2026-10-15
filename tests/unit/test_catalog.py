@@ -2,9 +2,9 @@
 
 import pytest
 
-from cistern.errors import ForbiddenWrite, UnknownQuery, UnknownScenario
-from cistern.graph import keys
-from cistern.graph.catalog import CATALOG, to_markdown
+from devries.errors import ForbiddenWrite, UnknownQuery, UnknownScenario
+from devries.graph import keys
+from devries.graph.catalog import CATALOG, to_markdown
 from helpers import build, tool
 
 HOSTILE = [

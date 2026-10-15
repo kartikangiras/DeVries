@@ -1,6 +1,8 @@
-# Cistern
+<p align="center"><img src="ui/public/brand/wordmark.png" width="440" alt="DeVries"></p>
 
-Cistern finds the paths by which untrusted text can reach a high-impact action in a system of AI agents, shows each one hop by hop, and finds the smallest change to the configuration that closes it without breaking the work the agents are there to do. It models agents, MCP tools, data sources and resources as a graph in [FalkorDB](https://www.falkordb.com/). Every finding and every verdict on a fix is a graph query, and every fix is tested in a throwaway copy of the graph before a person is asked to approve it.
+# DeVries
+
+DeVries finds the paths by which untrusted text can reach a high-impact action in a system of AI agents, shows each one hop by hop, and finds the smallest change to the configuration that closes it without breaking the work the agents are there to do. It models agents, MCP tools, data sources and resources as a graph in [FalkorDB](https://www.falkordb.com/). Every finding and every verdict on a fix is a graph query, and every fix is tested in a throwaway copy of the graph before a person is asked to approve it.
 
 Built for **Graph Hacks: Context for AI Agents** (WeMakeDevs × FalkorDB), **Track 01, Agents That Act on Connected Data**.
 
@@ -33,7 +35,7 @@ Three things to know before reading further:
 
 ## What it does
 
-An agent that reads a customer ticket and can also issue a refund is one prompt injection away from issuing the wrong refund. Whether that is possible is a question about the configuration: which agent may call which tool, who delegates to whom, what each tool reads and what it acts on. Cistern answers it from the graph of that configuration.
+An agent that reads a customer ticket and can also issue a refund is one prompt injection away from issuing the wrong refund. Whether that is possible is a question about the configuration: which agent may call which tool, who delegates to whom, what each tool reads and what it acts on. DeVries answers it from the graph of that configuration.
 
 1. **Scan.** Seven rules turn the configuration into a second layer of edges that say where text and data can flow. Two graph queries over that layer find every *injection path* (an untrusted source reaches a high-impact resource) and every *lethal trifecta* (one agent is reached by untrusted text and by private data, and can reach a way out of the organisation).
 2. **Explain.** Each finding comes with its path, hop by hop, each hop naming the rule that made it and the config edge behind it. A third kind of finding, *manifest drift*, has no path: a server's tool definitions are not the ones loaded before, and the finding stands until a person accepts them. The longest in the bundled scenarios is eleven hops, through three agents, a push to a branch and a deploy.
@@ -43,7 +45,7 @@ An agent that reads a customer ticket and can also issue a refund is one prompt 
 
 ## What FalkorDB does here
 
-Without FalkorDB, Cistern cannot compute a path, rank a chokepoint or verify a fix. It is the only store, and the work is done inside it:
+Without FalkorDB, DeVries cannot compute a path, rank a chokepoint or verify a fix. It is the only store, and the work is done inside it:
 
 | What | How |
 | --- | --- |
@@ -90,16 +92,16 @@ acme_dev: 27 nodes, 34 config edges, 4 injection and 3 trifecta findings in 31 m
 acme_exec: 12 nodes, 13 config edges, 0 injection and 2 trifecta findings in 18 ms
 acme_support: 15 nodes, 14 config edges, 1 injection and 0 trifecta findings in 8 ms
   fnd:dce0910d42 injection: src:customer-tickets -> tool:helpdesk.get_ticket -> agent:support-bot -> tool:payments.issue_refund -> res:payments-api
-cistern_self: 19 nodes, 36 config edges, 0 injection and 0 trifecta findings in 5 ms
+devries_self: 19 nodes, 36 config edges, 0 injection and 0 trifecta findings in 5 ms
 ```
 
-Other targets: `make probe` checks the FalkorDB behaviours the design depends on, `make dev` runs the app with reload beside the Vite dev server, `make mcp` runs the MCP server over stdio, `make mcp-config` prints the entry for an MCP client's config file, `make queries-doc` rewrites [docs/QUERIES.md](docs/QUERIES.md), `make self-manifest` rewrites the manifest Cistern audits itself with, and `make agent-eval` compares the auditor with the baseline search.
+Other targets: `make probe` checks the FalkorDB behaviours the design depends on, `make dev` runs the app with reload beside the Vite dev server, `make mcp` runs the MCP server over stdio, `make mcp-config` prints the entry for an MCP client's config file, `make queries-doc` rewrites [docs/QUERIES.md](docs/QUERIES.md), `make self-manifest` rewrites the manifest DeVries audits itself with, and `make agent-eval` compares the auditor with the baseline search.
 
-To let a model drive the auditor, put `ANTHROPIC_API_KEY` in `.env`. `.env.example` lists the other settings: the model, a daily spend ceiling, a bearer token for `/mcp`, the session limits, and the hosted mode. `CISTERN_PUBLIC=true` is the setting for a public address: the import takes only what is pasted and launches nothing, nothing is ever written to a file, imports and runs are rationed per address, visitor copies are dropped past a FalkorDB memory ceiling, and the app waits for the database at start instead of starting empty. The host port for FalkorDB is 6380, not 6379, because many machines already run a Redis there.
+To let a model drive the auditor, put `ANTHROPIC_API_KEY` in `.env`. `.env.example` lists the other settings: the model, a daily spend ceiling, a bearer token for `/mcp`, the session limits, and the hosted mode. `DEVRIES_PUBLIC=true` is the setting for a public address: the import takes only what is pasted and launches nothing, nothing is ever written to a file, imports and runs are rationed per address, visitor copies are dropped past a FalkorDB memory ceiling, and the app waits for the database at start instead of starting empty. The host port for FalkorDB is 6380, not 6379, because many machines already run a Redis there.
 
 ## A tour in five minutes
 
-The sidebar is in four groups: **Findings** (Inbox, Done), **Fixes** (Ledger, What if), **System** (Graph, Servers, Queries) and **Audit** (Runs, Import). The switch at its top changes scenario. A finding is worked through in three steps, **Problem**, **Fix** and **Options**, with the run's **Trace** beside them. Every chart has two renderers: Cistern's own, laid out by ELK and drawn with React Flow, and FalkorDB's canvas component on the same nodes; the switch over each chart remembers your choice. Anything you change is changed in your own copy of the scenario; the arrow at the foot of the sidebar gives you the original back.
+The sidebar is in four groups: **Findings** (Inbox, Done), **Fixes** (Ledger, What if), **System** (Graph, Servers, Queries) and **Audit** (Runs, Import). The switch at its top changes scenario. A finding is worked through in three steps, **Problem**, **Fix** and **Options**, with the run's **Trace** beside them. Every chart has two renderers: DeVries's own, laid out by ELK and drawn with React Flow, and FalkorDB's canvas component on the same nodes; the switch over each chart remembers your choice. Anything you change is changed in your own copy of the scenario; the arrow at the foot of the sidebar gives you the original back.
 
 1. **Acme support desk → Inbox.** One finding: customer tickets can reach the payments API. The audit the app ran at start has already tested fixes for it in sandbox graphs: both revokes fail (the refund workflow needs those tools), stopping the tool reading tickets fails for the same reason, the gate passes and so does a split. The row reads "Awaiting nod" and carries its OWASP class. Open it.
 2. **Step 1, the problem.** The brief says how in one paragraph with numbered evidence; the chart draws the four hops as cards in lanes, with the hop the fix would cut marked; "Whole system" draws everything around them, and "FalkorDB canvas" draws the same nodes on FalkorDB's own component. The hop table folds out under the chart with the rule and the config edge behind each hop, and the analysis under that reads the agents on the path against Meta's Rule of Two, names the workflows that constrain a fix, and gives the OWASP class.
@@ -109,9 +111,9 @@ The sidebar is in four groups: **Findings** (Inbox, Done), **Fixes** (Ledger, Wh
 6. **Fixes → Ledger** is every plan a sandbox was asked about, across findings, with its verdict and the literal change; select a plan to see the finding's path as that plan would leave it. **Fixes → What if** tests a change that widens the config: on *Acme dev team*, "Release bot could call request" opens one new finding; under it, the cheapest cut as a Claude Code `permissions` block and Docker MCP Gateway commands.
 7. **Acme executive office.** Here the gate fails, because the daily digest runs unattended and nobody is there to approve; the audit proposes quarantining the inbox reader instead, and that closes two findings at once.
 8. **Acme dev team.** Seven findings, closed by two fixes in two rounds. One finding is the eleven-hop path: an issue is read by the triage agent, handed to the planner and the coder, pushed to the main branch, read back from the repository by the release bot, and deployed.
-9. **System → Graph.** The overview: untrusted sources on the left, the agents they reach in the middle, the high-impact actions on the right, and only the open paths drawn between them, as sankey ribbons whose width grows with the number of routes. The title is a sentence read from the graph, each agent carries its Rule of Two letters, and the counts strip gives the cheapest cut's cost by `algo.maxFlow`. "All nodes" draws everything as cards in lanes, on Cistern's chart or on FalkorDB's canvas (force or tree); "More" holds the layers, Communities, Most central, the Cheapest cut and the edges as a table.
+9. **System → Graph.** The overview: untrusted sources on the left, the agents they reach in the middle, the high-impact actions on the right, and only the open paths drawn between them, as sankey ribbons whose width grows with the number of routes. The title is a sentence read from the graph, each agent carries its Rule of Two letters, and the counts strip gives the cheapest cut's cost by `algo.maxFlow`. "All nodes" draws everything as cards in lanes, on DeVries's chart or on FalkorDB's canvas (force or tree); "More" holds the layers, Communities, Most central, the Cheapest cut and the edges as a table.
 10. **Graph → More → Cheapest cut.** `algo.maxFlow` marks the cheapest set of hops that separates every untrusted source from every high-impact resource, and shows the cut as a Claude Code `permissions` block and as Docker MCP Gateway commands. On the support desk the cut is one revoke, which the sandbox refuses: the cut says where to look, the sandbox says what is safe.
-11. **Cistern itself.** Cistern's own MCP tools, loaded as a scenario. Nothing is open, and only because `apply_fix` needs a person: take that gate away and two injection paths open.
+11. **DeVries itself.** DeVries's own MCP tools, loaded as a scenario. Nothing is open, and only because `apply_fix` needs a person: take that gate away and two injection paths open.
 12. **Graph → More → Communities** colours the cards' edges by `algo.labelPropagation` over the config edges; **Most central** rings the five agents and tools the most flow passes through, by `algo.betweenness`; clicking an agent shows its PageRank and its Rule of Two badges.
 13. **Inbox → Rule of Two.** Under the findings, a scorecard: for each agent, whether untrusted input reaches it, whether private data does, and whether it can act. On the executive office the assistant holds all three and runs unattended, which Meta's rule says it must not.
 14. **System → Servers.** Each MCP server with its tools, who holds them and the findings that run through them, and "test removing it": a sandbox says what taking the server out would close and break. On the dev team, removing the HTTP server closes five findings and breaks nothing.
@@ -237,7 +239,7 @@ RETURN w.id AS workflow, 'data' AS kind, d.id AS missing, w.mode AS mode, false 
 
 `$max_depth` is the node count of the graph, so the search is exhaustive. The paths a finding shows come from a separate query, `evidence.pair_paths` (`algo.SPpaths`), which never decides anything: a finding exists because the verdict query says so, and the path is how it is explained.
 
-**A verdict.** To judge a plan, Cistern copies the graph (`GRAPH.COPY`), applies the plan's fixes to the copy, rebuilds the flow layer, runs the three queries, and compares with the same three queries on the original. The plan passes if every finding it targets is gone, no finding exists that did not before, and no workflow is broken that was not before. Then the copy is deleted. A supervised workflow can live with a gate, because someone is there to approve; an autonomous one cannot, and that difference is what makes the right fix depend on the graph.
+**A verdict.** To judge a plan, DeVries copies the graph (`GRAPH.COPY`), applies the plan's fixes to the copy, rebuilds the flow layer, runs the three queries, and compares with the same three queries on the original. The plan passes if every finding it targets is gone, no finding exists that did not before, and no workflow is broken that was not before. Then the copy is deleted. A supervised workflow can live with a gate, because someone is there to approve; an autonomous one cannot, and that difference is what makes the right fix depend on the graph.
 
 **The fixes.** Cost orders the search; it is a preference, not a measurement.
 
@@ -259,7 +261,7 @@ A plan is one to three fixes; each fix after the first adds a point. The baselin
 
 ## The queries and algorithms
 
-Every Cypher statement the product runs is a named entry in [`cistern/graph/catalog.py`](cistern/graph/catalog.py), sent with parameters and never built from strings. There are 63. **[docs/QUERIES.md](docs/QUERIES.md) is the full list with the Cypher of each**, generated from the catalog (a test fails if it is out of date). The app serves the same list at `/api/queries`.
+Every Cypher statement the product runs is a named entry in [`devries/graph/catalog.py`](devries/graph/catalog.py), sent with parameters and never built from strings. There are 63. **[docs/QUERIES.md](docs/QUERIES.md) is the full list with the Cypher of each**, generated from the catalog (a test fails if it is out of date). The app serves the same list at `/api/queries`.
 
 | Group | Queries | Purpose |
 | --- | --- | --- |
@@ -306,9 +308,9 @@ flowchart LR
   Ops --> Engine --> Catalog --> FDB
 ```
 
-- **One path to the graph.** The UI's routes and the MCP tools call the same functions in `cistern/ops.py`. The auditor is itself an MCP client of the same server, so what it can do is exactly what any MCP client can do.
+- **One path to the graph.** The UI's routes and the MCP tools call the same functions in `devries/ops.py`. The auditor is itself an MCP client of the same server, so what it can do is exactly what any MCP client can do.
 - **Approval lives in one place.** A person approves through the API, by name. There is no MCP tool for it, and the model is never offered one.
-- **A file is written only by a person.** The MCP tool `apply_fix` changes the graph and nothing else. The file a scenario came from is written by a click in the review panel, after the diff has been read, or by `python -m cistern.apply --yes` typed at a prompt. A public site never writes a file.
+- **A file is written only by a person.** The MCP tool `apply_fix` changes the graph and nothing else. The file a scenario came from is written by a click in the review panel, after the diff has been read, or by `python -m devries.apply --yes` typed at a prompt. A public site never writes a file.
 - **Three kinds of graph, told apart by key.** `scn:` is a scenario, `ses:<session>:` is one visitor's copy, `sbx:` is a sandbox. The client refuses a write that the key does not allow: an analysis query cannot write, a fix cannot touch a scenario graph outside apply, and a what-if change can only ever run on a sandbox.
 - **Events.** Scans, findings, proposals, decisions and every step of an audit run go to the browser over one server-sent event stream.
 - **Self-check.** At start, and on each health check, a small graph with a known injection and a known trifecta is built and scanned; if FalkorDB stops finding them, `/api/health` says so.
@@ -333,7 +335,7 @@ An audit run moves through phases: scan, investigate, mitigate, wait for approva
 | `acme_support` | gate the refund call (2, 5) | the same, three runs of three | 2–3 | 5–6 | 0.09–0.11 |
 | `acme_exec` | quarantine the inbox reader (2, 8) | the same, three of three | 2–5 | 6–7 | 0.12–0.16 |
 | `acme_dev` | gate the coder's push (2, 7) | the same, three of three | 2 | 6 | 0.14–0.16 |
-| `cistern_self` | nothing is open | | | | |
+| `devries_self` | nothing is open | | | | |
 
 Nine runs, nine matches, each in fewer sandboxes than the search because the model reads the verdict of the failed revoke and goes straight to the gate. A full run on the dev team through the app, with both proposals approved, took 28 steps over two rounds and closed all seven findings; its report was the model's own, with every id grounded. No refusal was seen. A run costs about ten to sixteen cents at list price.
 
@@ -341,14 +343,14 @@ Nine runs, nine matches, each in fewer sandboxes than the search because the mod
 
 ## Use it from an MCP client
 
-The MCP server speaks stdio, and the app serves the same tools at `/mcp` (streamable HTTP; set `CISTERN_MCP_TOKEN` to require a bearer token). For Claude Desktop, keep `make up` running and add what `make mcp-config` prints to `claude_desktop_config.json`:
+The MCP server speaks stdio, and the app serves the same tools at `/mcp` (streamable HTTP; set `DEVRIES_MCP_TOKEN` to require a bearer token). For Claude Desktop, keep `make up` running and add what `make mcp-config` prints to `claude_desktop_config.json`:
 
 ```json
 {
   "mcpServers": {
-    "cistern": {
+    "devries": {
       "command": "/absolute/path/to/uv",
-      "args": ["run", "--directory", "/absolute/path/to/this/folder", "python", "-m", "cistern.mcp_server"]
+      "args": ["run", "--directory", "/absolute/path/to/this/folder", "python", "-m", "devries.mcp_server"]
     }
   }
 }
@@ -373,19 +375,19 @@ Try: "scan acme_support, show me how a customer ticket can reach the payments AP
 
 ## Import your own install
 
-The four scenarios are files. Cistern can also take its graph from the systems you actually run:
+The four scenarios are files. DeVries can also take its graph from the systems you actually run:
 
 ```bash
-uv run python -m cistern.ingest --import claude-desktop                 # every server in claude_desktop_config.json
-uv run python -m cistern.ingest --import cursor                         # .cursor/mcp.json
-uv run python -m cistern.ingest --import "npx -y @modelcontextprotocol/server-filesystem ~/notes"
-uv run python -m cistern.ingest --import https://host.example/mcp       # a streamable-HTTP server
-uv run python -m cistern.ingest --import path/to/tools.json             # a saved tools/list
+uv run python -m devries.ingest --import claude-desktop                 # every server in claude_desktop_config.json
+uv run python -m devries.ingest --import cursor                         # .cursor/mcp.json
+uv run python -m devries.ingest --import "npx -y @modelcontextprotocol/server-filesystem ~/notes"
+uv run python -m devries.ingest --import https://host.example/mcp       # a streamable-HTTP server
+uv run python -m devries.ingest --import path/to/tools.json             # a saved tools/list
 ```
 
 Each server is launched or called, with your own environment and credentials, and its `tools/list` becomes a manifest. The app container mounts `scenarios/` and `manifests/` from this folder, so an import made here shows up in the running app. The draft scenario has one agent, the client, holding every tool, and one data source and one resource per server, both **unknown**: nothing in an import is a finding until you say what is untrusted and what matters. Open the scenario in the UI and the Inbox asks you, with guesses from the servers' names; save, and the scan runs on your answer. `--label src:filesystem=private` does the same from the command line. What the import shows is the thing every MCP scanner shows and no scenario file can: your own setup, as a graph, audited.
 
-The same import is in the app: the last entry of the scenario switch, or "Paste your config" on the landing page. On this machine the page takes a pasted client config or `tools/list`, or any source the command line takes, and the import joins the shared scenarios. On a public site (`CISTERN_PUBLIC=true`) it takes only what is pasted, asks servers with a `url` for their tools over HTTPS with a timeout and a size cap, skips every `command` and says so, keeps the result in a graph that exists for that session alone, and rations imports per address. Either way, once the sources and resources are labelled the audit runs by itself to its first proposal. Launching a command is the exception, not the rule: the scanners warn that scanning a config runs its stdio servers, and a saved or fetched `tools/list` shows the same tools without running anything.
+The same import is in the app: the last entry of the scenario switch, or "Paste your config" on the landing page. On this machine the page takes a pasted client config or `tools/list`, or any source the command line takes, and the import joins the shared scenarios. On a public site (`DEVRIES_PUBLIC=true`) it takes only what is pasted, asks servers with a `url` for their tools over HTTPS with a timeout and a size cap, skips every `command` and says so, keeps the result in a graph that exists for that session alone, and rations imports per address. Either way, once the sources and resources are labelled the audit runs by itself to its first proposal. Launching a command is the exception, not the rule: the scanners warn that scanning a config runs its stdio servers, and a saved or fetched `tools/list` shows the same tools without running anything.
 
 ### Fix the real configuration
 
@@ -400,12 +402,12 @@ A plan that passed its sandbox is then compiled into the change that would enfor
 | Docker MCP Gateway | the gateway has no approval step, so the deny, with a note | `docker mcp profile tools … --disable <server>.<tool>` | a note |
 | A scenario file | `gate: human_approval` on the grant's line, comments kept | the line removed | the file rewritten, with a note |
 
-The panel shows the path, the diff (secrets in `env` never appear in it), a note on what the target can and cannot express, and a text area to edit. Approve applies the plan to the graph; with "Also write it" ticked it also writes the file, keeping `<file>.cistern.bak` beside it and replacing atomically, then reloads the scenario from the file and records a receipt on the draft: the hash before and after, who, when, and which findings closed. If the file changed since the import, the write is refused and the panel says to import again. The same from a prompt: `uv run python -m cistern.apply --scenario <name> --mitigation <mit:id>` prints the diff, and `--yes` writes it. Nothing writes a file but those two.
+The panel shows the path, the diff (secrets in `env` never appear in it), a note on what the target can and cannot express, and a text area to edit. Approve applies the plan to the graph; with "Also write it" ticked it also writes the file, keeping `<file>.devries.bak` beside it and replacing atomically, then reloads the scenario from the file and records a receipt on the draft: the hash before and after, who, when, and which findings closed. If the file changed since the import, the write is refused and the panel says to import again. The same from a prompt: `uv run python -m devries.apply --scenario <name> --mitigation <mit:id>` prints the diff, and `--yes` writes it. Nothing writes a file but those two.
 
 ### In CI
 
 ```bash
-uv run python -m cistern.ingest --import .mcp.json --label src:github=untrusted --label res:github=high --fail-on open
+uv run python -m devries.ingest --import .mcp.json --label src:github=untrusted --label res:github=high --fail-on open
 ```
 
 exits 1 with the open findings on stdout, so a config in a repository is checked on each change. [deploy/ci.yml](deploy/ci.yml) is a GitHub Actions example that starts FalkorDB as a service and runs it.
@@ -414,14 +416,14 @@ Two more kinds of finding come with it. **Manifest drift**: every tool definitio
 
 ## Scenarios and data
 
-**All of the data is synthetic.** No real organisation, system, customer or credential appears anywhere. The agents, tools, sources, resources, workflows and trust labels of the three Acme scenarios were invented for this project, and their tool manifests are synthetic files in the shape of an MCP `tools/list` result; each says so in its own `note` field. The fourth scenario uses Cistern's real tool list, generated from the running server.
+**All of the data is synthetic.** No real organisation, system, customer or credential appears anywhere. The agents, tools, sources, resources, workflows and trust labels of the three Acme scenarios were invented for this project, and their tool manifests are synthetic files in the shape of an MCP `tools/list` result; each says so in its own `note` field. The fourth scenario uses DeVries's real tool list, generated from the running server.
 
 | Scenario | What is in it | What it shows |
 | --- | --- | --- |
 | `acme_support` | A support bot that reads tickets and can issue refunds | One four-hop injection path. Revoking breaks the refund workflow; a gate passes; so does a split |
 | `acme_exec` | An executive assistant that delegates inbox reading and sends a daily digest | Two trifectas. The gate fails because the digest is autonomous; quarantining the delegation closes both |
 | `acme_dev` | A planner that delegates to a triage agent and a coder, and a release bot | Seven findings, among them an eleven-hop path through a stored write (rule 7). Two fixes in two rounds close all seven |
-| `cistern_self` | Cistern's own eleven MCP tools and its auditor | Nothing open, and only because `apply_fix` is gated |
+| `devries_self` | DeVries's own eleven MCP tools and its auditor | Nothing open, and only because `apply_fix` is gated |
 
 A scenario is a YAML file in `scenarios/` that points at manifests in `manifests/`. Each file carries an `expect` block with the findings it should produce and the kind of fix that should win; `make seed` fails if a scan disagrees with it.
 
@@ -441,13 +443,13 @@ A scenario is a YAML file in `scenarios/` that points at manifests in `manifests
 `make e2e` drives the running app in headless Chrome: the plans the start-up audit proposed, the finding's three steps, the review panel's diff, an approval and the finding closing on two scenarios; a rejection followed by approving the split; both fixes of `acme_dev`; the sankey overview and the whole graph on both renderers, the cheapest cut and its policy, the servers page, the what-if page, the queries drawer, the import page, deep links, and three screen widths. It fails on any console error, any 4xx or 5xx, and any request to another origin. Run it against an app started without a model key, so a run costs nothing:
 
 ```bash
-ANTHROPIC_API_KEY= uv run uvicorn cistern.app:app --port 8010    # in one terminal
+ANTHROPIC_API_KEY= uv run uvicorn devries.app:app --port 8010    # in one terminal
 make e2e APP_URL=http://127.0.0.1:8010                          # in another
 ```
 
 ## Deployment
 
-**Nothing is deployed.** The owner decided not to host it for the event. What a public address needs in the app is built and tested: `CISTERN_PUBLIC=true` (see [Run it](#run-it)), the retry for the database at start, the memory ceiling for visitor copies, and the per-address rationing.
+**Nothing is deployed.** The owner decided not to host it for the event. What a public address needs in the app is built and tested: `DEVRIES_PUBLIC=true` (see [Run it](#run-it)), the retry for the database at start, the memory ceiling for visitor copies, and the per-address rationing.
 
 What exists: the `Dockerfile` builds the UI and the app into one image that runs as a non-root user with a health check, and `docker-compose.yml` runs it beside FalkorDB, with the database published on the local machine only. [deploy/](deploy/README.md) adds what a public address needs: a compose overlay that puts Caddy in front for HTTPS, turns on secure cookies, and refuses to start without a token for `/mcp`; and a script that checks `/api/health` from outside. The overlay was brought up on a laptop and the whole loop was driven through the proxy in a browser. It has not been run on a server.
 
@@ -484,27 +486,27 @@ At run time the only model involved is the auditor's own use of Claude, describe
 
 The look and the structure of the UI are not original, and are not meant to pass as original.
 
-- The interface is adapted from [Manthan](https://github.com/akash-mondal/manthan) (Copyright 2026 Manthan Engineering, Apache License 2.0): its design tokens, its type, its sidebar shell, the structure of its inbox, case workspace, approval ledger and audit log, and the structure and motion of its landing page. Nothing is copied file for file; it is rewritten for Cistern's data, the accent is iris where Manthan's is emerald, and Manthan's name, logo, videos and text are not used.
+- The interface is adapted from [Manthan](https://github.com/akash-mondal/manthan) (Copyright 2026 Manthan Engineering, Apache License 2.0): its design tokens, its type, its sidebar shell, the structure of its inbox, case workspace, approval ledger and audit log, and the structure and motion of its landing page. Nothing is copied file for file; it is rewritten for DeVries's data, the accent is iris where Manthan's is emerald, and Manthan's name, logo, videos and text are not used.
 - The marks of MCP servers on the landing page are from [simple-icons](https://github.com/simple-icons/simple-icons) (CC0-1.0); each is its owner's trademark.
 - The charts are drawn with [React Flow](https://reactflow.dev/) (MIT) laid out by [ELK](https://github.com/kieler/elkjs) (EPL-2.0), the overview with [d3-sankey](https://github.com/d3/d3-sankey) (BSD-3-Clause), and every chart can also be drawn by [FalkorDB's canvas](https://github.com/FalkorDB/falkordb-canvas) (MIT). The lanes and the vocabulary of the key come from the hand-drawn SVG chart they replaced, which followed [Agent Ethology](https://agent-ethology.vercel.app/backstage.html).
 - The fonts are Geist, Geist Mono and Instrument Serif, under the SIL Open Font License, served by the app.
 
-[ui/THIRD_PARTY_NOTICES.md](ui/THIRD_PARTY_NOTICES.md) lists what was taken from each and what was changed, and [ui/licenses/Apache-2.0.txt](ui/licenses/Apache-2.0.txt) is Manthan's licence. What is Cistern's own is everything the UI shows: the graph model, the taint rules, the queries, the sandbox verdicts, the auditor and the MCP tools.
+[ui/THIRD_PARTY_NOTICES.md](ui/THIRD_PARTY_NOTICES.md) lists what was taken from each and what was changed, and [ui/licenses/Apache-2.0.txt](ui/licenses/Apache-2.0.txt) is Manthan's licence. What is DeVries's own is everything the UI shows: the graph model, the taint rules, the queries, the sandbox verdicts, the auditor and the MCP tools.
 
 Also used, unmodified: FalkorDB and its Python client, the MCP Python SDK, the Anthropic Python SDK, FastAPI, React and Vite.
 
 ## Layout
 
 ```text
-cistern/graph/        keys, the query catalog (every Cypher statement), the client, schema, projection
-cistern/analysis/     scans and findings, chokepoints and the min cut, trust zones, the canary self-check
-cistern/mitigation/   the change language, sandbox verdicts, the baseline search, records, approval and apply; compile.py turns a plan into the change to the file it came from, write.py writes it
-cistern/ingest/       scenario files and MCP manifests -> a scenario graph
-cistern/mcp_server/   the eleven MCP tools
-cistern/agent/        the auditor: loop, phases, prompts, the model adapter, grounding, the scripted fallback, the evaluation
-cistern/api/          REST routes, the event stream, visitor sessions
-cistern/app.py        the app process
-cistern/apply.py      write a tested plan to its file from the command line
+devries/graph/        keys, the query catalog (every Cypher statement), the client, schema, projection
+devries/analysis/     scans and findings, chokepoints and the min cut, trust zones, the canary self-check
+devries/mitigation/   the change language, sandbox verdicts, the baseline search, records, approval and apply; compile.py turns a plan into the change to the file it came from, write.py writes it
+devries/ingest/       scenario files and MCP manifests -> a scenario graph
+devries/mcp_server/   the eleven MCP tools
+devries/agent/        the auditor: loop, phases, prompts, the model adapter, grounding, the scripted fallback, the evaluation
+devries/api/          REST routes, the event stream, visitor sessions
+devries/app.py        the app process
+devries/apply.py      write a tested plan to its file from the command line
 ui/                   React and Vite; src/graph/ draws the charts (React Flow laid out by ELK, d3-sankey, FalkorDB's canvas); src/landing/ is the landing page; THIRD_PARTY_NOTICES.md says what the design and the libraries are
 scenarios/            scenario files; each carries the findings and the fix it expects
 manifests/            MCP tool manifests the scenarios point at (synthetic ones say so)

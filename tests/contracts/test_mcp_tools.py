@@ -7,8 +7,8 @@ import pytest
 import pytest_asyncio
 from mcp import Client
 
-from cistern.ingest.scenario_loader import load_scenario
-from cistern.mcp_server.server import MAX_BYTES, build_server, untrusted
+from devries.ingest.scenario_loader import load_scenario
+from devries.mcp_server.server import MAX_BYTES, build_server, untrusted
 
 ROOT = Path(__file__).resolve().parents[2]
 READ_TOOLS = {"list_scenarios", "scan", "trust_zones", "rule_of_two", "find_injection_paths", "find_trifecta_agents", "rank_chokepoints"}
@@ -133,7 +133,7 @@ async def test_answers_stay_small_on_a_dense_graph(client, server):
     """Twelve agents that all share tools: many findings, long name lists. The answer must still fit."""
     async with Client(server) as mcp:
         from helpers import build
-        from cistern.graph import keys
+        from devries.graph import keys
         key = keys.scenario_key("t_dense")
         await client.delete(key)
         agents = [f"a{i}" for i in range(12)]
@@ -164,7 +164,7 @@ async def test_answers_stay_small_on_a_dense_graph(client, server):
 # ---------------------------------------------------------------------- the write side
 
 async def test_simulate_reports_a_verdict_and_changes_nothing(client, server):
-    from cistern.mitigation.sandbox import config_hash
+    from devries.mitigation.sandbox import config_hash
     before = await config_hash(client, "scn:acme_support")
     async with Client(server) as mcp:
         failed = await call(mcp, "simulate_mitigation", scenario="acme_support", finding_ids=[FINDING], plan={"fixes": [REVOKE]})
@@ -184,7 +184,7 @@ async def test_simulate_reports_a_verdict_and_changes_nothing(client, server):
 async def test_what_if_shows_what_a_wider_config_would_open(client, server):
     """A second agent that can only read tickets is given the refund tool."""
     from helpers import build
-    from cistern.analysis import findings
+    from devries.analysis import findings
     key = "scn:t_whatif"
     await client.delete(key)
     try:
@@ -207,7 +207,7 @@ async def test_what_if_shows_what_a_wider_config_would_open(client, server):
 
 
 async def test_propose_then_apply_only_after_a_person_approves(client, server):
-    from cistern.mitigation import apply
+    from devries.mitigation import apply
     async with Client(server) as mcp:
         try:
             refused = await call(mcp, "propose_fix", scenario="acme_support", finding_ids=[FINDING], plan={"fixes": [REVOKE]},

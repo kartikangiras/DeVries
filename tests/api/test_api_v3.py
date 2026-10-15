@@ -13,10 +13,10 @@ import pytest
 import pytest_asyncio
 import uvicorn
 
-from cistern.agent.llm import spend
-from cistern.app import create_app
-from cistern.config import get_settings
-from cistern.ingest.scenario_loader import load_scenario
+from devries.agent.llm import spend
+from devries.app import create_app
+from devries.config import get_settings
+from devries.ingest.scenario_loader import load_scenario
 from test_api import Stream, base, open_ids, visitor  # noqa: F401  (the fixture and helpers of the first API file)
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -35,7 +35,7 @@ async def test_the_overview_is_one_sentence_and_three_columns(base):
         assert (ribbon["id"], ribbon["kind"], ribbon["hops"], ribbon["agent_ids"]) == ("fnd:dce0910d42", "injection", 4, ["agent:support-bot"])
         assert view["counts"]["untrusted_sources"] == 1 and view["counts"]["open_findings"] == 1 and view["counts"]["cut_cost"] == 1
         assert "src:payment-records" in view["folded"]["sources"] and "overview.counts" in view["queries"]
-        clean = (await http.get("/api/scenarios/cistern_self/overview")).json()
+        clean = (await http.get("/api/scenarios/devries_self/overview")).json()
         assert clean["ribbons"] == [] and "Nothing untrusted reaches" in clean["sentence"]
         dev = (await http.get("/api/scenarios/acme_dev/overview")).json()
         assert "agents hold untrusted input, private data and a way out" in dev["sentence"] and len(dev["ribbons"]) == 7
@@ -83,12 +83,12 @@ async def test_a_plan_is_drafted_as_the_change_to_the_scenario_file_and_a_visito
         assert bad["draft"]["writable"] is False and "does not load" in bad["draft"]["note"]
         assert (await http.get("/api/scenarios/acme_support/mitigations/mit:0000000000/draft")).status_code == 404
         # the bundled file is not written by a test: the public switch refuses the write before anything is touched
-        get_settings().cistern_public = True
+        get_settings().devries_public = True
         try:
             refused = await http.post(f"/api/scenarios/acme_support/mitigations/{gate['id']}/draft/write", json={"approver": "Tester"})
             assert refused.status_code == 403 and refused.json()["error"]["code"] == "forbidden_write"
         finally:
-            get_settings().cistern_public = False
+            get_settings().devries_public = False
 
 
 async def test_a_write_from_the_browser_changes_the_file_reloads_the_shared_graph_and_drops_the_copy(base, client, tmp_path, monkeypatch):
@@ -163,7 +163,7 @@ async def test_a_pasted_tools_list_becomes_a_scenario_and_labelling_starts_an_au
 
 
 async def test_on_a_public_site_an_import_is_pasted_only_private_and_rationed(base, client, tmp_path, monkeypatch):
-    monkeypatch.setattr(get_settings(), "cistern_public", True)
+    monkeypatch.setattr(get_settings(), "devries_public", True)
     monkeypatch.setattr(get_settings(), "import_dir", tmp_path / "imports")
     monkeypatch.setattr(get_settings(), "rate_imports_per_hour", 1)
     async with visitor(base) as http, visitor(base) as other:
@@ -175,7 +175,7 @@ async def test_on_a_public_site_an_import_is_pasted_only_private_and_rationed(ba
         assert made_resp.status_code == 200, made_resp.text
         made = made_resp.json()
         assert made["private"] is True and made["run"] is not None and made["findings"]
-        session = http.cookies["cistern_session"]
+        session = http.cookies["devries_session"]
         assert f"ses:{session}:mine" in await client.list_graphs() and "scn:mine" not in await client.list_graphs()
         listed = {s["id"]: s for s in (await http.get("/api/scenarios")).json()["scenarios"]}
         assert listed["mine"]["private"] is True and listed["mine"]["own_copy"] is True
@@ -226,7 +226,7 @@ async def test_the_app_audits_each_shared_scenario_to_a_proposal_at_start(client
     finally:
         server.should_exit = True
         await task
-        for name in ("acme_support", "acme_exec", "acme_dev", "cistern_self"):
+        for name in ("acme_support", "acme_exec", "acme_dev", "devries_self"):
             await load_scenario(client, ROOT / "scenarios" / f"{name}.yaml")
         for key in await client.list_graphs():
             if key.startswith("ses:"):

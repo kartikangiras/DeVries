@@ -1,4 +1,4 @@
-// Cistern's own chart, drawn with React Flow and laid out by ELK: every node a card in its lane, every hop a
+// DeVries's own chart, drawn with React Flow and laid out by ELK: every node a card in its lane, every hop a
 // labelled arc, a finding's path lit, a plan's cuts marked, the most central ringed, communities coloured.
 // What a card says is FalkorDB's answer (tainted, trust, impact, gates); the page only draws it.
 

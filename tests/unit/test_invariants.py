@@ -1,7 +1,7 @@
 """The six invariants of the projection (PLAN.md section 5), with rule 7 as the one exception to the fourth."""
 
-from cistern.analysis import findings
-from cistern.graph.projection import SIGNATURES
+from devries.analysis import findings
+from devries.graph.projection import SIGNATURES
 from helpers import build, flows, gated, rebuild, set_call_gate
 
 BUSY = dict(

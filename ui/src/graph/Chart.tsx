@@ -1,4 +1,4 @@
-// One chart, two renderers: Cistern's own (React Flow, laid out by ELK) and FalkorDB's canvas. The switch
+// One chart, two renderers: DeVries's own (React Flow, laid out by ELK) and FalkorDB's canvas. The switch
 // sits over the chart and remembers the choice for the session, so every chart on every page shows the
 // same way until the visitor changes it.
 
@@ -6,12 +6,12 @@ import { useEffect, useState } from "react";
 import { Flow, type FlowProps } from "./Flow";
 import { GraphCanvas } from "./GraphCanvas";
 
-export type Renderer = "cistern" | "falkordb";
-const KEY = "cistern.renderer";
+export type Renderer = "devries" | "falkordb";
+const KEY = "devries.renderer";
 
 export function useRenderer(): [Renderer, (r: Renderer) => void] {
   const [renderer, set] = useState<Renderer>(() => {
-    try { return (localStorage.getItem(KEY) as Renderer) || "cistern"; } catch { return "cistern"; }
+    try { return (localStorage.getItem(KEY) as Renderer) || "devries"; } catch { return "devries"; }
   });
   useEffect(() => { try { localStorage.setItem(KEY, renderer); } catch { /* a private window */ } }, [renderer]);
   return [renderer, set];
@@ -22,7 +22,7 @@ export function RendererSwitch({ value, onChange, layout, onLayout }: { value: R
     <div className="renderers">
       <span className="control">Drawn by</span>
       <div className="pills" role="tablist" aria-label="Renderer">
-        <button role="tab" aria-selected={value === "cistern"} className={value === "cistern" ? "on" : ""} onClick={() => onChange("cistern")}>Cistern</button>
+        <button role="tab" aria-selected={value === "devries"} className={value === "devries" ? "on" : ""} onClick={() => onChange("devries")}>DeVries</button>
         <button role="tab" aria-selected={value === "falkordb"} className={value === "falkordb" ? "on" : ""} onClick={() => onChange("falkordb")}>FalkorDB canvas</button>
       </div>
       {value === "falkordb" && onLayout && (

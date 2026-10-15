@@ -14,11 +14,11 @@ import pytest
 import pytest_asyncio
 import uvicorn
 
-from cistern.agent.llm import spend
-from cistern.app import create_app
-from cistern.config import get_settings
-from cistern.graph.catalog import CATALOG
-from cistern.ingest.scenario_loader import load_scenario
+from devries.agent.llm import spend
+from devries.app import create_app
+from devries.config import get_settings
+from devries.graph.catalog import CATALOG
+from devries.ingest.scenario_loader import load_scenario
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -106,7 +106,7 @@ async def test_health_reports_the_graph_the_model_and_how_sandboxes_are_made(bas
     async with visitor(base) as http:
         body = (await http.get("/api/health")).json()
         assert body["ok"] and body["canary"]["ok"]
-        assert body["scenarios"] == {"acme_dev": True, "acme_exec": True, "acme_support": True, "cistern_self": True}
+        assert body["scenarios"] == {"acme_dev": True, "acme_exec": True, "acme_support": True, "devries_self": True}
         assert body["model"] == {"configured": False, "name": None, "budget_spent": False, "spent_today_usd": 0.0}
         assert body["sessions"]["max"] == 30
 
@@ -115,8 +115,8 @@ async def test_a_visitor_gets_one_http_only_session_cookie(base):
     async with visitor(base) as http:
         first = await http.get("/api/scenarios")
         cookie = first.headers["set-cookie"]
-        assert cookie.startswith("cistern_session=") and "HttpOnly" in cookie and "SameSite=Lax" in cookie
-        assert len(http.cookies["cistern_session"]) == 22            # 128 random bits
+        assert cookie.startswith("devries_session=") and "HttpOnly" in cookie and "SameSite=Lax" in cookie
+        assert len(http.cookies["devries_session"]) == 22            # 128 random bits
         assert "set-cookie" not in (await http.get("/api/scenarios")).headers
         info = (await http.get("/api/session")).json()
         assert info["copies"] == [] and info["model"]["configured"] is False
@@ -249,7 +249,7 @@ async def test_reset_gives_the_visitor_the_shared_scenario_back(base, client):
         assert applied["open"] == [] and applied["patch"]["changes"][0]["gate"] == "human_approval"
         stored = (await http.get(f"/api/scenarios/acme_support/mitigations/{best['id']}")).json()["mitigation"]
         assert stored["status"] == "applied" and stored["approved_by"] == "bKartikb"      # markup never reaches the record
-        session = http.cookies["cistern_session"]
+        session = http.cookies["devries_session"]
         assert f"ses:{session}:acme_support" in await client.list_graphs()
 
         assert (await http.post("/api/session/reset")).json() == {"reset": ["acme_support"]}
@@ -300,14 +300,14 @@ async def test_when_every_copy_is_in_use_a_new_visitor_can_still_read(base, monk
 
 async def test_mcp_over_http_needs_the_bearer_token_when_one_is_set(base, monkeypatch):
     from mcp import Client
-    monkeypatch.setattr(get_settings(), "cistern_mcp_token", "s3cret-token")
+    monkeypatch.setattr(get_settings(), "devries_mcp_token", "s3cret-token")
     async with visitor(base) as http:
         refused = await http.post("/mcp", json={"jsonrpc": "2.0", "id": 1, "method": "tools/list"})
         assert refused.status_code == 401 and refused.json()["error"]["code"] == "unauthorized"
         wrong = await http.post("/mcp", json={}, headers={"Authorization": "Bearer nope"})
         assert wrong.status_code == 401
         assert (await http.get("/api/health")).status_code == 200                      # the API is not behind it
-    monkeypatch.setattr(get_settings(), "cistern_mcp_token", None)
+    monkeypatch.setattr(get_settings(), "devries_mcp_token", None)
     async with Client(f"{base}/mcp") as session:
         assert len((await session.list_tools()).tools) == 11
 
@@ -320,7 +320,7 @@ async def test_a_visitor_only_hears_about_their_own_copy(base):
         await asyncio.sleep(0.2)
         assert "scan.finished" not in their_stream.types() and their_stream.types() == ["hello"]
         assert all(set(e) == {"id", "type", "scenario", "at", "data"} for e in my_stream.events[1:])   # no graph key, no session
-        assert mine.cookies["cistern_session"] not in json.dumps(my_stream.events)
+        assert mine.cookies["devries_session"] not in json.dumps(my_stream.events)
         await my_stream.close()
         await their_stream.close()
 
@@ -391,7 +391,7 @@ async def test_a_plan_can_be_previewed_before_anyone_approves_it(base):
 
 
 def test_sandbox_reads_are_rationed_by_the_minute():
-    from cistern.api.sessions import SANDBOX_READS_PER_MIN, RateLimited, Sessions
+    from devries.api.sessions import SANDBOX_READS_PER_MIN, RateLimited, Sessions
 
     sessions = Sessions()
     for _ in range(SANDBOX_READS_PER_MIN):
@@ -416,7 +416,7 @@ async def test_the_cheapest_cut_is_read_from_max_flow_and_marks_flow_hops(base, 
         refused = [m for m in found["failed"] if m["summary"] == ["revoke tool:helpdesk.get_ticket from agent:support-bot"]]
         assert len(refused) == 1 and "wf:refund-request" in refused[0]["reason"]
 
-        clean = (await http.get("/api/scenarios/cistern_self/cut")).json()
+        clean = (await http.get("/api/scenarios/devries_self/cut")).json()
         assert (clean["cost"], clean["hops"], clean["cuttable"]) == (0, [], True)
         assert (await http.get("/api/scenarios/no_such/cut")).status_code == 404
 
@@ -444,12 +444,12 @@ async def test_an_imported_scenario_is_labelled_from_the_ui_and_the_bundled_ones
     import sys
     from pathlib import Path
 
-    from cistern.ingest.importer import import_install
-    from cistern.ingest.scenario_loader import load_scenario
+    from devries.ingest.importer import import_install
+    from devries.ingest.scenario_loader import load_scenario
 
     root = Path(__file__).resolve().parents[2]
     name = "import_labels_test"
-    result = await import_install(f"{sys.executable} -m cistern.mcp_server", root, name=name)
+    result = await import_install(f"{sys.executable} -m devries.mcp_server", root, name=name)
     try:
         await load_scenario(client, result.scenario_path)
         async with visitor(base) as http:

@@ -11,16 +11,16 @@ from pathlib import Path
 
 import pytest
 
-from cistern.config import get_settings
-from cistern.errors import ForbiddenWrite
-from cistern.ingest.importer import import_install
-from cistern.ingest.scenario_loader import load_scenario
-from cistern.mitigation import search, store
-from cistern.mitigation import write as write_mod
-from cistern.mitigation.sandbox import StaleTarget
+from devries.config import get_settings
+from devries.errors import ForbiddenWrite
+from devries.ingest.importer import import_install
+from devries.ingest.scenario_loader import load_scenario
+from devries.mitigation import search, store
+from devries.mitigation import write as write_mod
+from devries.mitigation.sandbox import StaleTarget
 
 ROOT = Path(__file__).resolve().parents[2]
-OWN = f"{sys.executable} -m cistern.mcp_server"
+OWN = f"{sys.executable} -m devries.mcp_server"
 
 
 def _copy_support(tmp_path: Path) -> tuple[str, Path]:
@@ -104,7 +104,7 @@ async def test_nothing_is_written_on_a_public_site(client, tmp_path, monkeypatch
         await load_scenario(client, path, root=tmp_path)
         found = await search.search(client, key)
         gate = next(m for m in found.passing if m.plan.fixes[0].kind == "gate_call")
-        monkeypatch.setattr(get_settings(), "cistern_public", True)
+        monkeypatch.setattr(get_settings(), "devries_public", True)
         before = path.read_text()
         with pytest.raises(ForbiddenWrite):
             await write_mod.write(client, key, key, path, gate.id, await _names(client, key), "Tester", root=tmp_path)
@@ -118,8 +118,8 @@ NOTES = ROOT / "tests" / "fixtures" / "notes_server.py"
 
 async def _propose(client, key, fix) -> str:
     """A plan with one fix, verified in a sandbox and stored as proposed: what the search or the model would leave."""
-    from cistern.mitigation import sandbox
-    from cistern.mitigation.dsl import FixPlan
+    from devries.mitigation import sandbox
+    from devries.mitigation.dsl import FixPlan
 
     targets = sorted((await sandbox.measure(client, key)).findings)
     verdict = await sandbox.verify(client, key, FixPlan(fixes=[fix]), targets)
@@ -131,7 +131,7 @@ async def _propose(client, key, fix) -> str:
 async def test_a_claude_code_project_gets_an_ask_rule_and_the_finding_closes_on_the_reimport(client, tmp_path):
     """A project with .mcp.json and an empty .claude/settings.json: the gate becomes an ask rule, the re-import reads
     the rule as a gate on the grant, and the finding is gone."""
-    from cistern.mitigation.dsl import GateCall
+    from devries.mitigation.dsl import GateCall
 
     project = tmp_path / "project"
     (project / ".claude").mkdir(parents=True)
@@ -167,7 +167,7 @@ async def test_a_claude_code_project_gets_an_ask_rule_and_the_finding_closes_on_
 
 
 async def test_a_desktop_config_that_moved_on_since_the_import_is_not_written(client, tmp_path):
-    from cistern.mitigation.dsl import RevokeCall
+    from devries.mitigation.dsl import RevokeCall
 
     config = tmp_path / "claude_desktop_config.json"
     config.write_text(json.dumps({"mcpServers": {

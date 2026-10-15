@@ -10,8 +10,8 @@ from pathlib import Path
 import uvicorn
 from mcp import Client, StdioServerParameters
 
-from cistern.app import create_app
-from cistern.ingest.scenario_loader import load_scenario
+from devries.app import create_app
+from devries.ingest.scenario_loader import load_scenario
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -23,7 +23,7 @@ def payload(result) -> dict:
 
 async def test_stdio_server_answers_like_claude_desktop_would_see_it(client):
     await load_scenario(client, ROOT / "scenarios" / "acme_support.yaml", strict=True)
-    server = StdioServerParameters(command=sys.executable, args=["-m", "cistern.mcp_server"], cwd=str(ROOT))
+    server = StdioServerParameters(command=sys.executable, args=["-m", "devries.mcp_server"], cwd=str(ROOT))
     async with Client(server) as session:
         assert {t.name for t in (await session.list_tools()).tools} >= {"scan", "find_injection_paths"}
         scanned = payload(await session.call_tool("scan", {"scenario": "acme_support"}))
@@ -40,12 +40,12 @@ async def test_the_config_entry_launches_the_server_without_a_shell(client):
 
     import pytest
 
-    from cistern.mcp_server.__main__ import client_config
+    from devries.mcp_server.__main__ import client_config
 
     if shutil.which("uv") is None:
         pytest.skip("uv is not installed here")
     await load_scenario(client, ROOT / "scenarios" / "acme_support.yaml", strict=True)
-    entry = client_config()["mcpServers"]["cistern"]
+    entry = client_config()["mcpServers"]["devries"]
     assert Path(entry["command"]).is_absolute() and str(ROOT) in entry["args"]
     bare = {"PATH": "/usr/bin:/bin:/usr/sbin:/sbin", "HOME": os.environ["HOME"]}
     server = StdioServerParameters(command=entry["command"], args=entry["args"], env=bare, cwd="/")

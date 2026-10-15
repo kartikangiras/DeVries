@@ -67,7 +67,7 @@ function mulberry32(seed: number) {
 }
 
 /**
- * A slow, dark field of colour with ripples crossing it: the water in a cistern. It is drawn small
+ * A slow, dark field of colour with ripples crossing it: the water in a devries. It is drawn small
  * and blurred up, pauses off screen, and holds still when the visitor asks for reduced motion.
  */
 export function Ambient({ seed = 1, hue = 250, strength = 1, className = "" }: { seed?: number; hue?: number; strength?: number; className?: string }) {

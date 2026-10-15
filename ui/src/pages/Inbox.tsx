@@ -7,7 +7,7 @@ import { useState } from "react";
 import { headline } from "../brief";
 import { deskOf, exposure, recommendation, type Desk } from "../desk";
 import { href } from "../route";
-import type { Cistern } from "../state";
+import type { DeVries } from "../state";
 import { KIND_WORDS, capital, clock, countWord, plural, short } from "../text";
 import { Button, Empty, Eyebrow, Loading, PageBody, PageHeader } from "../ui";
 
@@ -26,7 +26,7 @@ function gist(finding: Finding, desk: Desk, names: Record<string, string>): stri
 }
 
 /** An imported install carries no labels: say what is untrusted and what matters, and the scan runs on the answer. */
-function LabelForm({ c }: { c: Cistern }) {
+function LabelForm({ c }: { c: DeVries }) {
   const sources = (c.flow?.nodes ?? []).filter((n) => n.label === "DataSource");
   const resources = (c.flow?.nodes ?? []).filter((n) => n.label === "Resource");
   const [trust, setTrust] = useState<Record<string, string>>({});
@@ -141,7 +141,7 @@ function Row({ finding, desk, names, scenario }: { finding: Finding; desk: Desk;
   );
 }
 
-export function Inbox({ c, scenario, done = false }: { c: Cistern; scenario: string; done?: boolean }) {
+export function Inbox({ c, scenario, done = false }: { c: DeVries; scenario: string; done?: boolean }) {
   const found = c.findings;
   const list = found ? (done ? found.past : found.findings.filter((f) => f.status === "open")) : null;
   const desks = (list ?? []).map((f) => ({ finding: f, desk: deskOf(f, c.plans, c.run, c.openIds) }));

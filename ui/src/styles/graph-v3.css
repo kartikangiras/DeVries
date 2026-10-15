@@ -1,5 +1,5 @@
 /*
- * The three renderers of revision 3: Cistern's chart (React Flow laid out by ELK), the overview (d3-sankey)
+ * The three renderers of revision 3: DeVries's chart (React Flow laid out by ELK), the overview (d3-sankey)
  * and FalkorDB's canvas. Same tokens as chart.css; the names of the marks (hot, private, plain, gated, cut,
  * central) are the same words the lane chart used, so the key reads the same on every chart.
  */

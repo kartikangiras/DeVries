@@ -2,7 +2,7 @@
 // brief looks like, the rules as switches, the model beside the search, and the trail a run
 // leaves. The cards and their visuals follow Manthan's CaseAnatomy and its six visuals
 // (manthan-ui/src/pages/Landing.tsx, Apache-2.0; see ui/THIRD_PARTY_NOTICES.md), rewritten for
-// what Cistern shows.
+// what DeVries shows.
 
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { Check, Reveal } from "./bits";

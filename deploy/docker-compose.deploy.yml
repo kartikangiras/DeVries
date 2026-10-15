@@ -4,7 +4,7 @@
 #
 # The base file already publishes FalkorDB, its Browser and the app on 127.0.0.1 only, so with this
 # overlay the one thing reachable from outside is Caddy, on 80 and 443. See deploy/README.md.
-name: cistern
+name: devries
 
 services:
   falkordb:
@@ -14,7 +14,7 @@ services:
     restart: unless-stopped
     environment:
       COOKIE_SECURE: "true"
-      CISTERN_MCP_TOKEN: "${CISTERN_MCP_TOKEN:?set CISTERN_MCP_TOKEN: /mcp must not be open on a public address}"
+      DEVRIES_MCP_TOKEN: "${DEVRIES_MCP_TOKEN:?set DEVRIES_MCP_TOKEN: /mcp must not be open on a public address}"
       LLM_DAILY_BUDGET_USD: "${LLM_DAILY_BUDGET_USD:-5}"
 
   caddy:
@@ -24,7 +24,7 @@ services:
       app:
         condition: service_healthy
     environment:
-      SITE_ADDRESS: "${SITE_ADDRESS:?set SITE_ADDRESS to the public host name, such as cistern.example.org}"
+      SITE_ADDRESS: "${SITE_ADDRESS:?set SITE_ADDRESS to the public host name, such as devries.example.org}"
     ports:
       - "${HTTP_PORT:-80}:80"
       - "${HTTPS_PORT:-443}:443"

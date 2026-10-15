@@ -17,15 +17,15 @@ ENV UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy PYTHONUNBUFFERED=1
 COPY pyproject.toml uv.lock README.md ./
 RUN uv sync --frozen --no-dev --no-install-project
 
-COPY cistern/ cistern/
+COPY devries/ devries/
 COPY scenarios/ scenarios/
 COPY manifests/ manifests/
 RUN uv sync --frozen --no-dev
 COPY --from=ui /ui/dist ui/dist
 
-RUN useradd --system --uid 10001 --home /app cistern && chown -R cistern /app
-USER cistern
+RUN useradd --system --uid 10001 --home /app devries && chown -R devries /app
+USER devries
 EXPOSE 8000
 HEALTHCHECK --interval=10s --timeout=5s --start-period=20s --retries=6 \
   CMD ["/app/.venv/bin/python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=4).status == 200 else 1)"]
-CMD ["/app/.venv/bin/uvicorn", "cistern.app:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["/app/.venv/bin/uvicorn", "devries.app:app", "--host", "0.0.0.0", "--port", "8000"]

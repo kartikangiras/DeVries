@@ -4,7 +4,7 @@
 // is launched, and the result is yours alone.
 
 import { useState } from "react";
-import type { Cistern } from "../state";
+import type { DeVries } from "../state";
 import { href } from "../route";
 import { Button, Empty, Eyebrow, PageBody, PageHeader } from "../ui";
 
@@ -17,7 +17,7 @@ const EXAMPLE = `{
 
 const CLIENTS = [["claude-code", "Claude Code (.mcp.json)"], ["claude-desktop", "Claude Desktop"], ["cursor", "Cursor"], ["vscode", "VS Code"], ["pasted", "Something else"]];
 
-export function ImportPage({ c, scenario }: { c: Cistern; scenario: string }) {
+export function ImportPage({ c, scenario }: { c: DeVries; scenario: string }) {
   // until the session has answered, the page assumes a public site: nothing that launches a command is offered unseen
   const isPublic = c.session ? !!c.session.public : true;
   const [mode, setMode] = useState<"paste" | "source">("paste");
@@ -26,7 +26,7 @@ export function ImportPage({ c, scenario }: { c: Cistern; scenario: string }) {
   const [client, setClient] = useState("claude-code");
   const [name, setName] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [result, setResult] = useState<Awaited<ReturnType<Cistern["importConfig"]>>>(null);
+  const [result, setResult] = useState<Awaited<ReturnType<DeVries["importConfig"]>>>(null);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -78,7 +78,7 @@ export function ImportPage({ c, scenario }: { c: Cistern; scenario: string }) {
           <label className="import-field">
             <Eyebrow>The source</Eyebrow>
             <input type="text" value={source} onChange={(e) => setSource(e.target.value)} placeholder="claude-code · claude-desktop · cursor · a path to a config · a command · an https:// URL" aria-label="Source" />
-            <p className="about-note">The same words <code>python -m cistern.ingest --import</code> takes. A client name reads that client's config on this machine.</p>
+            <p className="about-note">The same words <code>python -m devries.ingest --import</code> takes. A client name reads that client's config on this machine.</p>
           </label>
         )}
         <div className="import-row">

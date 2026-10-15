@@ -3,11 +3,11 @@
 import json
 import textwrap
 
-from cistern import ops
-from cistern.analysis import findings
-from cistern.errors import NotFound
-from cistern.ingest.manifests import definition_changes
-from cistern.ingest.scenario_loader import load_scenario
+from devries import ops
+from devries.analysis import findings
+from devries.errors import NotFound
+from devries.ingest.manifests import definition_changes
+from devries.ingest.scenario_loader import load_scenario
 
 MANIFEST = {"tools": [
     {"name": "get", "description": "Read a thing.", "annotations": {"readOnlyHint": True}, "inputSchema": {"type": "object"}},

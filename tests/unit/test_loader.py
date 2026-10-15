@@ -5,9 +5,9 @@ import textwrap
 
 import pytest
 
-from cistern.errors import InvalidScenario
-from cistern.ingest.manifests import capability_from_annotations, clean_description
-from cistern.ingest.scenario_loader import read_scenario
+from devries.errors import InvalidScenario
+from devries.ingest.manifests import capability_from_annotations, clean_description
+from devries.ingest.scenario_loader import read_scenario
 
 MANIFEST = {"tools": [
     {"name": "get", "description": "Read a thing.", "annotations": {"readOnlyHint": True}},

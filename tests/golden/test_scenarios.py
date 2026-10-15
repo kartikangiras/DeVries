@@ -7,10 +7,10 @@ from pathlib import Path
 import pytest
 import yaml
 
-from cistern.analysis import findings
-from cistern.graph import keys
-from cistern.ingest.scenario_loader import load_scenario
-from cistern.mitigation import apply, search
+from devries.analysis import findings
+from devries.graph import keys
+from devries.ingest.scenario_loader import load_scenario
+from devries.mitigation import apply, search
 from helpers import broken
 
 SCENARIOS = sorted((Path(__file__).resolve().parents[2] / "scenarios").glob("*.yaml"))
@@ -152,32 +152,32 @@ async def test_acme_dev_takes_two_fixes(client):
         await load_scenario(client, path, strict=True)
 
 
-async def test_cistern_itself_is_clean_and_only_because_of_its_gate(client):
-    path = next(p for p in SCENARIOS if p.stem == "cistern_self")
+async def test_devries_itself_is_clean_and_only_because_of_its_gate(client):
+    path = next(p for p in SCENARIOS if p.stem == "devries_self")
     report = await load_scenario(client, path, strict=True)
     try:
         assert report.scan.findings == []
         gated = await client.run("flow.gated_edges", report.graph)
-        assert [(g["from_id"], g["to_id"], g["gate"]) for g in gated] == [("agent:auditor", "tool:cistern.apply_fix", "human_approval")]
+        assert [(g["from_id"], g["to_id"], g["gate"]) for g in gated] == [("agent:auditor", "tool:devries.apply_fix", "human_approval")]
 
         # take the approval away, as a scenario file without the gate would
         await client.run("ingest.can_call", report.graph, rows=[
-            {"from_id": "agent:auditor", "to_id": "tool:cistern.apply_fix", "gate": None, "origin": "test"}])
+            {"from_id": "agent:auditor", "to_id": "tool:devries.apply_fix", "gate": None, "origin": "test"}])
         opened = (await findings.scan(client, report.graph)).findings
         assert sorted((f.kind, f.source_id, f.target_id) for f in opened) == [
             ("injection", "src:approver-notes", "res:agent-config"), ("injection", "src:manifest-text", "res:agent-config")]
-        assert all(f.path_ids[-3:] == ["agent:auditor", "tool:cistern.apply_fix", "res:agent-config"] for f in opened)
+        assert all(f.path_ids[-3:] == ["agent:auditor", "tool:devries.apply_fix", "res:agent-config"] for f in opened)
     finally:
         await load_scenario(client, path, strict=True)
 
 
 async def test_the_self_audit_manifest_is_what_the_server_answers(client):
-    """cistern_self audits the tools this server really has: the manifest is generated, and must not go stale."""
+    """devries_self audits the tools this server really has: the manifest is generated, and must not go stale."""
     import json
 
-    from cistern.mcp_server.__main__ import own_manifest
+    from devries.mcp_server.__main__ import own_manifest
 
-    on_disk = json.loads((SCENARIOS[0].parents[1] / "manifests" / "cistern.tools.json").read_text())
+    on_disk = json.loads((SCENARIOS[0].parents[1] / "manifests" / "devries.tools.json").read_text())
     assert on_disk == await own_manifest(), "run `make self-manifest`"
-    declared = {t["id"] for t in yaml.safe_load(next(p for p in SCENARIOS if p.stem == "cistern_self").read_text())["tools"]}
-    assert declared == {f"tool:cistern.{t['name']}" for t in on_disk["tools"]}      # every tool has its facts stated
+    declared = {t["id"] for t in yaml.safe_load(next(p for p in SCENARIOS if p.stem == "devries_self").read_text())["tools"]}
+    assert declared == {f"tool:devries.{t['name']}" for t in on_disk["tools"]}      # every tool has its facts stated

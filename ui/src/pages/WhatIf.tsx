@@ -5,12 +5,12 @@
 import { useEffect, useState } from "react";
 import { api, type Change, type Cut, type Policy, type WhatIf } from "../api";
 import { href } from "../route";
-import type { Cistern } from "../state";
+import type { DeVries } from "../state";
 import { KIND_WORDS, WithNames, capital, findingTitle, plural } from "../text";
 import { Button, Eyebrow, Loading, PageBody, PageHeader } from "../ui";
 
 /** One change, asked as a question: what would it open, close and break? Answered from a sandbox. */
-export function WhatIfLine({ c, scenario, agentId }: { c: Cistern; scenario: string; agentId?: string | null }) {
+export function WhatIfLine({ c, scenario, agentId }: { c: DeVries; scenario: string; agentId?: string | null }) {
   const [kind, setKind] = useState<"grant_call" | "add_delegation">("grant_call");
   const [who, setWho] = useState(agentId ?? "");
   const [what, setWhat] = useState("");
@@ -83,7 +83,7 @@ export function WhatIfLine({ c, scenario, agentId }: { c: Cistern; scenario: str
 }
 
 /** What max flow found: the hops of the cheapest cut, each with the fix that would cut it, and the rules that would make it. */
-export function CutBlock({ c, scenario, compact = false }: { c: Cistern; scenario: string; compact?: boolean }) {
+export function CutBlock({ c, scenario, compact = false }: { c: DeVries; scenario: string; compact?: boolean }) {
   const [cut, setCut] = useState<Cut | null>(null);
   const [policy, setPolicy] = useState<Policy | null>(null);
   useEffect(() => {
@@ -139,7 +139,7 @@ export function CutBlock({ c, scenario, compact = false }: { c: Cistern; scenari
   );
 }
 
-export function WhatIfPage({ c, scenario }: { c: Cistern; scenario: string }) {
+export function WhatIfPage({ c, scenario }: { c: DeVries; scenario: string }) {
   return (
     <PageBody>
       <PageHeader eyebrow="What if" title="Ask the sandbox before you change anything." meta="A grant or a delegation that is not in the config yet, tested on a copy of the graph that is deleted afterwards; and the cheapest cut, from max flow, as rules." />

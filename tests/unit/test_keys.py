@@ -1,7 +1,7 @@
 import pytest
 
-from cistern.errors import UnknownScenario
-from cistern.graph import keys
+from devries.errors import UnknownScenario
+from devries.graph import keys
 
 SESSION = "A1b2C3d4E5f6G7h8I9j0K1"
 

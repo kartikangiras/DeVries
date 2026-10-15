@@ -1,7 +1,7 @@
 #!/bin/sh
 # Is the deployment up, and is its graph still answering correctly?
 #
-#   deploy/uptime-check.sh https://cistern.example.org
+#   deploy/uptime-check.sh https://devries.example.org
 #
 # /api/health answers 200 only when FalkorDB is reachable, every scenario graph is loaded, and the canary
 # passes: a small graph with a known injection path and a known trifecta is built and scanned, and both must

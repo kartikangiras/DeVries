@@ -2,7 +2,7 @@
 #
 #   docker compose up -d --wait falkordb     the database only; run the app from source (make serve)
 #   docker compose up -d --wait --build      both, with the built UI at http://localhost:8000
-name: cistern
+name: devries
 
 services:
   falkordb:
@@ -38,12 +38,12 @@ services:
       LLM_MODEL: "${LLM_MODEL:-claude-opus-5-5}"
       LLM_EFFORT: "${LLM_EFFORT:-medium}"
       LLM_DAILY_BUDGET_USD: "${LLM_DAILY_BUDGET_USD:-}"
-      CISTERN_MCP_TOKEN: "${CISTERN_MCP_TOKEN:-}"
+      DEVRIES_MCP_TOKEN: "${DEVRIES_MCP_TOKEN:-}"
       COOKIE_SECURE: "${COOKIE_SECURE:-false}"
       SESSION_MAX: "${SESSION_MAX:-30}"
     ports:
       - "${APP_BIND:-127.0.0.1}:${APP_PORT:-8000}:8000"
-    # the scenario files from this folder, so that an import made here (`cistern.ingest --import`) shows up in the
+    # the scenario files from this folder, so that an import made here (`devries.ingest --import`) shows up in the
     # running app and its labels can be saved from the UI; the image carries its own copy for a deployment
     volumes:
       - ./scenarios:/app/scenarios

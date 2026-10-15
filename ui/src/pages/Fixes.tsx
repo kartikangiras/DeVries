@@ -9,7 +9,7 @@ import { best, isLive, patchText, recommendation, type Tone } from "../desk";
 import { Chart, RendererSwitch, useRenderer, type Renderer } from "../graph/Chart";
 import { focusOf, withReaders } from "../paths";
 import { go, href } from "../route";
-import type { Cistern } from "../state";
+import type { DeVries } from "../state";
 import { WithNames, capital, clock, countWord, plural, short } from "../text";
 import { Button, Empty, Eyebrow, KV, Loading, PageHeader, Status, Tabs } from "../ui";
 
@@ -28,7 +28,7 @@ const SUPERSEDED = { word: "Superseded", tone: "muted" as Tone, pulse: false, fi
 
 const SOURCE: Record<string, string> = { scripted: "the scripted search", agent: "the model", search: "a search asked for here" };
 
-function Selection({ m, c, scenario, superseded }: { m: Mitigation; c: Cistern; scenario: string; superseded: boolean }) {
+function Selection({ m, c, scenario, superseded }: { m: Mitigation; c: DeVries; scenario: string; superseded: boolean }) {
   const before = m.open_before?.length ?? 0;
   const resolved = m.resolved?.length ?? 0;
   const current = c.configHash && m.config_hash ? c.configHash === m.config_hash : null;
@@ -75,7 +75,7 @@ function Selection({ m, c, scenario, superseded }: { m: Mitigation; c: Cistern; 
 }
 
 /** The selected plan's target, drawn with the plan applied: read from a sandbox, or from the graph once it is applied. */
-export function After({ m, c, scenario, renderer = "cistern", layout = "tree" }: { m: Mitigation; c: Cistern; scenario: string; renderer?: Renderer; layout?: "force" | "tree" }) {
+export function After({ m, c, scenario, renderer = "devries", layout = "tree" }: { m: Mitigation; c: DeVries; scenario: string; renderer?: Renderer; layout?: "force" | "tree" }) {
   const [shown, setShown] = useState<{ preview?: Preview; error?: string } | null>(null);
   const stamp = `${m.id}/${m.status}/${c.configHash}`;      // ask again when the plan or the config has moved
   useEffect(() => {
@@ -119,7 +119,7 @@ export function After({ m, c, scenario, renderer = "cistern", layout = "tree" }:
   );
 }
 
-export function Fixes({ c, scenario, selectedId }: { c: Cistern; scenario: string; selectedId: string | null }) {
+export function Fixes({ c, scenario, selectedId }: { c: DeVries; scenario: string; selectedId: string | null }) {
   const [filter, setFilter] = useState<Filter>("all");
   const [renderer, setRenderer] = useRenderer();
   const plans = [...c.plans].reverse(); // newest first

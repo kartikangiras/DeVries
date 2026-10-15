@@ -1,4 +1,4 @@
-"""Importing a real install: Cistern's own server over stdio stands in for one, so no network is needed."""
+"""Importing a real install: DeVries's own server over stdio stands in for one, so no network is needed."""
 
 import json
 import sys
@@ -6,13 +6,13 @@ from pathlib import Path
 
 import pytest
 
-from cistern.analysis import findings
-from cistern.errors import InvalidScenario
-from cistern.ingest.importer import discover, draft, fetch_tools, guess, import_install, slug
-from cistern.ingest.scenario_loader import load_scenario, read_scenario
+from devries.analysis import findings
+from devries.errors import InvalidScenario
+from devries.ingest.importer import discover, draft, fetch_tools, guess, import_install, slug
+from devries.ingest.scenario_loader import load_scenario, read_scenario
 
 ROOT = Path(__file__).resolve().parents[2]
-OWN = f"{sys.executable} -m cistern.mcp_server"
+OWN = f"{sys.executable} -m devries.mcp_server"
 
 
 def test_sources_are_told_apart_and_servers_named(tmp_path):
@@ -29,15 +29,15 @@ def test_sources_are_told_apart_and_servers_named(tmp_path):
     saved.write_text(json.dumps({"tools": [{"name": "get"}]}))
     assert discover(str(saved))[1][0].manifest_path == saved
     with pytest.raises(InvalidScenario):
-        discover("claude-desktop" if not any(p.is_file() for p in __import__("cistern.ingest.importer", fromlist=["CLIENT_CONFIGS"]).CLIENT_CONFIGS["claude-desktop"]) else "   ")
+        discover("claude-desktop" if not any(p.is_file() for p in __import__("devries.ingest.importer", fromlist=["CLIENT_CONFIGS"]).CLIENT_CONFIGS["claude-desktop"]) else "   ")
     assert slug("@modelcontextprotocol/server-filesystem") == "filesystem" and slug("My Server!") == "my-server"
     assert guess("github") == {"trust": "untrusted", "impact": None, "external": True}
     assert guess("filesystem")["trust"] == "private" and guess("filesystem")["impact"] == "high"
 
 
 async def test_an_install_is_imported_labelled_and_scanned(client, tmp_path):
-    result = await import_install(OWN, tmp_path, name="import_test", labels={"src:cistern-mcp-server": "untrusted"})
-    assert result.servers == ["srv:cistern-mcp-server"]
+    result = await import_install(OWN, tmp_path, name="import_test", labels={"src:devries-mcp-server": "untrusted"})
+    assert result.servers == ["srv:devries-mcp-server"]
     assert result.tools == 11 and result.skipped == []
     spec = read_scenario(result.scenario_path, root=tmp_path).spec
     assert spec.imported and spec.imported["client"] == "client" and spec.order == 50
@@ -63,8 +63,8 @@ async def test_an_install_is_imported_labelled_and_scanned(client, tmp_path):
 
 
 def test_a_draft_reads_like_a_scenario_file(tmp_path):
-    from cistern.ingest.importer import ServerSource
-    from cistern.ingest.manifests import Manifest, ManifestTool
+    from devries.ingest.importer import ServerSource
+    from devries.ingest.manifests import Manifest, ManifestTool
 
     manifest = Manifest(tools=[ManifestTool(name="read_file", annotations={"readOnlyHint": True}),
                                ManifestTool(name="write_file", annotations={"destructiveHint": True}),

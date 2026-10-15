@@ -9,11 +9,11 @@ from types import SimpleNamespace
 import anthropic
 import pytest
 
-from cistern.agent import grounding, phases
-from cistern.agent.llm import (
+from devries.agent import grounding, phases
+from devries.agent.llm import (
     AssistantTurn, ClaudeLLM, LLMError, LLMRefused, Spend, ToolResult, ToolResults, ToolSpec, UserText, configured_llm, cost_usd,
 )
-from cistern.config import Settings
+from devries.config import Settings
 
 TOOLS = [ToolSpec("scan", "Scan a scenario.", {"type": "object", "properties": {"scenario": {"type": "string"}}})]
 

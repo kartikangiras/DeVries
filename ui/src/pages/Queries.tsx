@@ -5,7 +5,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import type { CatalogQuery } from "../api";
 import { go, href, type Route } from "../route";
-import type { Cistern } from "../state";
+import type { DeVries } from "../state";
 import { plural } from "../text";
 import { Eyebrow, Icon, KV, Loading } from "../ui";
 
@@ -39,7 +39,7 @@ export function Cypher({ text }: { text: string }) {
 }
 
 /** The drawer: the catalogue down the side, the statement in the middle, what it is for and who used it on the right. */
-export function QueryDrawer({ c, scenario, name, back }: { c: Cistern; scenario: string; name: string | null; back: Route }) {
+export function QueryDrawer({ c, scenario, name, back }: { c: DeVries; scenario: string; name: string | null; back: Route }) {
   const [find, setFind] = useState("");
   const byName = useMemo(() => new Map(c.catalog.map((q) => [q.name, q])), [c.catalog]);
   const selected = byName.get(name ?? DEFAULT) ?? c.catalog[0] ?? null;

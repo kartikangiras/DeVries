@@ -15,7 +15,7 @@ help:
 	@echo "make mcp-config  print the entry for an MCP client's config file (Claude Desktop), with absolute paths"
 	@echo "make queries-md  print the query catalog as Markdown"
 	@echo "make queries-doc rewrite docs/QUERIES.md from the query catalog"
-	@echo "make self-manifest  rewrite manifests/cistern.tools.json from this server's own tool list"
+	@echo "make self-manifest  rewrite manifests/devries.tools.json from this server's own tool list"
 	@echo "make agent-eval  compare the auditor with the baseline search on every scenario (RUNS=3; needs a model to say anything about the agent)"
 	@echo "make down        stop FalkorDB (data volume kept)     make wipe   stop it and delete the volume"
 
@@ -35,7 +35,7 @@ probe: up
 	uv run pytest tests/probes -v
 
 seed: up
-	uv run python -m cistern.ingest --strict
+	uv run python -m devries.ingest --strict
 
 test: up
 	uv run pytest
@@ -47,10 +47,10 @@ ui: ui/node_modules
 	cd ui && npm run build
 
 serve: up ui
-	uv run uvicorn cistern.app:app --port 8000
+	uv run uvicorn devries.app:app --port 8000
 
 dev: up ui/node_modules
-	(uv run uvicorn cistern.app:app --port 8000 --reload --reload-dir cistern & cd ui && npm run dev)
+	(uv run uvicorn devries.app:app --port 8000 --reload --reload-dir devries & cd ui && npm run dev)
 
 app: .env
 	docker compose up -d --wait --build
@@ -59,20 +59,20 @@ e2e: ui/node_modules
 	cd ui && node e2e/gate.mjs $(APP_URL) && node e2e/views.mjs $(APP_URL)
 
 mcp: up
-	uv run python -m cistern.mcp_server
+	uv run python -m devries.mcp_server
 
 mcp-config:
-	@uv run python -m cistern.mcp_server --client-config
+	@uv run python -m devries.mcp_server --client-config
 
 queries-md:
-	@uv run python -m cistern.graph.catalog
+	@uv run python -m devries.graph.catalog
 
 queries-doc:
-	@mkdir -p docs && uv run python -m cistern.graph.catalog > docs/QUERIES.md && echo "docs/QUERIES.md rewritten"
+	@mkdir -p docs && uv run python -m devries.graph.catalog > docs/QUERIES.md && echo "docs/QUERIES.md rewritten"
 
 self-manifest:
-	uv run python -m cistern.mcp_server --manifest > manifests/cistern.tools.json
+	uv run python -m devries.mcp_server --manifest > manifests/devries.tools.json
 
 RUNS ?= 3
 agent-eval: up
-	uv run python -m cistern.agent.evaluate --runs $(RUNS)
+	uv run python -m devries.agent.evaluate --runs $(RUNS)

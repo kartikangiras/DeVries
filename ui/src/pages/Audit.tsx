@@ -6,7 +6,7 @@ import type { Run } from "../api";
 import type { Tone } from "../desk";
 import { go } from "../route";
 import { runState } from "../runs";
-import type { Cistern } from "../state";
+import type { DeVries } from "../state";
 import { capital, clock, day, plural } from "../text";
 import { RunTrace } from "../Trace";
 import { Button, Empty, Loading, PageBody, PageHeader, Status } from "../ui";
@@ -15,7 +15,7 @@ const TONE: Record<string, Tone> = { failed: "danger", waiting: "amber", done: "
 
 /** A question for the auditor. With a model it answers with its tools; without one the graph answers four kinds of
  *  question by itself (what can reach X, what X reaches, a path from A to B, which workflows need X). */
-function AskBox({ c }: { c: Cistern }) {
+function AskBox({ c }: { c: DeVries }) {
   const [question, setQuestion] = useState("");
   const model = c.session?.model;
   const withModel = !!model?.configured && !model.budget_spent && model.questions_left > 0;
@@ -54,7 +54,7 @@ function AskBox({ c }: { c: Cistern }) {
   );
 }
 
-export function Audit({ c, scenario, runId }: { c: Cistern; scenario: string; runId: string | null }) {
+export function Audit({ c, scenario, runId }: { c: DeVries; scenario: string; runId: string | null }) {
   const { showRun } = c;
   useEffect(() => {
     if (runId) showRun(runId);

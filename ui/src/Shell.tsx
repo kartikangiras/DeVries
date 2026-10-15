@@ -5,7 +5,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { deskOf } from "./desk";
 import { go, href, type Page, type Route } from "./route";
-import type { Cistern } from "./state";
+import type { DeVries } from "./state";
 import { Icon, Mark, type IconName } from "./ui";
 
 type Row = { page: Page; label: string; icon: IconName };
@@ -22,7 +22,7 @@ export function placeOf(route: Route, closed: boolean): Page {
   return route.page;
 }
 
-function ScenarioSwitch({ c, scenario }: { c: Cistern; scenario: string | null }) {
+function ScenarioSwitch({ c, scenario }: { c: DeVries; scenario: string | null }) {
   const [open, setOpen] = useState(false);
   const box = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -42,7 +42,7 @@ function ScenarioSwitch({ c, scenario }: { c: Cistern; scenario: string | null }
       <button className="switch-button" onClick={() => setOpen((o) => !o)} aria-haspopup="listbox" aria-expanded={open} aria-label="Scenario">
         <Mark />
         <span className="switch-text">
-          <span className="switch-name">{scenario ? c.titleOf(scenario) : "Cistern"}</span>
+          <span className="switch-name">{scenario ? c.titleOf(scenario) : "DeVries"}</span>
           <span className="switch-sub">{now ? (now.private ? `${now.id} · yours alone` : now.id) : c.ready ? "no scenario" : "connecting"}</span>
         </span>
         <Icon name="switch" size={14} />
@@ -70,7 +70,7 @@ function ScenarioSwitch({ c, scenario }: { c: Cistern; scenario: string | null }
   );
 }
 
-function Session({ c }: { c: Cistern }) {
+function Session({ c }: { c: DeVries }) {
   const own = !!c.current?.own_copy;
   const model = c.session?.model;
   return (
@@ -89,7 +89,7 @@ function Session({ c }: { c: Cistern }) {
   );
 }
 
-export function Shell({ c, route, closed = false, queriesOpen = false, children }: { c: Cistern; route: Route; closed?: boolean; queriesOpen?: boolean; children: ReactNode }) {
+export function Shell({ c, route, closed = false, queriesOpen = false, children }: { c: DeVries; route: Route; closed?: boolean; queriesOpen?: boolean; children: ReactNode }) {
   const open = c.findings?.findings.filter((f) => f.status === "open") ?? [];
   const awaiting = open.some((f) => deskOf(f, c.plans, c.run, c.openIds).proposal);
   const counts: Partial<Record<Page, number | undefined>> = {

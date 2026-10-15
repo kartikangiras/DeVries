@@ -1,6 +1,6 @@
 // The whole system in one picture, and a panel that reads whatever is clicked. The page opens on the
 // overview: untrusted sources, the agents they reach, the actions those can take, with only the open
-// paths drawn. "All nodes" draws everything, on Cistern's own chart or on FalkorDB's canvas; "More" adds
+// paths drawn. "All nodes" draws everything, on DeVries's own chart or on FalkorDB's canvas; "More" adds
 // the layers, the communities, the cheapest cut and the most central nodes, and the edges as a table.
 
 import { useEffect, useMemo, useState } from "react";
@@ -10,7 +10,7 @@ import { OverviewCounts } from "../graph/Overview";
 import { OverviewSankey } from "../graph/Sankey";
 import { KIND_OF, nodeFacts, nodeIndex, nodesOn } from "../paths";
 import { href } from "../route";
-import type { Cistern } from "../state";
+import type { DeVries } from "../state";
 import { KIND_WORDS, WithNames, capital, findingTitle, plural } from "../text";
 import { Eyebrow, Loading, PageBody, PageHeader } from "../ui";
 import { CutBlock } from "./WhatIf";
@@ -35,7 +35,7 @@ function Edge({ link, graph, names }: { link: GraphLink; graph: Graph; names: Re
 }
 
 /** Meta's Rule of Two for one agent: which of A, B and C it holds, read off the flow layer. */
-function RuleOfTwo({ id, c, scenario }: { id: string; c: Cistern; scenario: string }) {
+function RuleOfTwo({ id, c, scenario }: { id: string; c: DeVries; scenario: string }) {
   const card = c.scorecard?.agents.find((a) => a.agent_id === id);
   if (!card) return null;
   const held = (p: string) => card.properties.includes(p);
@@ -61,7 +61,7 @@ function RuleOfTwo({ id, c, scenario }: { id: string; c: Cistern; scenario: stri
   );
 }
 
-function Read({ id, graph, c, scenario }: { id: string | null; graph: Graph; c: Cistern; scenario: string }) {
+function Read({ id, graph, c, scenario }: { id: string | null; graph: Graph; c: DeVries; scenario: string }) {
   const node = id ? nodeIndex(graph).get(id) : undefined;
   if (!node) {
     return (
@@ -111,11 +111,11 @@ type View = "overview" | "all" | "more";
 type Show = "all" | "zones" | "cut" | "central";
 
 /** An agent's Rule of Two letters, to print on its card. */
-export function badgesOf(c: Cistern): Map<string, string> {
+export function badgesOf(c: DeVries): Map<string, string> {
   return new Map((c.scorecard?.agents ?? []).map((a) => [a.agent_id, ["A", "B", "C"].filter((p) => a.properties.includes(p)).join("·") || "·"]));
 }
 
-export function GraphPage({ c, scenario }: { c: Cistern; scenario: string }) {
+export function GraphPage({ c, scenario }: { c: DeVries; scenario: string }) {
   const [view, setView] = useState<View>("overview");
   const [renderer, setRenderer] = useRenderer();
   const [canvasLayout, setCanvasLayout] = useState<"force" | "tree">("force");
@@ -199,7 +199,7 @@ export function GraphPage({ c, scenario }: { c: Cistern; scenario: string }) {
                   <button role="tab" aria-selected={flow} className={flow ? "on" : ""} onClick={() => { setLayer("flow"); setPicked(null); }}>Flow</button>
                   <button role="tab" aria-selected={!flow} className={!flow ? "on" : ""} onClick={() => { setLayer("config"); setPicked(null); }}>Config</button>
                 </div>
-                {renderer === "cistern" && (
+                {renderer === "devries" && (
                   <>
                     <span className="control">Show</span>
                     <div className="pills" role="tablist" aria-label="How much">
@@ -256,7 +256,7 @@ export function GraphPage({ c, scenario }: { c: Cistern; scenario: string }) {
                 Source: the {layer} layer of {scenario}{c.current?.own_copy ? " (your sandbox copy)" : ""} in FalkorDB, read by{" "}
                 {graph.queries.map((q, i) => <span key={q}>{i > 0 && ", "}<a href={href(scenario, "queries", q)}>{q}</a></span>)}.{" "}
                 {renderer === "falkordb"
-                  ? "Drawn by FalkorDB's canvas component on the database's own node ids; the colours are Cistern's facts."
+                  ? "Drawn by FalkorDB's canvas component on the database's own node ids; the colours are DeVries's facts."
                   : "Laid out by ELK in lanes, drawn with React Flow; a card is filled when untrusted text reaches it, which FalkorDB works out (reach.untrusted_nodes)."}
                 {flow ? " A path means text can flow, not that it did." : " Config edges are what a person set up; the flow layer is derived from them."}
                 {c.health?.canary && <> Self-check: {c.health.canary.ok ? "passed" : "FAILED"} ({c.health.canary.detail}).</>}

@@ -12,15 +12,15 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).parent))
 
-from cistern.agent import phases, prompts  # noqa: E402
-from cistern.agent.llm import AssistantTurn, LLMError, LLMRefused, ToolResults, UserText, spend  # noqa: E402
-from cistern.analysis import findings  # noqa: E402
-from cistern.analysis.models import finding_id, injection_fingerprint  # noqa: E402
-from cistern.config import get_settings  # noqa: E402
-from cistern.events import bus  # noqa: E402
-from cistern.graph import keys  # noqa: E402
-from cistern.mitigation import sandbox, store  # noqa: E402
-from cistern.mitigation.dsl import FixPlan, mitigation_id  # noqa: E402
+from devries.agent import phases, prompts  # noqa: E402
+from devries.agent.llm import AssistantTurn, LLMError, LLMRefused, ToolResults, UserText, spend  # noqa: E402
+from devries.analysis import findings  # noqa: E402
+from devries.analysis.models import finding_id, injection_fingerprint  # noqa: E402
+from devries.config import get_settings  # noqa: E402
+from devries.events import bus  # noqa: E402
+from devries.graph import keys  # noqa: E402
+from devries.mitigation import sandbox, store  # noqa: E402
+from devries.mitigation.dsl import FixPlan, mitigation_id  # noqa: E402
 from fake import FakeLLM, call, calls, drive, new_run, say, tools_used  # noqa: E402
 from helpers import build, flows, workflow  # noqa: E402
 
@@ -313,7 +313,7 @@ async def test_a_plan_made_stale_before_apply_is_searched_for_again(client, grap
     await desk(client, graph)
 
     async def change_then_approve(run):
-        from cistern import ops
+        from devries import ops
         if not getattr(change_then_approve, "done", False):
             change_then_approve.done = True
             await client.run("ingest.workflows", graph, rows=[workflow("refunds", "autonomous")])
@@ -413,7 +413,7 @@ async def test_a_question_cannot_close_its_own_block():
 # ---------------------------------------------------------------------- measuring the agent against the search
 
 async def test_evaluation_takes_a_run_to_its_proposal_and_compares_it_with_the_search(client, graph):
-    from cistern.agent import evaluate
+    from devries.agent import evaluate
 
     name = await desk(client, graph)
     before = set(await client.list_graphs())
@@ -431,7 +431,7 @@ async def test_evaluation_takes_a_run_to_its_proposal_and_compares_it_with_the_s
 
 
 async def test_evaluation_does_not_count_a_scripted_run_as_the_agents(client, graph):
-    from cistern.agent import evaluate
+    from devries.agent import evaluate
 
     name = await desk(client, graph)
     measured = await evaluate.measure_agent(client, FakeLLM([LLMError("the provider is down")]), name, 1)
@@ -443,7 +443,7 @@ async def test_evaluation_does_not_count_a_scripted_run_as_the_agents(client, gr
 # ---------------------------------------------------------------------- questions the graph answers without a model
 
 def test_the_four_question_kinds_are_recognised_and_nothing_else():
-    from cistern.agent.scripted import parse_question, resolve
+    from devries.agent.scripted import parse_question, resolve
 
     assert parse_question("What can reach the payments API?") == ("into", ["the payments api"])
     assert parse_question("who reaches res:payments") == ("into", ["res:payments"])

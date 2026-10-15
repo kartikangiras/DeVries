@@ -2,9 +2,9 @@
 
 import pytest
 
-from cistern.analysis import canary, chokepoints, findings, zones
-from cistern.analysis.models import Finding, PathEvidence
-from cistern.errors import CanaryFailed
+from devries.analysis import canary, chokepoints, findings, zones
+from devries.analysis.models import Finding, PathEvidence
+from devries.errors import CanaryFailed
 from helpers import broken, build, res, set_call_gate, src
 
 PRIVATE = {"id": "src:crm", "name": "crm", "trust": "private"}

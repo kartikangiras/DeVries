@@ -1,7 +1,7 @@
 // The screens beyond the gate: the overview as a sankey, the whole-graph chart on both renderers (hover
 // line, click to read, layers, the cheapest cut and its policy, communities, the edges as a table), the
 // servers page, the what-if page, the queries drawer, the scenario switch, a deep link, a plan that is
-// rejected and the split that is approved in its place, Cistern's audit of itself, the two fixes of
+// rejected and the split that is approved in its place, DeVries's audit of itself, the two fixes of
 // acme_dev from the ledger, the ask box, the import page, and narrower screens. Needs the app running.
 //
 //   node e2e/views.mjs [app url]                    screenshots land in e2e/shots/
@@ -57,7 +57,7 @@ const stepTo = (page, name) => page.locator(".workflow-step", { hasText: name })
 
   // every node, as cards in lanes: what is under the pointer is named, a clicked card is read out beside the chart
   await tab(page, "All nodes").click();
-  await tab(page, "Cistern").click();
+  await tab(page, "DeVries").click();
   await page.waitForSelector(".chart .fcard", { timeout: 60000 });
   out.lanes = await page.locator(".chart .lane").allTextContents();
   need(out.lanes.length === 5, `the support graph should have five lanes, got ${out.lanes}`);
@@ -85,7 +85,7 @@ const stepTo = (page, name) => page.locator(".workflow-step", { hasText: name })
   await tab(page, "Tree").click();
   await page.waitForTimeout(1200);
   await shot(page, "views-graph-canvas");
-  await tab(page, "Cistern").click();
+  await tab(page, "DeVries").click();
 
   // one step further in: the config layer and its edges as a table
   await tab(page, "More").click();
@@ -168,7 +168,7 @@ const stepTo = (page, name) => page.locator(".workflow-step", { hasText: name })
   // the scenario switch with its way to an import, and a deep link straight to a finding
   await page.locator(".switch-button").click();
   out.scenarios = await page.locator(".switch-menu li:not(.switch-import) .switch-name").allInnerTexts();
-  need(out.scenarios.length === 4 && out.scenarios.includes("Cistern itself"), "the switch should list the four scenarios by their titles: " + out.scenarios);
+  need(out.scenarios.length === 4 && out.scenarios.includes("DeVries itself"), "the switch should list the four scenarios by their titles: " + out.scenarios);
   need((await page.locator(".switch-menu .switch-import").count()) === 1, "the switch should offer an import of your own config");
   await page.locator(".switch-menu button", { hasText: "Acme support" }).click();
   await page.waitForFunction(() => location.hash === "#/acme_support");
@@ -227,17 +227,17 @@ const stepTo = (page, name) => page.locator(".workflow-step", { hasText: name })
   await page.getByRole("button", { name: "Reset" }).click();
   await page.waitForFunction(() => document.querySelector(".session-name")?.textContent === "Shared scenario", null, { timeout: 240000 });
 
-  // Cistern audited by Cistern: nothing open, and the one hop that would open something is gated
-  await page.goto(`${base}/#/cistern_self`);
+  // DeVries audited by DeVries: nothing open, and the one hop that would open something is gated
+  await page.goto(`${base}/#/devries_self`);
   await page.waitForFunction(() => document.querySelector(".page-head h1")?.textContent === "Inbox zero.");
-  await page.goto(`${base}/#/cistern_self/graph`);
+  await page.goto(`${base}/#/devries_self/graph`);
   await page.waitForSelector(".sankey", { state: "attached" });
   need(/Nothing is drawn because nothing is open/.test(await text(page, ".sankey .chart-over")), "with nothing open the overview should say so");
   await tab(page, "All nodes").click();
-  await tab(page, "Cistern").click();
+  await tab(page, "DeVries").click();
   await page.waitForSelector('.chart .fcard[data-id="agent:auditor"]', { timeout: 60000 });
   out.selfGated = await page.locator(".chart .wire.gated").evaluateAll((wires) => wires.map((w) => w.getAttribute("data-hop")));
-  need(out.selfGated.join() === "agent:auditor>tool:cistern.apply_fix", "the auditor's own apply_fix should be the one gated hop: " + out.selfGated);
+  need(out.selfGated.join() === "agent:auditor>tool:devries.apply_fix", "the auditor's own apply_fix should be the one gated hop: " + out.selfGated);
   need(await page.locator('.fcard.hot[data-id="agent:auditor"]').count() === 1 && await page.locator('.fcard.plain[data-id="res:agent-config"]').count() === 1,
     "untrusted text should reach the auditor and stop short of the agent configuration");
   await shot(page, "views-self-graph");

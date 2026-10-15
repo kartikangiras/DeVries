@@ -1,7 +1,7 @@
-// The landing page: what Cistern is, before the app. Its structure, its measurements and its motion
+// The landing page: what DeVries is, before the app. Its structure, its measurements and its motion
 // follow Manthan's landing page (manthan-ui/src/pages/Landing.tsx, Copyright 2026 Manthan
 // Engineering, Apache-2.0; see ui/THIRD_PARTY_NOTICES.md), rewritten as plain React and CSS for
-// Cistern's own content, with the accent moved from emerald to iris and the videos replaced by a
+// DeVries's own content, with the accent moved from emerald to iris and the videos replaced by a
 // drawn background. Routes stay in the hash: the bare address is this page, "#/acme_support" is the app.
 
 import { useEffect, useRef, useState, type CSSProperties, type MouseEvent } from "react";
@@ -74,8 +74,8 @@ function Hero({ app }: { app: string }) {
     <section ref={section} className="l-hero">
       <nav className="l-nav">
         <a href="#/" className="l-brand" onClick={jump("top")}>
-          <Mark size={26} />
-          <span>Cistern</span>
+          <Mark size={30} />
+          <span>DeVries</span>
         </a>
         <div className="l-nav-right">
           <a href="#/" className="l-nav-link" onClick={jump("how")}>How it works</a>
@@ -124,7 +124,7 @@ function Hero({ app }: { app: string }) {
 /* ---- 2 · manifesto: one sentence, lit word by word as it is scrolled into */
 
 const LINE =
-  "A list of grants never tells the whole story. Cistern puts every agent, tool, data source and resource in one " +
+  "A list of grants never tells the whole story. DeVries puts every agent, tool, data source and resource in one " +
   "FalkorDB graph, derives where text can flow, finds each path to a payment or a deploy, and tests the fix on a " +
   "copy before anyone is asked.";
 
@@ -162,7 +162,7 @@ function Manifesto() {
       <Reveal className="l-manifesto-inner" y={50} margin="-120px" duration={0.7}>
         <Reveal className="l-manifesto-label" y={16} delay={0.05} duration={0.5} margin="-120px">
           <span className="l-quote" aria-hidden>“</span>
-          <span>How Cistern works</span>
+          <span>How DeVries works</span>
         </Reveal>
         <Reveal className="l-words" y={24} delay={0.12} duration={0.7} margin="-120px">
           <div ref={words} className="l-words-inner" style={{ "--n": parts.length } as CSSProperties}>
@@ -240,7 +240,7 @@ function Stack() {
             <em>your agents already run.</em>
           </h2>
           <p>
-            Claude Desktop, Cursor, a command, a URL or a saved tools/list. Cistern loads every MCP server it
+            Claude Desktop, Cursor, a command, a URL or a saved tools/list. DeVries loads every MCP server it
             finds, classifies each tool it lists, and audits the whole system as one graph.
           </p>
         </Reveal>
@@ -328,7 +328,7 @@ function AnatomySection() {
   );
 }
 
-/* ---- 6 · run it: where Manthan prices, Cistern says one command */
+/* ---- 6 · run it: where Manthan prices, DeVries says one command */
 
 const CLOSED = ["The finding is gone", "No new finding appeared", "Every workflow still has what it needs"];
 const COUNTS: [string, string][] = [["Rules", "7"], ["Kinds of fix", "5"], ["Queries", "81"], ["MCP tools", "11"], ["Scenarios", "4"]];
@@ -346,7 +346,7 @@ function RunIt({ app, queries }: { app: string; queries: string }) {
           <span className="l-price-unit">/ nothing to install</span>
         </Reveal>
         <Reveal as="p" className="l-run-sub" y={0} delay={0.3} duration={0.5} margin="-80px">
-          The support desk, the executive office, the dev team and Cistern itself are loaded, scanned, and their first plans tested. Paste your own client config or a tools/list to audit what you actually run.
+          The support desk, the executive office, the dev team and DeVries itself are loaded, scanned, and their first plans tested. Paste your own client config or a tools/list to audit what you actually run.
         </Reveal>
         <Reveal className="l-run-ctas" y={12} delay={0.35} duration={0.5} margin="-80px">
           <a href={app} className="l-btn-accent">Open the app <Arrow /></a>
@@ -430,8 +430,8 @@ function Footer({ app, queries }: { app: string; queries: string }) {
           <Ambient seed={9} strength={0.9} />
           <div className="l-fcard-vignette" />
           <div className="l-fbrand">
-            <Mark size={28} />
-            <span>Cistern</span>
+            <Mark size={32} />
+            <span>DeVries</span>
           </div>
           <div className="l-ftag">
             <p>
@@ -466,7 +466,7 @@ function Footer({ app, queries }: { app: string; queries: string }) {
             <FooterCol title="Project" links={project} />
           </div>
           <div className="l-fbottom">
-            <span className="l-fcopy">© {new Date().getFullYear()} Cistern. Built for Graph Hacks: Context for AI Agents.</span>
+            <span className="l-fcopy">© {new Date().getFullYear()} DeVries. Built for Graph Hacks: Context for AI Agents.</span>
             <div className="l-fsub">
               <h4>
                 Run it yourself.
@@ -510,7 +510,7 @@ function Watermark() {
   return (
     <Reveal className="l-watermark" y={24} delay={0.3} duration={0.9} margin="-40px">
       <svg ref={svg} viewBox="62 95 876 175" preserveAspectRatio="xMidYMid meet" aria-hidden>
-        <text ref={text} x={500} y={240} textAnchor="middle" fontSize={320}>Cistern</text>
+        <text ref={text} x={500} y={240} textAnchor="middle" fontSize={320}>DeVries</text>
       </svg>
     </Reveal>
   );

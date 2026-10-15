@@ -12,7 +12,7 @@ import { FIX_VERB, deskOf, exposure, patchText, recommendation, verdictLine, typ
 import { Chart, RendererSwitch, useRenderer } from "../graph/Chart";
 import { KIND_OF, cutsOf, findingQueries, focusOf, hopKey, linkIndex, nodeFacts, nodeIndex, pathsOf, withReaders } from "../paths";
 import { href } from "../route";
-import type { Cistern } from "../state";
+import type { DeVries } from "../state";
 import { KIND_WORDS, WithNames, capital, clock, plural, short } from "../text";
 import { RunTrace } from "../Trace";
 import { Button, Empty, Eyebrow, KV, Loading } from "../ui";
@@ -25,7 +25,7 @@ const two = (n: number) => String(n).padStart(2, "0");
 type Step = "problem" | "fix" | "options" | "trace";
 
 /** Hop by hop: the rule that derived each one, the config edge behind it, and whether a fix can cut it. */
-function Hops({ path, c }: { path: Path; c: Cistern }) {
+function Hops({ path, c }: { path: Path; c: DeVries }) {
   const live = linkIndex(c.flow);
   return (
     <ol className="steps hops">
@@ -68,7 +68,7 @@ function Hops({ path, c }: { path: Path; c: Cistern }) {
 }
 
 /** The plan on the table, change by change, each with the literal edit to the configuration. */
-function Drafted({ plan, c, applying }: { plan: Mitigation; c: Cistern; applying: boolean }) {
+function Drafted({ plan, c, applying }: { plan: Mitigation; c: DeVries; applying: boolean }) {
   const n = plan.plan.fixes.length;
   return (
     <section className="block drafted">
@@ -100,7 +100,7 @@ function Drafted({ plan, c, applying }: { plan: Mitigation; c: Cistern; applying
 }
 
 /** After Approve: what happened, in order. Applied by a run, each line comes from the step that did it; by a click, from what apply always does. */
-function Applied({ plan, run, c }: { plan: Mitigation; run: RunWithSteps | null; c: Cistern }) {
+function Applied({ plan, run, c }: { plan: Mitigation; run: RunWithSteps | null; c: DeVries }) {
   const mine = run && run.mitigation_id === plan.id ? run.steps : [];
   const person = mine.find((s) => s.by === "person");
   const apply = mine.find((s) => s.tool === "apply_fix");
@@ -142,7 +142,7 @@ function Applied({ plan, run, c }: { plan: Mitigation; run: RunWithSteps | null;
 }
 
 /** Every plan a sandbox was asked about for this finding, passed or not, with the reason; a passing one can be previewed. */
-function Tested({ desk, c, picked, onPick }: { desk: Desk; c: Cistern; picked: string | null; onPick: (id: string | null) => void }) {
+function Tested({ desk, c, picked, onPick }: { desk: Desk; c: DeVries; picked: string | null; onPick: (id: string | null) => void }) {
   if (!desk.tested.length) return <Empty>No plan has been tested for this finding yet.</Empty>;
   const ms = desk.tested.reduce((sum, m) => sum + (m.sandbox_ms ?? 0), 0);
   return (
@@ -171,7 +171,7 @@ function Tested({ desk, c, picked, onPick }: { desk: Desk; c: Cistern; picked: s
 }
 
 /** Why the path is a problem: the agents on it against Meta's Rule of Two, the workflows that constrain a fix, the class in OWASP's list. */
-function Analysis({ finding, agentIds, c, scenario }: { finding: Finding; agentIds: string[]; c: Cistern; scenario: string }) {
+function Analysis({ finding, agentIds, c, scenario }: { finding: Finding; agentIds: string[]; c: DeVries; scenario: string }) {
   const cards = agentIds.map((id) => c.scorecard?.agents.find((a) => a.agent_id === id)).filter((a): a is NonNullable<typeof a> => !!a);
   const workflows = (c.flow?.workflows ?? []).filter((w) => agentIds.includes(w.run_by));
   return (
@@ -208,7 +208,7 @@ function Analysis({ finding, agentIds, c, scenario }: { finding: Finding; agentI
   );
 }
 
-function Rail({ finding, cites, picked, onPick, c, scenario }: { finding: Finding; cites: Map<string, number>; picked: string | null; onPick: (id: string | null) => void; c: Cistern; scenario: string }) {
+function Rail({ finding, cites, picked, onPick, c, scenario }: { finding: Finding; cites: Map<string, number>; picked: string | null; onPick: (id: string | null) => void; c: DeVries; scenario: string }) {
   const nodes = nodeIndex(c.flow);
   const paths = pathsOf(finding);
   const catalog = new Map(c.catalog.map((q) => [q.name, q]));
@@ -314,7 +314,7 @@ function Rail({ finding, cites, picked, onPick, c, scenario }: { finding: Findin
 }
 
 /** What an attacker would plant: the model's rehearsal of the finding, asked for from here and answered as a question run. */
-function Rehearsal({ finding, c, scenario }: { finding: Finding; c: Cistern; scenario: string }) {
+function Rehearsal({ finding, c, scenario }: { finding: Finding; c: DeVries; scenario: string }) {
   const model = c.session?.model;
   const runs = c.runList.filter((r) => r.kind === "ask" && (r.question ?? "").startsWith(`Rehearse ${finding.id}:`));
   const latest = runs[0];
@@ -347,9 +347,9 @@ function Rehearsal({ finding, c, scenario }: { finding: Finding; c: Cistern; sce
 }
 
 /** A standing finding (drift, a poisoned description): what was found, and the one decision a person can take, to accept it. */
-function StandingPage({ c, scenario, finding }: { c: Cistern; scenario: string; finding: Finding }) {
+function StandingPage({ c, scenario, finding }: { c: DeVries; scenario: string; finding: Finding }) {
   const poisoned = finding.kind === "poisoned_description";
-  const [approver, setApprover] = useState(() => localStorage.getItem("cistern.approver") ?? "");
+  const [approver, setApprover] = useState(() => localStorage.getItem("devries.approver") ?? "");
   const desk = deskOf(finding, c.plans, c.run, c.openIds);
   const head = headline(finding, c.names);
   const d = finding.drift ?? { added: [], removed: [], changed: {} };
@@ -408,7 +408,7 @@ function StandingPage({ c, scenario, finding }: { c: Cistern; scenario: string; 
             ))}
           </ol>
           {finding.status === "open" && (
-            <form className="accept" onSubmit={(e) => { e.preventDefault(); localStorage.setItem("cistern.approver", approver.trim()); c.acceptFinding(finding.id, approver.trim() || "a visitor"); }}>
+            <form className="accept" onSubmit={(e) => { e.preventDefault(); localStorage.setItem("devries.approver", approver.trim()); c.acceptFinding(finding.id, approver.trim() || "a visitor"); }}>
               <Eyebrow>Your decision</Eyebrow>
               <p className="rail-note">{poisoned
                 ? "Accepting says you have read the description and will run the tool as it is. It changes nothing in the graph; the next scan keeps the finding, marked accepted. No tool can do this."
@@ -447,12 +447,12 @@ function StandingPage({ c, scenario, finding }: { c: Cistern; scenario: string; 
   );
 }
 
-export function FindingPage({ c, scenario, finding }: { c: Cistern; scenario: string; finding: Finding }) {
+export function FindingPage({ c, scenario, finding }: { c: DeVries; scenario: string; finding: Finding }) {
   if (finding.kind === "drift" || finding.kind === "poisoned_description") return <StandingPage c={c} scenario={scenario} finding={finding} />;
   return <FindingBody c={c} scenario={scenario} finding={finding} />;
 }
 
-function FindingBody({ c, scenario, finding }: { c: Cistern; scenario: string; finding: Finding }) {
+function FindingBody({ c, scenario, finding }: { c: DeVries; scenario: string; finding: Finding }) {
   const [step, setStep] = useState<Step>("problem");
   const [scope, setScope] = useState<"finding" | "system">("finding");
   const [renderer, setRenderer] = useRenderer();

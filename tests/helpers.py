@@ -1,6 +1,6 @@
 """Small builders for config graphs in tests. They go through the same ingest queries the loader uses."""
 
-from cistern.graph.client import GraphClient
+from devries.graph.client import GraphClient
 
 
 def src(name: str, trust: str = "untrusted") -> dict:

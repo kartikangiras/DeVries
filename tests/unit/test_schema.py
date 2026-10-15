@@ -3,8 +3,8 @@
 import pytest
 import redis.exceptions as rex
 
-from cistern.graph import schema
-from cistern.graph.catalog import CONSTRAINED_LABELS, INDEXES
+from devries.graph import schema
+from devries.graph.catalog import CONSTRAINED_LABELS, INDEXES
 from helpers import agent
 
 

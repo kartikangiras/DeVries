@@ -1,5 +1,5 @@
 // The small pieces every page is made of. Their shapes and sizes follow Manthan's page, button and
-// badge components (see ui/THIRD_PARTY_NOTICES.md); the code and the icons are Cistern's own.
+// badge components (see ui/THIRD_PARTY_NOTICES.md); the code and the icons are DeVries's own.
 
 import type { ButtonHTMLAttributes, ReactNode } from "react";
 import type { Tone } from "./desk";
@@ -111,13 +111,7 @@ export function Icon({ name, size = 20 }: { name: keyof typeof ICONS; size?: num
   );
 }
 
-/** Cistern's mark: a basin and its outlet. */
-export function Mark({ size = 20 }: { size?: number }) {
-  return (
-    <svg className="mark" width={size} height={size} viewBox="0 0 32 32" aria-hidden>
-      <rect width="32" height="32" rx="7" />
-      <path d="M9 11h14v3a7 7 0 0 1-14 0z" />
-      <path d="M16 21v4" />
-    </svg>
-  );
+/** DeVries's mark: a basin and its outlet. */
+export function Mark({ size = 24 }: { size?: number }) {
+  return <img className="mark" src="/brand/mark.png" width={size} height={size} alt="" aria-hidden />;
 }

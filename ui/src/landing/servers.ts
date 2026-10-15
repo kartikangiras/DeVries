@@ -1,5 +1,5 @@
 // MCP servers shown on the landing page, with their marks from simple-icons (CC0-1.0). The marquee
-// says what Cistern can load: any server a client config names, and the tools it lists. Brands
+// says what DeVries can load: any server a client config names, and the tools it lists. Brands
 // whose mark is black are drawn in ink so they read on a dark surface.
 
 import {

@@ -11,7 +11,7 @@ import { WhatIfPage } from "./pages/WhatIf";
 import { Landing } from "./landing/Landing";
 import { href, readRoute, type Route } from "./route";
 import { Shell } from "./Shell";
-import { useCistern } from "./state";
+import { useDeVries } from "./state";
 import { Empty, Loading, PageBody } from "./ui";
 
 const PLACE: Record<string, string> = {
@@ -30,12 +30,12 @@ export default function App() {
   if (route.page !== "queries") under.current = route;
   else if (under.current.scenario !== route.scenario) under.current = { scenario: route.scenario, page: "inbox", id: null };
 
-  const c = useCistern(route.scenario);
+  const c = useDeVries(route.scenario);
   const { scenario, page, id } = route;
   const shown = page === "queries" ? under.current : route;
 
   useEffect(() => {
-    document.title = scenario ? `${PLACE[page]} · ${c.titleOf(scenario)} · Cistern` : "Cistern";
+    document.title = scenario ? `${PLACE[page]} · ${c.titleOf(scenario)} · DeVries` : "DeVries";
   }, [page, scenario, c.titleOf]);
 
   // a bare address is the landing page; the app starts at a scenario

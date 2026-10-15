@@ -5,20 +5,20 @@ import asyncio
 import pytest
 from pydantic import ValidationError
 
-from cistern.analysis import findings
-from cistern.analysis.models import injection_fingerprint, trifecta_fingerprint
-from cistern.config import get_settings
-from cistern.errors import ForbiddenWrite, NotFound
-from cistern.graph import keys
-from cistern.mitigation import apply, sandbox, search, store
-from cistern.analysis import chokepoints
-from cistern.errors import InvalidFix
-from cistern.mitigation.candidates import candidates
-from cistern.mitigation.dsl import DropRead, SplitAgent, reader_id
-from cistern.mitigation.dsl import (
+from devries.analysis import findings
+from devries.analysis.models import injection_fingerprint, trifecta_fingerprint
+from devries.config import get_settings
+from devries.errors import ForbiddenWrite, NotFound
+from devries.graph import keys
+from devries.mitigation import apply, sandbox, search, store
+from devries.analysis import chokepoints
+from devries.errors import InvalidFix
+from devries.mitigation.candidates import candidates
+from devries.mitigation.dsl import DropRead, SplitAgent, reader_id
+from devries.mitigation.dsl import (
     AddDelegation, FixPlan, GateCall, GrantCall, QuarantineDelegation, RevokeCall, config_patch, mitigation_id,
 )
-from cistern.mitigation.sandbox import StaleTarget, config_hash
+from devries.mitigation.sandbox import StaleTarget, config_hash
 from helpers import broken, build, flows, gated, set_call_gate, workflow
 
 PRIVATE = {"id": "src:crm", "name": "crm", "trust": "private"}
@@ -615,7 +615,7 @@ async def test_candidates_offer_a_drop_for_each_read_and_a_split_for_an_agent_th
 
 
 def test_the_legs_of_a_trifecta_are_read_together_when_looking_for_an_agent_to_split():
-    from cistern.analysis.models import Finding, PathEvidence
+    from devries.analysis.models import Finding, PathEvidence
 
     finding = Finding(id="fnd:x", fingerprint="x", kind="trifecta", severity="high", agent_id="agent:a", evidence=[
         PathEvidence(node_ids=["src:mail", "tool:read", "agent:r", "agent:a"], rules=[1, 2, 6], leg="untrusted"),

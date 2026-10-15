@@ -1,4 +1,4 @@
-# Putting Cistern on a public address
+# Putting DeVries on a public address
 
 **This has not been done.** Nothing here has run on a server. The overlay was brought up on a laptop with
 `SITE_ADDRESS=localhost` and checked through the proxy (the list at the end); the steps below are what that
@@ -28,8 +28,8 @@ overlay, the one thing reachable from outside the machine is Caddy, on ports 80 
    cp .env.example .env
    # in .env, set:
    #   FALKORDB_PASSWORD=<a long random value>
-   #   CISTERN_MCP_TOKEN=<another long random value>   # external MCP clients send it as a bearer token
-   #   SITE_ADDRESS=cistern.example.org                # the public host name
+   #   DEVRIES_MCP_TOKEN=<another long random value>   # external MCP clients send it as a bearer token
+   #   SITE_ADDRESS=devries.example.org                # the public host name
    #   ANTHROPIC_API_KEY=...                           # optional: without it every run is scripted, and says so
    #   LLM_DAILY_BUDGET_USD=5                          # the overlay's default; past it, new runs are scripted
    ```
@@ -41,7 +41,7 @@ overlay, the one thing reachable from outside the machine is Caddy, on ports 80 
    ```
 
    The app loads any scenario graph that is missing and scans it, so a fresh volume heals itself.
-4. From another machine: `deploy/uptime-check.sh https://cistern.example.org`. Put it on a timer for as long as
+4. From another machine: `deploy/uptime-check.sh https://devries.example.org`. Put it on a timer for as long as
    the deployment has to stay up.
 
 To update: `git pull`, then the same `up` command. To stop and keep the data: the same command with `down`.
@@ -66,7 +66,7 @@ Checked on 13 October 2026, with the overlay up on `https://localhost:8443`:
 - the event stream's first event arrives at once, so the proxy is not buffering it
 - the browser test of the whole loop (audit, approve, the finding closes, on two scenarios) passes through the
   proxy, with the local certificate authority accepted for the test
-- without `CISTERN_MCP_TOKEN` or `SITE_ADDRESS` the overlay refuses to start, and says which is missing
+- without `DEVRIES_MCP_TOKEN` or `SITE_ADDRESS` the overlay refuses to start, and says which is missing
 
 Not checked: a real certificate from Let's Encrypt, a real host name, a reboot, memory under many sessions, and
 anything about a particular provider.

@@ -5,9 +5,9 @@ from pathlib import Path
 
 import yaml
 
-from cistern.ingest.importer import grants_from_rules, read_permissions, rule_matches
-from cistern.mitigation.compile import Origin, compile_draft, policy_from_cut, split_tool
-from cistern.mitigation.dsl import DropRead, GateCall, QuarantineDelegation, RevokeCall, SplitAgent
+from devries.ingest.importer import grants_from_rules, read_permissions, rule_matches
+from devries.mitigation.compile import Origin, compile_draft, policy_from_cut, split_tool
+from devries.mitigation.dsl import DropRead, GateCall, QuarantineDelegation, RevokeCall, SplitAgent
 
 ROOT = Path(__file__).resolve().parents[2]
 GATE = GateCall(kind="gate_call", agent_id="agent:support-bot", tool_id="tool:payments.issue_refund")

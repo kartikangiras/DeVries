@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import type { Finding } from "./api";
 
-/** Every id Cistern issues, as it appears in prose. The server's grounding check uses the same shape. */
+/** Every id DeVries issues, as it appears in prose. The server's grounding check uses the same shape. */
 export const ID = /\b(?:agent|tool|src|res|wf|srv|fnd|mit|scan|run):[A-Za-z0-9][A-Za-z0-9_.-]*/g;
 const trimId = (raw: string) => raw.replace(/[.\-_]+$/, "");
 

@@ -57,7 +57,7 @@ for (const [scenario, fix, cut] of [["acme_support", "gate one call", "set gate 
   need((await page.locator(".case .owasp").count()) === r.openBefore, `${scenario}: each open row should carry its OWASP class`);
   await shot(`${scenario}-1-inbox`);
 
-  // step 1, the problem: the brief, the path on Cistern's chart, the evidence it cites, the hops, the analysis
+  // step 1, the problem: the brief, the path on DeVries's chart, the evidence it cites, the hops, the analysis
   await page.locator(".case").first().click();
   await page.waitForSelector(".brief-title");
   await page.waitForSelector(".chart .fcard", { timeout: 60000 });
@@ -94,7 +94,7 @@ for (const [scenario, fix, cut] of [["acme_support", "gate one call", "set gate 
   await page.waitForTimeout(1200);
   need(/FalkorDB's canvas/.test(await first(".canvas-chart .chart-over")), `${scenario}: the canvas renderer should say what it is`);
   await shot(`${scenario}-2-finding-canvas`);
-  await page.getByRole("tab", { name: "Cistern" }).click();
+  await page.getByRole("tab", { name: "DeVries" }).click();
   await page.waitForSelector(".chart .fcard", { timeout: 60000 });
   await shot(`${scenario}-2-finding`);
 

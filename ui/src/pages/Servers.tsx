@@ -5,10 +5,10 @@
 import { useEffect, useState } from "react";
 import { api, type Servers as ServerList, type WhatIf } from "../api";
 import { href } from "../route";
-import type { Cistern } from "../state";
+import type { DeVries } from "../state";
 import { Empty, Eyebrow, Loading, PageBody, PageHeader } from "../ui";
 
-export function ServerTable({ c, scenario }: { c: Cistern; scenario: string }) {
+export function ServerTable({ c, scenario }: { c: DeVries; scenario: string }) {
   const [servers, setServers] = useState<ServerList | null>(null);
   const [answers, setAnswers] = useState<Record<string, WhatIf | string>>({});
   const [asking, setAsking] = useState<string | null>(null);
@@ -63,7 +63,7 @@ export function ServerTable({ c, scenario }: { c: Cistern; scenario: string }) {
   );
 }
 
-export function ServersPage({ c, scenario }: { c: Cistern; scenario: string }) {
+export function ServersPage({ c, scenario }: { c: DeVries; scenario: string }) {
   return (
     <PageBody width="wide">
       <PageHeader eyebrow="Servers" title="What each MCP server puts into the system." meta="Its tools, who holds them, the findings that run through it, and what a sandbox says removing it would do." />

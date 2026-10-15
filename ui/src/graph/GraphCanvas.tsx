@@ -1,6 +1,6 @@
 // FalkorDB's own canvas component, fed the same graph the other charts draw: the database's node ids,
 // our facts on each node, a force or a tree layout. It is the second renderer on every chart, so a
-// visitor can see the graph the way FalkorDB's own tools show it, beside the chart Cistern draws.
+// visitor can see the graph the way FalkorDB's own tools show it, beside the chart DeVries draws.
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import "@falkordb/canvas";

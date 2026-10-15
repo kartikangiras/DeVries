@@ -1,7 +1,7 @@
 // The showcase in the hero: one finding on the support desk, from the scan to its closing, in a
 // run the visitor starts and nods through. The frame, its phases and its measurements follow
 // Manthan's LandingHeroDemo (manthan-ui/src/components/landing/LandingHeroDemo.tsx, Apache-2.0;
-// see ui/THIRD_PARTY_NOTICES.md). The content is Cistern's: the hops, the verdicts and the receipts
+// see ui/THIRD_PARTY_NOTICES.md). The content is DeVries's: the hops, the verdicts and the receipts
 // are what the app shows on acme_support.
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
@@ -335,7 +335,7 @@ function ExplainingCanvas({ elapsed }: { elapsed: number }) {
       <div className="ld-col">
         <Eyebrow>Explaining</Eyebrow>
         <div className="ld-statement">
-          Cistern is tracing <span key={hop.rule} className="ld-subject ld-in">rule {hop.rule}</span>
+          DeVries is tracing <span key={hop.rule} className="ld-subject ld-in">rule {hop.rule}</span>
         </div>
         <div className="ld-question"><span key={hop.rule} className="ld-in">{hop.words}.</span></div>
         <div className="ld-glyph"><PathGlyph lit={idx} /></div>
@@ -372,7 +372,7 @@ function TestingCanvas({ elapsed }: { elapsed: number }) {
       <div className="ld-col">
         <Eyebrow>Testing fixes</Eyebrow>
         <div className="ld-statement">
-          Cistern is testing <span key={idx} className="ld-subject ld-in">{c.short}</span>
+          DeVries is testing <span key={idx} className="ld-subject ld-in">{c.short}</span>
         </div>
         <div className="ld-question"><span key={idx} className="ld-in">on a copy of the graph, with the same three queries.</span></div>
         <div className="ld-glyph"><SandboxGlyph verdict={show ? c.passed : null} /></div>

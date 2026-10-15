@@ -39,7 +39,7 @@ function DiffLines({ text }: { text: string }) {
  * follows Manthan's approval bar (see ui/THIRD_PARTY_NOTICES.md).
  */
 export function ApprovalBar({ mitigation, names, busy, scenario, canWrite, onApprove, onReject }: Props) {
-  const [approver, setApprover] = useState(() => localStorage.getItem("cistern.approver") ?? "");
+  const [approver, setApprover] = useState(() => localStorage.getItem("devries.approver") ?? "");
   // Turning a plan down, and why, belong to that one plan. When another plan takes its place in the bar
   // the bar is back to its two buttons: a reason typed for one plan can never be sent with the next.
   const [refusal, setRefusal] = useState<{ id: string; reason: string } | null>(null);
@@ -62,7 +62,7 @@ export function ApprovalBar({ mitigation, names, busy, scenario, canWrite, onApp
   const rejecting = refusal?.id === mitigation.id;
   const reason = rejecting ? refusal!.reason : "";
   const who = approver.trim() || "a visitor";
-  const remember = () => localStorage.setItem("cistern.approver", approver.trim());
+  const remember = () => localStorage.setItem("devries.approver", approver.trim());
   const changes = mitigation.summary.length;
   const d = draft?.draft ?? null;
   const can = canWrite && !!draft?.can_write && !!d?.writable;

@@ -54,7 +54,7 @@ export function tldr(finding: Finding, flow: Graph | undefined): string {
     const flags = finding.flags ?? [];
     const kinds = [...new Set(flags.map((f) => f.detail))];
     const head = `The description of ${finding.tool_id} is not only a description: it ${kinds.join("; it ")}.`;
-    const why = " A tool description reaches the model with every call, so text in it that reads as an instruction is a prompt injection planted by whoever wrote the manifest, which the scanners call tool poisoning. Cistern already shows descriptions to the model inside an untrusted block; this is the first time it tells a person.";
+    const why = " A tool description reaches the model with every call, so text in it that reads as an instruction is a prompt injection planted by whoever wrote the manifest, which the scanners call tool poisoning. DeVries already shows descriptions to the model inside an untrusted block; this is the first time it tells a person.";
     const path = finding.severity === "high" ? " The tool sits on an open finding's path, which is why this is high." : "";
     const now = finding.status === "accepted" ? ` ${finding.accepted_by ?? "A person"} read it and accepted it.` : " It stands until a person reads the description and accepts it; no scan closes it and no fix applies to it.";
     return head + why + path + now;

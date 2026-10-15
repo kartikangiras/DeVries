@@ -24,3 +24,9 @@ ui/e2e/shots/
 # local snapshots and OS files
 .snapshots/
 .DS_Store
+
+# plans and generated documents stay local; the README is the one document that ships
+*.md
+!README.md
+# brand sources
+logos/

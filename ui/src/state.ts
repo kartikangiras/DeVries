@@ -13,7 +13,7 @@ function mergeSteps(a: RunWithSteps["steps"], b: RunWithSteps["steps"]) {
   return [...new Map([...a, ...b].map((step) => [step.n, step])).values()].sort((x, y) => x.n - y.n);
 }
 
-export function useCistern(scenario: string | null) {
+export function useDeVries(scenario: string | null) {
   const [session, setSession] = useState<Session | null>(null);
   const [scenarios, setScenarios] = useState<Scenario[]>([]);
   const [graphs, setGraphs] = useState<Partial<Record<Layer, Graph>>>({});
@@ -281,4 +281,4 @@ export function useCistern(scenario: string | null) {
   };
 }
 
-export type Cistern = ReturnType<typeof useCistern>;
+export type DeVries = ReturnType<typeof useDeVries>;

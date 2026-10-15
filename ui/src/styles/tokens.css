@@ -33,7 +33,7 @@
   --ink-ghost: oklch(0.45 0.006 75);
 
   /* the one accent: what can be acted on, and what has been approved. No glow.
-     Manthan's is a desaturated emerald (hue 150); Cistern's is a desaturated iris (hue 285) at the
+     Manthan's is a desaturated emerald (hue 150); DeVries's is a desaturated iris (hue 285) at the
      same chroma, so that the app and the landing page are not mistaken for Manthan's. */
   --accent: oklch(0.64 0.15 285);
   --accent-hover: oklch(0.68 0.15 285);

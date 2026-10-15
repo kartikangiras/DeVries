@@ -3,8 +3,8 @@
 # Copy this into .github/workflows/ of the repository that holds the config, and point `--import` at the
 # file. Labels say what is untrusted and what matters; without them nothing is a finding, so give at least
 # the ones that are true of your system. Nothing is launched: the saved tools/list files under manifests/
-# are what the scan reads, so commit them (an earlier `cistern.ingest --import` writes them).
-name: cistern
+# are what the scan reads, so commit them (an earlier `devries.ingest --import` writes them).
+name: devries
 on: [push, pull_request]
 jobs:
   audit:
@@ -16,14 +16,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
-      - name: Fetch Cistern
-        run: git clone --depth 1 https://github.com/your-org/cistern cistern && cd cistern && uv sync --no-dev
+      - name: Fetch DeVries
+        run: git clone --depth 1 https://github.com/your-org/devries devries && cd devries && uv sync --no-dev
       - name: Scan the config
         env:
           FALKORDB_HOST: localhost
           FALKORDB_PORT: "6379"
         run: |
-          cd cistern
-          uv run python -m cistern.ingest --import ../.mcp.json --name ci_scan \
+          cd devries
+          uv run python -m devries.ingest --import ../.mcp.json --name ci_scan \
             --label src:github=untrusted --label res:filesystem=high \
             --fail-on open

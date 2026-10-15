@@ -1,6 +1,6 @@
 """One test per taint rule, plus the gates. Each builds the smallest config graph that shows the rule."""
 
-from cistern.analysis import findings
+from devries.analysis import findings
 from helpers import build, flows, gated, rebuild, set_call_gate, set_delegation_gate
 
 
@@ -116,8 +116,8 @@ async def test_rule7_what_is_written_to_a_store_is_read_back_from_it(client, gra
 
 
 async def test_rule7_has_no_fix_of_its_own(client, graph):
-    from cistern import views
-    from cistern.analysis.chokepoints import config_edge
+    from devries import views
+    from devries.analysis.chokepoints import config_edge
 
     assert config_edge(7, "res:notes-store", "src:notes") is None
     behind = views.behind_hop(7, "res:notes-store", "src:notes")

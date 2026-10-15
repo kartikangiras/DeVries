@@ -7,8 +7,8 @@ import pytest_asyncio
 
 sys.path.insert(0, str(Path(__file__).parent))
 
-from cistern.graph import keys  # noqa: E402
-from cistern.graph.client import GraphClient  # noqa: E402
+from devries.graph import keys  # noqa: E402
+from devries.graph.client import GraphClient  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
 

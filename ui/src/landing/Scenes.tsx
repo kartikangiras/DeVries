@@ -1,7 +1,7 @@
 // The three scenes beside the steps of "How it works": a scan sweeping the flow layer, four hops
 // gathering into one finding, and candidate fixes going into sandboxes one by one. The staging
 // follows Manthan's HowItWorksScenes (manthan-ui/src/components/marketing/HowItWorksScenes.tsx,
-// Apache-2.0; see ui/THIRD_PARTY_NOTICES.md), redrawn for Cistern's graph with CSS transitions in
+// Apache-2.0; see ui/THIRD_PARTY_NOTICES.md), redrawn for DeVries's graph with CSS transitions in
 // place of GSAP. Each scene runs only while it is on screen.
 
 import { useEffect, useState, type CSSProperties } from "react";

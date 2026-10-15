@@ -10,8 +10,8 @@ import asyncio
 import pytest
 import redis.exceptions as rex
 
-from cistern.graph import keys
-from cistern.graph.catalog import CATALOG
+from devries.graph import keys
+from devries.graph.catalog import CATALOG
 
 REBUILD = CATALOG["projection.rebuild"].cypher
 REACH = CATALOG["reach.untrusted_to_high"].cypher
