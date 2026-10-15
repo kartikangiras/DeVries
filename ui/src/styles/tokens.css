@@ -1,0 +1,207 @@
+/*
+ * Design tokens and base rules.
+ *
+ * Adapted from Manthan's "Operations Memo" design system
+ * (https://github.com/akash-mondal/manthan: manthan-ui/src/globals.css and manthan-ui/.impeccable.md),
+ * Copyright 2026 Manthan Engineering, licensed under the Apache License, Version 2.0.
+ * A copy of the licence is in ui/licenses/Apache-2.0.txt. What was taken and what was changed is
+ * listed in ui/THIRD_PARTY_NOTICES.md. In short: the colour values, radii, easings, the eyebrow,
+ * footnote-marker and hairline rules and the base element rules are Manthan's; the names are
+ * shortened, Tailwind is not used, the light theme is left out, the display serif is Instrument
+ * Serif throughout, and the fonts are served by the app instead of fetched from Google.
+ */
+
+:root {
+  color-scheme: dark;
+
+  /* surfaces: warm-tinted, never pure black */
+  --bg: oklch(0.135 0.006 75);
+  --surface: oklch(0.165 0.006 75);
+  --surface-2: oklch(0.195 0.006 75);
+  --surface-3: oklch(0.225 0.006 75);
+
+  /* rules replace boxes */
+  --rule: oklch(0.30 0.005 75);
+  --rule-soft: oklch(0.22 0.005 75);
+  --rule-strong: oklch(0.40 0.005 75);
+
+  /* ink: warm-tinted, never pure white */
+  --ink: oklch(0.92 0.004 75);
+  --ink-strong: oklch(0.98 0.003 75);
+  --ink-muted: oklch(0.78 0.006 75);
+  --ink-faint: oklch(0.60 0.006 75);
+  --ink-ghost: oklch(0.45 0.006 75);
+
+  /* the one accent: what can be acted on, and what has been approved. No glow.
+     Manthan's is a desaturated emerald (hue 150); Cistern's is a desaturated iris (hue 285) at the
+     same chroma, so that the app and the landing page are not mistaken for Manthan's. */
+  --accent: oklch(0.64 0.15 285);
+  --accent-hover: oklch(0.68 0.15 285);
+  --accent-soft: oklch(0.64 0.15 285 / 0.12);
+  --accent-tint: oklch(0.64 0.15 285 / 0.06);
+  --accent-line: oklch(0.64 0.15 285 / 0.30);
+  --accent-ink: oklch(0.20 0.06 285);
+
+  /* amber means one thing: it is waiting for a person */
+  --amber: oklch(0.78 0.13 75);
+  --amber-soft: oklch(0.78 0.13 75 / 0.12);
+  --amber-line: oklch(0.78 0.13 75 / 0.30);
+
+  --danger: oklch(0.64 0.20 28);
+  --danger-soft: oklch(0.62 0.20 28 / 0.12);
+  --danger-line: oklch(0.62 0.20 28 / 0.32);
+  --info: oklch(0.70 0.11 240);
+  --info-soft: oklch(0.70 0.11 240 / 0.10);
+
+  --ease-out-quart: cubic-bezier(0.25, 1, 0.5, 1);
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+
+  /* restrained radii: no bubbles */
+  --radius-xs: 3px;
+  --radius-sm: 5px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+
+  --sans: "Geist Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "Geist Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  --serif: "Instrument Serif", "Iowan Old Style", Charter, Georgia, serif;
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+}
+
+html {
+  font-family: var(--sans);
+  font-size: 16px;
+  line-height: 1.55;
+  color: var(--ink);
+  background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  font-feature-settings: "ss01", "cv11";
+  /* Geist has no italic and Instrument Serif no bold: never fake either */
+  font-synthesis: none;
+}
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+  min-height: 100vh;
+  overflow: hidden;
+}
+
+h1, h2, h3, h4 {
+  font-weight: 500;
+  letter-spacing: -0.022em;
+  line-height: 1.06;
+  text-wrap: balance;
+  color: var(--ink-strong);
+}
+
+ul, ol { list-style: none; padding: 0; }
+dl, dd { margin: 0; }
+
+::selection {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+
+:focus-visible {
+  outline: 1.5px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 3px;
+}
+
+a { color: inherit; text-decoration: none; }
+
+button {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  padding: 0;
+  text-align: inherit;
+}
+
+button, [role="button"], a, summary {
+  cursor: pointer;
+  transition: color 180ms var(--ease-out-quart), background-color 180ms var(--ease-out-quart),
+    border-color 180ms var(--ease-out-quart), opacity 180ms var(--ease-out-quart);
+}
+button:disabled { cursor: default; }
+
+input, textarea, select {
+  font-family: inherit;
+  background: transparent;
+  color: inherit;
+  border: 0;
+}
+input:focus, textarea:focus { outline: none; }
+input::placeholder { color: var(--ink-ghost); }
+
+code, pre { font-family: var(--mono); font-feature-settings: "zero", "ss01"; }
+
+/* quiet scrollbars, square thumb */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--rule); border-radius: 0; }
+::-webkit-scrollbar-thumb:hover { background: var(--rule-strong); }
+
+/* ---- type that carries meaning */
+
+/* a section's small label: sans capitals, not mono */
+.eyebrow {
+  font-family: var(--sans);
+  text-transform: uppercase;
+  letter-spacing: 0.11em;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--ink-faint);
+}
+
+/* a footnote marker: evidence is cited in the open */
+.ref {
+  font-family: var(--mono);
+  font-size: 0.72em;
+  font-weight: 500;
+  color: var(--accent);
+  vertical-align: super;
+  line-height: 0;
+  padding: 0 0.12em;
+}
+sup.ref { cursor: pointer; }
+sup.ref:hover { color: var(--accent-hover); }
+
+/* the five tones a status can take; components read --tone */
+.t-danger { --tone: var(--danger); }
+.t-info { --tone: var(--info); }
+.t-amber { --tone: var(--amber); }
+.t-accent { --tone: var(--accent); }
+.t-muted { --tone: var(--ink-faint); }
+.eyebrow[class*="t-"], .page-meta [class*="t-"] { color: var(--tone); }
+
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes route-fade {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}
+.pulse-text { display: inline-block; margin-left: 2px; animation: pulse-dot 1.8s ease-in-out infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

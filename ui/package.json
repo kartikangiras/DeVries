@@ -1,0 +1,33 @@
+{
+  "name": "cistern-ui",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@falkordb/canvas": "^0.3.3",
+    "@fontsource/geist-mono": "5.3.0",
+    "@fontsource/geist-sans": "5.3.0",
+    "@fontsource/instrument-serif": "5.3.0",
+    "@xyflow/react": "^12.12.0",
+    "d3-sankey": "^0.12.3",
+    "elkjs": "^0.12.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "simple-icons": "^16.35.0"
+  },
+  "devDependencies": {
+    "@types/d3-sankey": "^0.12.5",
+    "@types/node": "^22.20.5",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.3.4",
+    "playwright-core": "^1.64.0",
+    "typescript": "^5.6.3",
+    "vite": "^6.0.0"
+  }
+}
