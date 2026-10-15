@@ -1,0 +1,13 @@
+.git
+.env
+.venv
+**/__pycache__
+**/*.pyc
+.pytest_cache
+ui/node_modules
+ui/dist
+ui/e2e
+tests
+PLAN.md
+.DS_Store
+.snapshots

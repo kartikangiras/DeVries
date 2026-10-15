@@ -1,0 +1,19 @@
+# HTTPS for the app. Caddy gets and renews the certificate for SITE_ADDRESS by itself; for "localhost"
+# it signs one with its own local authority, which is how this file is tried before it is deployed.
+{$SITE_ADDRESS} {
+	# The UI's files compress well. The API and /mcp are left alone: both stream (server-sent events,
+	# streamable HTTP), and a stream must reach the browser as it is written.
+	@static not path /api/* /mcp*
+	encode @static zstd gzip
+
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "no-referrer"
+		-Server
+	}
+
+	reverse_proxy app:8000 {
+		flush_interval -1
+	}
+}

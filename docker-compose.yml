@@ -1,0 +1,53 @@
+# FalkorDB and the app.
+#
+#   docker compose up -d --wait falkordb     the database only; run the app from source (make serve)
+#   docker compose up -d --wait --build      both, with the built UI at http://localhost:8000
+name: cistern
+
+services:
+  falkordb:
+    image: falkordb/falkordb:6.0.2          # tested fallback: falkordb/falkordb:v4.22.0
+    environment:
+      REDIS_ARGS: "--requirepass ${FALKORDB_PASSWORD:?copy .env.example to .env and set FALKORDB_PASSWORD}"
+      # The image default is "MAX_QUEUED_QUERIES 25 TIMEOUT 1000 RESULTSET_SIZE 10000":
+      # reads cut off after 1 s and no timeout on writes. These apply to both.
+      FALKORDB_ARGS: "TIMEOUT_MAX 10000 TIMEOUT_DEFAULT 5000 MAX_QUEUED_QUERIES 200 RESULTSET_SIZE 10000"
+      FALKORDB_PASSWORD: "${FALKORDB_PASSWORD}"
+    ports:
+      - "127.0.0.1:${FALKORDB_HOST_PORT:-6380}:6379"
+      - "127.0.0.1:${FALKORDB_BROWSER_PORT:-3000}:3000"   # FalkorDB Browser, local development only
+    volumes:
+      - falkordb_data:/var/lib/falkordb/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a \"$$FALKORDB_PASSWORD\" --no-auth-warning ping | grep -q PONG"]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+
+  app:
+    build: .
+    depends_on:
+      falkordb:
+        condition: service_healthy
+    environment:
+      FALKORDB_HOST: falkordb
+      FALKORDB_PORT: "6379"
+      FALKORDB_PASSWORD: "${FALKORDB_PASSWORD}"
+      # Everything below is optional. With no key every auditor run is scripted, and says so.
+      ANTHROPIC_API_KEY: "${ANTHROPIC_API_KEY:-}"
+      LLM_MODEL: "${LLM_MODEL:-claude-opus-5-5}"
+      LLM_EFFORT: "${LLM_EFFORT:-medium}"
+      LLM_DAILY_BUDGET_USD: "${LLM_DAILY_BUDGET_USD:-}"
+      CISTERN_MCP_TOKEN: "${CISTERN_MCP_TOKEN:-}"
+      COOKIE_SECURE: "${COOKIE_SECURE:-false}"
+      SESSION_MAX: "${SESSION_MAX:-30}"
+    ports:
+      - "${APP_BIND:-127.0.0.1}:${APP_PORT:-8000}:8000"
+    # the scenario files from this folder, so that an import made here (`cistern.ingest --import`) shows up in the
+    # running app and its labels can be saved from the UI; the image carries its own copy for a deployment
+    volumes:
+      - ./scenarios:/app/scenarios
+      - ./manifests:/app/manifests
+
+volumes:
+  falkordb_data:
