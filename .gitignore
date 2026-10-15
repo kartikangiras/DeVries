@@ -1,0 +1,26 @@
+# secrets and local environment
+.env
+.venv/
+.python-version.local
+
+# python
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+
+# node and builds
+node_modules/
+dist/
+ui/dist/
+
+# what runs leave behind
+ui/e2e/shots/
+*.log
+.imports/
+*.cistern.bak
+*.cistern.tmp
+
+# local snapshots and OS files
+.snapshots/
+.DS_Store
