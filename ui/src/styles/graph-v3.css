@@ -1,0 +1,75 @@
+/*
+ * The three renderers of revision 3: Cistern's chart (React Flow laid out by ELK), the overview (d3-sankey)
+ * and FalkorDB's canvas. Same tokens as chart.css; the names of the marks (hot, private, plain, gated, cut,
+ * central) are the same words the lane chart used, so the key reads the same on every chart.
+ */
+
+/* ---- the React Flow chart: cards in lanes */
+.flowchart { position: relative; padding: 0; overflow: hidden; }
+.flowchart .react-flow { background: transparent; font-family: var(--sans); }
+.flowchart .react-flow__pane { cursor: grab; }
+.flowchart .react-flow__node { font-size: 12.5px; }
+.flowchart .react-flow__edge-path { stroke: var(--chart-line-strong); stroke-width: 1.4; fill: none; transition: opacity 180ms var(--ease-out-quart), stroke 180ms var(--ease-out-quart); }
+.flowchart .react-flow__edge-interaction { stroke-width: 16; }
+.flowchart .wire.s-hot .react-flow__edge-path, .flowchart .wire.traced.s-hot .react-flow__edge-path { stroke: var(--chart-hot); stroke-width: 2; }
+.flowchart .wire.s-private .react-flow__edge-path { stroke: var(--amber); stroke-width: 2; }
+.flowchart .wire.s-exit .react-flow__edge-path { stroke: var(--accent); stroke-width: 2; }
+.flowchart .wire.gated .react-flow__edge-path { stroke-dasharray: 5 4; }
+.flowchart .wire.gated.s-hot .react-flow__edge-path { stroke: var(--chart-ash); }
+.flowchart .wire.dim .react-flow__edge-path { opacity: 0.22; }
+.flowchart .wire-label { position: absolute; padding: 1px 5px; font: 400 10px var(--mono); letter-spacing: 0.04em; color: var(--chart-ash); background: var(--surface); border-radius: 4px; pointer-events: none; white-space: nowrap; }
+.flowchart .wire-label.dim { opacity: 0.25; }
+.flowchart .wire-label .cut-mark { margin-left: 5px; font: 700 12px var(--mono); color: var(--accent); }
+.flowchart .fport { width: 1px; height: 1px; min-width: 0; min-height: 0; border: 0; background: transparent; opacity: 0; }
+.flowchart .laying-out .react-flow { opacity: 0; }
+.flowchart .fit { position: absolute; right: 10px; top: 10px; z-index: 5; width: 28px; height: 28px; font-size: 14px; line-height: 1; color: var(--ink-faint); background: var(--surface); border: 1px solid var(--rule); border-radius: 6px; cursor: pointer; }
+.flowchart .fit:hover { color: var(--ink-strong); border-color: var(--rule-strong); }
+.flowchart .lane { width: 140px; text-align: center; font: 400 10.5px var(--mono); letter-spacing: 0.1em; text-transform: uppercase; color: var(--chart-ash); pointer-events: none; }
+.flowchart .lane text { display: inline; }
+
+.fcard { position: relative; display: flex; align-items: center; gap: 10px; box-sizing: border-box; height: 100%; padding: 0 14px 0 12px; background: var(--chart-tile); border: 1px solid var(--chart-line-strong); border-radius: 10px; color: var(--ink); transition: opacity 180ms var(--ease-out-quart), border-color 180ms var(--ease-out-quart), box-shadow 180ms var(--ease-out-quart); cursor: pointer; }
+.fcard .mark { flex: none; width: 10px; height: 10px; border-radius: 50%; background: var(--bg); border: 2px solid var(--chart-ash); }
+.fcard.hot .mark { background: var(--chart-hot); border-color: var(--chart-hot); }
+.fcard.private .mark { background: var(--amber); border-color: var(--amber); }
+.fcard.k-Agent { border-color: var(--accent-line); background: color-mix(in oklab, var(--chart-tile) 88%, var(--accent)); }
+.fcard.k-Agent .mark { border-radius: 3px; }
+.fcard.k-Resource.hot { border-color: var(--danger-line); }
+.fcard-text { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.fcard .name { font: 500 12.5px/1.2 var(--sans); color: var(--ink-strong); white-space: nowrap; }
+.fcard .name.code { font: 500 12px var(--mono); }
+.fcard .fact { font: 400 10.5px/1.2 var(--mono); color: var(--chart-ash); white-space: nowrap; }
+.fcard .cite { margin-left: 3px; font: 400 9.5px var(--mono); color: var(--accent); }
+.fcard .fbadge { margin-left: 4px; padding: 2px 6px; font: 500 10px var(--mono); letter-spacing: 0.08em; color: var(--ink-muted); border: 1px solid var(--rule); border-radius: 999px; }
+.fcard .rank { position: absolute; top: -9px; right: -6px; padding: 1px 6px; font: 500 9.5px var(--mono); color: var(--accent-ink); background: var(--accent); border-radius: 999px; }
+.fcard.lit { border-color: var(--chart-line-strong); box-shadow: 0 0 0 1px var(--rule-strong); }
+.fcard.lit.hot { border-color: var(--chart-hot); }
+.fcard.picked { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.fcard.central { border-color: var(--accent); }
+.fcard.dim { opacity: 0.28; }
+.fcard.c0 { border-color: oklch(0.72 0.14 285); } .fcard.c1 { border-color: oklch(0.72 0.14 60); } .fcard.c2 { border-color: oklch(0.72 0.14 160); }
+.fcard.c3 { border-color: oklch(0.72 0.14 340); } .fcard.c4 { border-color: oklch(0.72 0.14 210); } .fcard.c5 { border-color: oklch(0.72 0.14 110); }
+.chart-key i.k-c0 { background: oklch(0.72 0.14 285); } .chart-key i.k-c1 { background: oklch(0.72 0.14 60); } .chart-key i.k-c2 { background: oklch(0.72 0.14 160); }
+.chart-key i.k-c3 { background: oklch(0.72 0.14 340); } .chart-key i.k-c4 { background: oklch(0.72 0.14 210); } .chart-key i.k-c5 { background: oklch(0.72 0.14 110); }
+
+/* ---- the sankey overview */
+.sankey svg { overflow: visible; }
+.sankey .ov-ribbon .line { fill: none; stroke: var(--chart-hot); opacity: 0.42; stroke-linecap: butt; transition: opacity 180ms var(--ease-out-quart); }
+.sankey .ov-ribbon.trifecta .line { stroke: var(--chart-bone); }
+.sankey .ov-ribbon.lit .line { opacity: 0.9; }
+.sankey .ov-ribbon.dim .line { opacity: 0.1; }
+.sankey .ov-ribbon .hit { fill: none; stroke: transparent; }
+.sankey .ov-node .bar { fill: var(--chart-hot); }
+.sankey .ov-node.action .bar { fill: var(--chart-hot); opacity: 0.8; }
+.sankey .ov-node.agent rect { fill: var(--chart-tile); stroke: var(--chart-line-strong); }
+.sankey .ov-node.agent.worst rect { stroke: var(--chart-hot); }
+.sankey .ov-node.agent.worst .ov-sub { fill: var(--chart-hot); }
+
+/* ---- FalkorDB's canvas */
+.canvas-chart { padding: 0; overflow: hidden; }
+.canvas-box { position: relative; width: 100%; background: var(--surface); }
+.canvas-box falkordb-canvas { display: block; width: 100%; height: 100%; }
+.canvas-chart .chart-over { margin: 0 10px; }
+
+/* ---- the renderer switch that sits over every chart */
+.renderers { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.renderers .control { font: 400 10.5px var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-faint); }
