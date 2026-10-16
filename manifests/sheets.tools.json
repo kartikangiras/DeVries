@@ -1,0 +1,35 @@
+{
+  "server": "sheets",
+  "synthetic": true,
+  "note": "Synthetic manifest in the shape of an MCP tools/list result. No public server stands behind it.",
+  "tools": [
+    {
+      "name": "export_csv",
+      "description": "Write rows to a spreadsheet in a shared drive, replacing its contents.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "drive_id": {
+            "type": "string"
+          },
+          "sheet": {
+            "type": "string"
+          },
+          "rows": {
+            "type": "array"
+          }
+        },
+        "required": [
+          "drive_id",
+          "sheet",
+          "rows"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "openWorldHint": true
+      }
+    }
+  ]
+}

@@ -1,0 +1,73 @@
+# A data team's analytics assistant. Everything here is synthetic.
+#
+# The planted risk: the assistant does not run SQL itself. It hands questions
+# to a SQL runner, and whatever the runner reads comes back into its context
+# (rule 6). The warehouse holds the revenue tables and, since last quarter, the
+# transcript of every support chat, loaded for a churn model. Customers wrote
+# those. The assistant also exports to a drive shared with an outside agency.
+# Untrusted text, private data and a way out, at both agents.
+#
+# The weekly report is unattended and needs the export, so a gate and a revoke
+# break it; questions need the transcripts, so dropping that read breaks them.
+# Quarantining what the runner returns closes both findings: the assistant
+# gets rows, not prose.
+scenario: acme_data
+title: Acme data team
+order: 8
+description: An analytics assistant that hands SQL to a runner and exports to a shared drive
+
+servers:
+  - {id: srv:warehouse, name: Warehouse, manifest: manifests/warehouse.tools.json, synthetic: true}
+  - {id: srv:sheets, name: Sheets, manifest: manifests/sheets.tools.json, synthetic: true}
+  - {id: srv:chat, name: Chat, manifest: manifests/chat.tools.json, synthetic: true}
+
+tools:                                   # list_tables returns names and columns only, so it reads nothing here
+  - id: tool:warehouse.run_query
+    reads: [src:revenue-tables, src:support-transcripts]
+  - id: tool:sheets.export_csv
+    writes: [res:shared-drive]
+  - id: tool:chat.post_message
+    writes: [res:data-channel]
+
+data_sources:
+  - {id: src:revenue-tables, name: Revenue tables, trust: private}
+  - {id: src:support-transcripts, name: Support chat transcripts, trust: untrusted}
+
+resources:
+  - {id: res:shared-drive, name: Drive shared with the agency, impact: medium, external: true}
+  - {id: res:data-channel, name: Data team channel, impact: low, external: false}
+
+agents:
+  - id: agent:analyst
+    name: Analytics assistant
+    owner: data
+    can_call: [tool:sheets.export_csv, tool:chat.post_message]
+    delegates_to: [agent:sql-runner]
+  - id: agent:sql-runner
+    name: SQL runner
+    owner: data
+    can_call: [tool:warehouse.list_tables, tool:warehouse.run_query]
+
+workflows:
+  - id: wf:weekly-report
+    name: Weekly revenue report
+    description: Every Monday at seven, query last week's revenue and export the sheet to the drive the agency reads.
+    run_by: agent:analyst
+    mode: autonomous                     # it runs before anyone is in
+    needs: [tool:warehouse.run_query, tool:sheets.export_csv]
+    reads: [src:revenue-tables]
+  - id: wf:answer-questions
+    name: Answer questions
+    description: Someone asks in the channel; the assistant queries the warehouse, transcripts included, and posts the answer.
+    run_by: agent:analyst
+    mode: supervised
+    needs: [tool:warehouse.run_query, tool:chat.post_message]
+    reads: [src:revenue-tables, src:support-transcripts]
+
+expect:
+  injection: []
+  trifecta: [agent:analyst, agent:sql-runner]
+  best_fix_kind: quarantine_delegation
+  rejected:
+    - {kind: gate_call, reason_contains: "wf:weekly-report"}
+    - {kind: drop_read, reason_contains: "wf:answer-questions"}
