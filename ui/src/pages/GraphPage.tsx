@@ -12,7 +12,7 @@ import { KIND_OF, nodeFacts, nodeIndex, nodesOn } from "../paths";
 import { href } from "../route";
 import type { DeVries } from "../state";
 import { KIND_WORDS, WithNames, capital, findingTitle, plural } from "../text";
-import { Eyebrow, Loading, PageBody, PageHeader } from "../ui";
+import { Eyebrow, Fold, Loading, PageBody, PageHeader } from "../ui";
 import { CutBlock } from "./WhatIf";
 
 const RELATION: Record<string, string> = { CAN_CALL: "can call", DELEGATES_TO: "delegates to", READS: "reads", WRITES: "acts on", FEEDS: "is read back as" };
@@ -179,11 +179,15 @@ export function GraphPage({ c, scenario }: { c: DeVries; scenario: string }) {
           <figure className="figure">
             <OverviewCounts view={overview} />
             <OverviewSankey view={overview} names={c.names} scenario={scenario} />
-            <figcaption className="chart-note">
-              Source: {scenario}{overview.own_copy ? " (your sandbox copy)" : ""} in FalkorDB, read by{" "}
-              {overview.queries.map((q, i) => <span key={q}>{i > 0 && ", "}<a href={href(scenario, "queries", q)}>{q}</a></span>)}.{" "}
-              A ribbon is one open finding; its width is the number of routes; d3-sankey orders the columns so the ribbons cross least. An agent's line reads A · B · C for Meta's Rule of Two.
-              {overview.counts.cut_cost != null && ` The cheapest cut costs ${overview.counts.cut_cost}, by max flow.`}
+            <figcaption>
+              <Fold className="source" summary="Source and method" sub={`${plural(overview.queries.length, "FalkorDB query", "FalkorDB queries")} · d3-sankey`}>
+                <p className="chart-note">
+                  Source: {scenario}{overview.own_copy ? " (your sandbox copy)" : ""} in FalkorDB, read by{" "}
+                  {overview.queries.map((q, i) => <span key={q}>{i > 0 && ", "}<a href={href(scenario, "queries", q)}>{q}</a></span>)}.{" "}
+                  A ribbon is one open finding; its width is the number of routes; d3-sankey orders the columns so the ribbons cross least. An agent's line reads A · B · C for Meta's Rule of Two.
+                  {overview.counts.cut_cost != null && ` The cheapest cut costs ${overview.counts.cut_cost}, by max flow.`}
+                </p>
+              </Fold>
             </figcaption>
           </figure>
         ) : <Loading label={c.ready ? "Reading the graph" : "Connecting"} />
@@ -252,14 +256,18 @@ export function GraphPage({ c, scenario }: { c: DeVries; scenario: string }) {
               </p>
             )}
             {graph && (
-              <figcaption className="chart-note">
-                Source: the {layer} layer of {scenario}{c.current?.own_copy ? " (your sandbox copy)" : ""} in FalkorDB, read by{" "}
-                {graph.queries.map((q, i) => <span key={q}>{i > 0 && ", "}<a href={href(scenario, "queries", q)}>{q}</a></span>)}.{" "}
-                {renderer === "falkordb"
-                  ? "Drawn by FalkorDB's canvas component on the database's own node ids; the colours are DeVries's facts."
-                  : "Laid out by ELK in lanes, drawn with React Flow; a card is filled when untrusted text reaches it, which FalkorDB works out (reach.untrusted_nodes)."}
-                {flow ? " A path means text can flow, not that it did." : " Config edges are what a person set up; the flow layer is derived from them."}
-                {c.health?.canary && <> Self-check: {c.health.canary.ok ? "passed" : "FAILED"} ({c.health.canary.detail}).</>}
+              <figcaption>
+                <Fold className="source" summary="Source and method" sub={`the ${layer} layer · ${plural(graph.queries.length, "FalkorDB query", "FalkorDB queries")} · ${renderer === "falkordb" ? "FalkorDB canvas" : "ELK and React Flow"}`}>
+                  <p className="chart-note">
+                    Source: the {layer} layer of {scenario}{c.current?.own_copy ? " (your sandbox copy)" : ""} in FalkorDB, read by{" "}
+                    {graph.queries.map((q, i) => <span key={q}>{i > 0 && ", "}<a href={href(scenario, "queries", q)}>{q}</a></span>)}.{" "}
+                    {renderer === "falkordb"
+                      ? "Drawn by FalkorDB's canvas component on the database's own node ids; the colours are DeVries's facts."
+                      : "Laid out by ELK in lanes, drawn with React Flow; a card is filled when untrusted text reaches it, which FalkorDB works out (reach.untrusted_nodes)."}
+                    {flow ? " A path means text can flow, not that it did." : " Config edges are what a person set up; the flow layer is derived from them."}
+                    {c.health?.canary && <> Self-check: {c.health.canary.ok ? "passed" : "FAILED"} ({c.health.canary.detail}).</>}
+                  </p>
+                </Fold>
               </figcaption>
             )}
             {graph && view === "more" && (
