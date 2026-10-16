@@ -103,18 +103,18 @@ export function After({ m, c, scenario, renderer = "devries", layout = "tree", c
     <section className="block after">
       <div className="block-head">
         <Eyebrow>{shown?.preview?.applied ? "As applied" : "With this plan, in a sandbox"}</Eyebrow>
-        <span><a className="id" href={href(scenario, "finding", target.id)}>{target.id}</a></span>
+        <span>{link ? <a className="id" href={href(scenario, "finding", target.id)}>{target.id}</a> : shown?.preview?.applied ? "the graph as it stands" : "a copy of the graph, since deleted"}</span>
       </div>
       {controls && <div className="chart-controls">{controls}</div>}
       {graph ? (
         <>
-          <Chart renderer={renderer} layout={layout} graph={graph} names={c.names} focus={focus} only height={300} idle="The path of the finding this plan is meant to close, as the plan would leave it." />
+          <Chart renderer={renderer} layout={layout} graph={graph} names={c.names} focus={focus} only idle="The path of the finding this plan is meant to close, as the plan would leave it." />
           <p className="chart-note">
             {shown!.preview!.applied
               ? "The plan is applied, so this is the graph as it stands."
-              : "Read from a sandbox copy with the plan applied; the copy is deleted and nothing here has changed."}{" "}
-            A hop the plan gates is green and dashed, a grant it revokes is gone, and a dot is no longer filled once untrusted text stops reaching it.
-            {splits && " The reader a split adds stands with the delegates: it does the reading, and what it returns is quarantined."}
+              : "Read from a sandbox copy with the plan applied, since deleted; nothing here has changed."}{" "}
+            A hop the plan gates is dashed, a grant it revokes is gone, and a card is no longer filled once untrusted text stops reaching it.
+            {splits && " The reader a split adds does the reading; what it returns is quarantined."}
           </p>
         </>
       ) : shown?.error ? <p className="rail-note">{shown.error}</p> : <Loading label="Asking a sandbox" />}
