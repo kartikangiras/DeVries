@@ -90,7 +90,8 @@ const stepTo = (page, name) => page.locator(".workflow-step", { hasText: name })
   // one step further in: the config layer and its edges as a table
   await tab(page, "More").click();
   await tab(page, "Config").click();
-  await page.waitForFunction(() => /Config edges are what a person set up/.test(document.querySelector(".figure .chart-note")?.textContent ?? ""));
+  await page.locator(".figure .fold.source summary").click();                   // the source note is folded under the chart
+  await page.waitForFunction(() => /Config edges are what a person set up/.test(document.querySelector(".figure .fold.source .chart-note")?.textContent ?? ""));
   await page.locator("details.as-table summary").click();
   out.configTable = { rows: await page.locator("details.as-table tbody tr").count() };
   need(out.configTable.rows === 11, "the config edges as a table should have 11 rows, got " + out.configTable.rows);
@@ -231,7 +232,7 @@ const stepTo = (page, name) => page.locator(".workflow-step", { hasText: name })
 
   // DeVries audited by DeVries: nothing open, and the one hop that would open something is gated
   await page.goto(`${base}/#/devries_self`);
-  await page.waitForFunction(() => document.querySelector(".page-head h1")?.textContent === "Inbox zero.");
+  await page.waitForFunction(() => document.querySelector(".page-head h1")?.textContent === "Nothing open.");
   await page.goto(`${base}/#/devries_self/graph`);
   await page.waitForSelector(".sankey", { state: "attached" });
   need(/Nothing is drawn because nothing is open/.test(await text(page, ".sankey .chart-over")), "with nothing open the overview should say so");
@@ -272,7 +273,10 @@ const stepTo = (page, name) => page.locator(".workflow-step", { hasText: name })
   out.devFirst = await text(page, ".approval .approval-change");
   need(/Require human approval before Coder calls push/.test(out.devFirst), "the plan on offer should be the one the run proposed: " + out.devFirst);
   need((await page.locator(".after .chart .wire.gated").getAttribute("data-hop")) === "agent:coder>tool:git.push", "the preview should show the push as gated");
+  await page.waitForSelector(".after .chart .fcard", { timeout: 240000 });     // the preview is laid out on DeVries's chart, whatever else re-renders
   need(/sandbox/.test(await text(page, ".after .chart-note")), "the preview should say it was read from a sandbox");
+  out.ledgerCards = await page.locator(".after .chart .fcard").count();
+  need(out.ledgerCards >= 3, `the ledger preview should draw the plan's path as cards, got ${out.ledgerCards}`);
   await page.getByLabel("Your name").fill("Kartik");
   await page.getByRole("button", { name: "Approve · Apply" }).click();
   await page.waitForFunction(() => /Revoke request from Coder/.test(document.querySelector(".approval .approval-change")?.textContent ?? ""), null, { timeout: 240000 });
@@ -280,9 +284,9 @@ const stepTo = (page, name) => page.locator(".workflow-step", { hasText: name })
   need(/resolves 3 · introduces 0 · breaks 0/.test(out.devSecond), "the second plan should close all three trifectas: " + out.devSecond);
   await page.getByRole("button", { name: "Approve · Apply" }).click();
   await page.waitForFunction(() => !document.querySelector(".approval"), null, { timeout: 240000 });
-  await place(page, "Inbox").click();
-  await page.waitForFunction(() => document.querySelector(".page-head h1")?.textContent === "Inbox zero.", null, { timeout: 240000 });
-  await place(page, "Done").click();
+  await place(page, "Open").click();
+  await page.waitForFunction(() => document.querySelector(".page-head h1")?.textContent === "Nothing open.", null, { timeout: 240000 });
+  await place(page, "Closed").click();
   await page.waitForSelector(".case.status-mitigated");
   out.devDone = await page.locator(".case.status-mitigated").count();
   need(out.devDone === out.devOpen && out.devOpen === 7, `two fixes should close all seven findings of acme_dev: ${out.devDone} of ${out.devOpen}`);
