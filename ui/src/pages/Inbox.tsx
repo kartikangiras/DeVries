@@ -8,7 +8,7 @@ import { deskOf, exposure, recommendation, type Desk } from "../desk";
 import { href } from "../route";
 import type { DeVries } from "../state";
 import { KIND_WORDS, capital, clock, countWord, plural, short } from "../text";
-import { Button, Empty, Eyebrow, Loading, PageBody, PageHeader } from "../ui";
+import { Button, Empty, Eyebrow, Fold, Loading, PageBody, PageHeader } from "../ui";
 
 /** The row's one italic line: why this finding matters, or why it no longer does. */
 function gist(finding: Finding, desk: Desk, names: Record<string, string>): string {
@@ -207,8 +207,7 @@ export function Inbox({ c, scenario, done = false }: { c: DeVries; scenario: str
           </p>
           {c.current.imported && <LabelForm c={c} />}
           {c.scorecard && c.scorecard.agents.length > 0 && (
-            <div className="scorecard">
-              <Eyebrow>Rule of Two</Eyebrow>
+            <Fold className="scorecard" summary="Rule of Two" sub={`${plural(c.scorecard.agents.length, "agent", "agents")} · which of untrusted input, private data and a way to act each one holds`}>
               <table className="table">
                 <thead><tr><th>Agent</th><th>A · untrusted in</th><th>B · private in</th><th>C · acts</th><th>Runs</th><th>Verdict</th></tr></thead>
                 <tbody>
@@ -225,7 +224,7 @@ export function Inbox({ c, scenario, done = false }: { c: DeVries; scenario: str
                 </tbody>
               </table>
               <p className="about-note">Meta's Agents Rule of Two: an agent holds at most two of the three, and one that needs all three should not run unattended. Read off the flow layer by <a href={href(scenario, "queries", "reach.agents_from_sources")}>three BFS passes</a>; the findings are the verdicts.</p>
-            </div>
+            </Fold>
           )}
         </section>
       )}
