@@ -471,7 +471,7 @@ function Footer({ app, queries }: { app: string; queries: string }) {
               <h4>
                 Run it yourself.
                 <br />
-                <strong>One command, four scenarios.</strong>
+                <strong>One command, nine scenarios.</strong>
               </h4>
               <div className="l-copy-box">
                 <code>make app</code>

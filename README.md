@@ -73,7 +73,7 @@ cp .env.example .env        # then set FALKORDB_PASSWORD
 make app                    # FalkorDB 6.0.2 and the app, in containers
 ```
 
-Open <http://localhost:8000>: a landing page, with the app behind "Open the app" (or at `#/acme_support`) and your own config behind "Paste your config" (`#/acme_support/import`). The app loads the four scenarios on first start, scans each, and audits each to its first proposal, scripted, so the first screen already holds tested plans waiting for a nod. `PRERUN_AUDITS=false` skips that pass.
+Open <http://localhost:8000>: a landing page, with the app behind "Open the app" (or at `#/acme_support`) and your own config behind "Paste your config" (`#/acme_support/import`). The app loads the nine scenarios on first start, scans each, and audits each to its first proposal, scripted, so the first screen already holds tested plans waiting for a nod. `PRERUN_AUDITS=false` skips that pass.
 
 From source, for development:
 
@@ -88,11 +88,16 @@ make e2e                    # drive the running app in headless Chrome (needs Go
 `make seed` prints what it found:
 
 ```text
-acme_dev: 27 nodes, 34 config edges, 4 injection and 3 trifecta findings in 31 ms
-acme_exec: 12 nodes, 13 config edges, 0 injection and 2 trifecta findings in 18 ms
+acme_data: 15 nodes, 18 config edges, 0 injection and 2 trifecta findings in 16 ms
+acme_dev: 27 nodes, 34 config edges, 4 injection and 3 trifecta findings in 29 ms
+acme_exec: 12 nodes, 13 config edges, 0 injection and 2 trifecta findings in 14 ms
+acme_finance: 12 nodes, 14 config edges, 1 injection and 1 trifecta findings in 12 ms
+acme_hr: 15 nodes, 17 config edges, 1 injection and 1 trifecta findings in 12 ms
+acme_ops: 19 nodes, 25 config edges, 1 injection and 0 trifecta findings in 8 ms
+acme_sales: 15 nodes, 15 config edges, 0 injection and 1 trifecta findings in 9 ms
 acme_support: 15 nodes, 14 config edges, 1 injection and 0 trifecta findings in 8 ms
   fnd:dce0910d42 injection: src:customer-tickets -> tool:helpdesk.get_ticket -> agent:support-bot -> tool:payments.issue_refund -> res:payments-api
-devries_self: 19 nodes, 36 config edges, 0 injection and 0 trifecta findings in 5 ms
+devries_self: 20 nodes, 38 config edges, 0 injection and 0 trifecta findings in 5 ms
 ```
 
 Other targets: `make probe` checks the FalkorDB behaviours the design depends on, `make dev` runs the app with reload beside the Vite dev server, `make mcp` runs the MCP server over stdio, `make mcp-config` prints the entry for an MCP client's config file, `make queries-doc` rewrites [docs/QUERIES.md](docs/QUERIES.md), `make self-manifest` rewrites the manifest DeVries audits itself with, and `make agent-eval` compares the auditor with the baseline search.
@@ -375,7 +380,7 @@ Try: "scan acme_support, show me how a customer ticket can reach the payments AP
 
 ## Import your own install
 
-The four scenarios are files. DeVries can also take its graph from the systems you actually run:
+The nine scenarios are files. DeVries can also take its graph from the systems you actually run:
 
 ```bash
 uv run python -m devries.ingest --import claude-desktop                 # every server in claude_desktop_config.json
@@ -416,13 +421,18 @@ Two more kinds of finding come with it. **Manifest drift**: every tool definitio
 
 ## Scenarios and data
 
-**All of the data is synthetic.** No real organisation, system, customer or credential appears anywhere. The agents, tools, sources, resources, workflows and trust labels of the three Acme scenarios were invented for this project, and their tool manifests are synthetic files in the shape of an MCP `tools/list` result; each says so in its own `note` field. The fourth scenario uses DeVries's real tool list, generated from the running server.
+**All of the data is synthetic.** No real organisation, system, customer or credential appears anywhere. The agents, tools, sources, resources, workflows and trust labels of the eight Acme scenarios were invented for this project, and their tool manifests are synthetic files in the shape of an MCP `tools/list` result; each says so in its own `note` field. The ninth scenario uses DeVries's real tool list, generated from the running server.
 
 | Scenario | What is in it | What it shows |
 | --- | --- | --- |
 | `acme_support` | A support bot that reads tickets and can issue refunds | One four-hop injection path. Revoking breaks the refund workflow; a gate passes; so does a split |
 | `acme_exec` | An executive assistant that delegates inbox reading and sends a daily digest | Two trifectas. The gate fails because the digest is autonomous; quarantining the delegation closes both |
 | `acme_dev` | A planner that delegates to a triage agent and a coder, and a release bot | Seven findings, among them an eleven-hop path through a stored write (rule 7). Two fixes in two rounds close all seven |
+| `acme_sales` | A sales rep that answers website leads from the CRM, round the clock | One trifecta. The follow-up is autonomous and needs every tool and both reads, so a gate, a revoke and a drop all break it; a split passes: a quarantined reader takes the form and the CRM |
+| `acme_finance` | An accounts payable bot that pays approved invoices overnight | An injection and a trifecta through one tool that returns supplier portal messages with the vendor record. Nothing needs the messages, so dropping that read closes both |
+| `acme_hr` | A recruiting assistant set up from a general HR template | A four-hop path from a cover letter to payroll, and a trifecta. Nothing needs `set_compensation`, so the cheapest fix, revoking it, wins; a gate on the candidate email follows |
+| `acme_ops` | An on-call bot that writes runbooks and a remediation bot that follows them | A nine-hop path from request logs through a stored wiki page (rule 7) to a rollback. Triage is autonomous, so the first half cannot be cut; an engineer confirms rollbacks, so a gate passes |
+| `acme_data` | An analytics assistant that hands SQL to a runner and exports to a shared drive | Two trifectas, the untrusted leg arriving through the runner (rule 6). The weekly export is autonomous, so a gate fails; quarantining the delegation closes both |
 | `devries_self` | DeVries's own eleven MCP tools and its auditor | Nothing open, and only because `apply_fix` is gated |
 
 A scenario is a YAML file in `scenarios/` that points at manifests in `manifests/`. Each file carries an `expect` block with the findings it should produce and the kind of fix that should win; `make seed` fails if a scan disagrees with it.
@@ -470,7 +480,7 @@ On a public address, each visitor works in their own copy of a scenario (at most
 
 The event runs from 15 to 18 October 2026, and its rules ask that the main coding and design work begin after it starts. **That is not what happened here, and this section says so rather than leaving it to be inferred.**
 
-Everything in this repository was written before the event opened, and all of the code on 13 October 2026, two days before: the Python package, the UI (rebuilt twice that day; this is its third form), the scenarios, the tests and this README. The design document and the first probes of FalkorDB are a little older. Nothing was committed during that time; the folder held no git repository.
+Everything in this repository was written before the event opened, and all of the code on 13 October 2026, two days before: the Python package, the UI (rebuilt twice that day; this is its third form), the first four scenarios, the tests and this README. Five scenarios were added on 16 October, during the event: sales, finance, people, operations and data. They are data files in the shape the other four already had, with their synthetic manifests, and no code changed for them beyond the scenario count in one API test, one browser check and the landing page's footer. The design document and the first probes of FalkorDB are a little older. Nothing was committed during that time; the folder held no git repository.
 
 The rules allow ideas, notes, graph model sketches and diagrams to be prepared beforehand. Of what is here, only PLAN.md is that kind of preparation. The code is not.
 
