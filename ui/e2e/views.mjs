@@ -190,6 +190,8 @@ const stepTo = (page, name) => page.locator(".workflow-step", { hasText: name })
   await page.goto(`${base}/#/acme_support`);
   await page.waitForSelector(".case .phase.t-amber", { timeout: 240000 });
   await page.locator(".case").first().click();
+  await page.waitForSelector(".brief-title");
+  await stepTo(page, "Fix");                                                      // a plan waits for a person on the fix step and nowhere else
   await page.waitForSelector(".approval");
   await page.getByLabel("Your name").fill("Kartik");
   await page.getByRole("button", { name: "Reject", exact: true }).click();
@@ -201,7 +203,7 @@ const stepTo = (page, name) => page.locator(".workflow-step", { hasText: name })
     await stepTo(page, "Options");
     out.rejected = await text(page, ".tested .verdict.pass");
     need(/rejected by Kartik: refunds must stay automatic/.test(out.rejected), "the rejected plan should say who rejected it and why: " + out.rejected);
-    await stepTo(page, "Problem");
+    await stepTo(page, "Summary");
     await page.waitForSelector(".chart .fcard", { timeout: 60000 });
     need((await page.locator(".chart .wire.gated").count()) === 0, "a rejected plan must not change the graph");
     await shot(page, "views-rejected");
@@ -211,14 +213,16 @@ const stepTo = (page, name) => page.locator(".workflow-step", { hasText: name })
     await stepTo(page, "Options");
     out.rejected = await text(page, ".tested .verdict.pass");
     need(/rejected by Kartik: refunds must stay automatic/.test(out.rejected), "the rejected plan should say who rejected it and why: " + out.rejected);
-    await stepTo(page, "Problem");
+    await stepTo(page, "Summary");
     await page.waitForSelector(".chart .fcard", { timeout: 60000 });
     need((await page.locator(".chart .wire.gated").count()) === 0, "a rejected plan must not change the graph");
     await shot(page, "views-rejected");
     // the split keeps refunds automatic: approved, the reading moves behind a reader whose results are quarantined
+    await stepTo(page, "Fix");
     await page.getByLabel("Your name").fill("Kartik");
     await page.getByRole("button", { name: "Approve · Apply" }).click();
     await page.waitForFunction(() => document.querySelector(".strip .phase")?.textContent === "Mitigated", null, { timeout: 240000 });
+    await stepTo(page, "Summary");
     await page.waitForSelector('.chart .fcard[data-id="agent:support-bot.reader"]', { timeout: 60000 });
     await page.waitForSelector(".chart .wire.gated", { state: "attached", timeout: 60000 });   // the arcs are drawn a frame after the cards
     out.split = await page.locator(".chart .wire.gated").evaluateAll((wires) => wires.map((w) => w.getAttribute("data-hop")));
@@ -269,14 +273,14 @@ const stepTo = (page, name) => page.locator(".workflow-step", { hasText: name })
   await shot(page, "views-dev-whatif");
 
   await place(page, "Ledger").click();
+  await page.waitForSelector(".after .chart .fcard", { timeout: 240000 });     // the preview is laid out on DeVries's chart, whatever else re-renders
   await page.waitForSelector(".after .chart .wire.gated", { state: "attached", timeout: 240000 });
+  out.ledgerCards = await page.locator(".after .chart .fcard").count();
+  need(out.ledgerCards >= 3, `the ledger preview should draw the plan's path as cards, got ${out.ledgerCards}`);
   out.devFirst = await text(page, ".approval .approval-change");
   need(/Require human approval before Coder calls push/.test(out.devFirst), "the plan on offer should be the one the run proposed: " + out.devFirst);
   need((await page.locator(".after .chart .wire.gated").getAttribute("data-hop")) === "agent:coder>tool:git.push", "the preview should show the push as gated");
-  await page.waitForSelector(".after .chart .fcard", { timeout: 240000 });     // the preview is laid out on DeVries's chart, whatever else re-renders
   need(/sandbox/.test(await text(page, ".after .chart-note")), "the preview should say it was read from a sandbox");
-  out.ledgerCards = await page.locator(".after .chart .fcard").count();
-  need(out.ledgerCards >= 3, `the ledger preview should draw the plan's path as cards, got ${out.ledgerCards}`);
   await page.getByLabel("Your name").fill("Kartik");
   await page.getByRole("button", { name: "Approve · Apply" }).click();
   await page.waitForFunction(() => /Revoke request from Coder/.test(document.querySelector(".approval .approval-change")?.textContent ?? ""), null, { timeout: 240000 });
