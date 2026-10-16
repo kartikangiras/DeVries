@@ -7,10 +7,10 @@ import { api, type Change, type Cut, type Policy, type WhatIf } from "../api";
 import { href } from "../route";
 import type { DeVries } from "../state";
 import { KIND_WORDS, WithNames, capital, findingTitle, plural } from "../text";
-import { Button, Eyebrow, Loading, PageBody, PageHeader } from "../ui";
+import { Button, Eyebrow, Fold, Loading, PageBody, PageHeader } from "../ui";
 
-/** One change, asked as a question: what would it open, close and break? Answered from a sandbox. */
-export function WhatIfLine({ c, scenario, agentId }: { c: DeVries; scenario: string; agentId?: string | null }) {
+/** One change, asked as a question: what would it open, close and break? Answered from a sandbox. `head` is off where a fold already names it. */
+export function WhatIfLine({ c, scenario, agentId, head = true }: { c: DeVries; scenario: string; agentId?: string | null; head?: boolean }) {
   const [kind, setKind] = useState<"grant_call" | "add_delegation">("grant_call");
   const [who, setWho] = useState(agentId ?? "");
   const [what, setWhat] = useState("");
@@ -38,10 +38,12 @@ export function WhatIfLine({ c, scenario, agentId }: { c: DeVries; scenario: str
   const opened = answer?.introduced.length ?? 0;
   return (
     <section className="block whatif">
-      <div className="block-head">
-        <Eyebrow>What if</Eyebrow>
-        <span>tested in a sandbox · nothing changes</span>
-      </div>
+      {head && (
+        <div className="block-head">
+          <Eyebrow>What if</Eyebrow>
+          <span>tested in a sandbox · nothing changes</span>
+        </div>
+      )}
       <form className="whatif-line" onSubmit={(e) => { e.preventDefault(); if (who && what && !asking) ask(); }}>
         <select value={who} onChange={(e) => { setWho(e.target.value); setAnswer(null); }} aria-label="Agent">
           <option value="">an agent…</option>
@@ -83,7 +85,7 @@ export function WhatIfLine({ c, scenario, agentId }: { c: DeVries; scenario: str
 }
 
 /** What max flow found: the hops of the cheapest cut, each with the fix that would cut it, and the rules that would make it. */
-export function CutBlock({ c, scenario, compact = false }: { c: DeVries; scenario: string; compact?: boolean }) {
+export function CutBlock({ c, scenario, compact = false, head = true }: { c: DeVries; scenario: string; compact?: boolean; head?: boolean }) {
   const [cut, setCut] = useState<Cut | null>(null);
   const [policy, setPolicy] = useState<Policy | null>(null);
   useEffect(() => {
@@ -95,14 +97,27 @@ export function CutBlock({ c, scenario, compact = false }: { c: DeVries; scenari
   if (!cut || cut.scenario !== scenario) return <Loading label="Asking max flow for the cheapest cut" />;
   const by = <>Worked out by <a href={href(scenario, "queries", "choke.maxflow")}>choke.maxflow</a>, which runs FalkorDB's <code>algo.maxFlow</code> over the flow layer with each hop's capacity set to the cost of the cheapest fix that cuts it.</>;
   const rules = policy && policy.scenario === scenario && (policy.docker_mcp_gateway.length > 0 || Object.keys(policy.claude_code.permissions).length > 0) ? policy : null;
+  const how = (
+    <Fold summary="How it was worked out" sub="choke.maxflow · algo.maxFlow">
+      <p className="chart-note">
+        {by} It is a guide, not a verdict: it knows nothing about which workflows need what, and a trifecta is not a cut.
+        A fix is real only once a sandbox has passed it; the plans that were tested are under <a href={href(scenario, "fixes")}>Fixes</a>.
+      </p>
+    </Fold>
+  );
   return (
     <section className="block cut-block">
-      <div className="block-head">
-        <Eyebrow>The cheapest cut</Eyebrow>
-        <span>{cut.hops.length ? (cut.cuttable ? `cost ${cut.cost} · ${plural(cut.hops.length, "hop", "hops")}` : "no set of fixes separates them") : "nothing to cut"}</span>
-      </div>
+      {head && (
+        <div className="block-head">
+          <Eyebrow>The cheapest cut</Eyebrow>
+          <span>{cut.hops.length ? (cut.cuttable ? `cost ${cut.cost} · ${plural(cut.hops.length, "hop", "hops")}` : "no set of fixes separates them") : "nothing to cut"}</span>
+        </div>
+      )}
       {!cut.hops.length ? (
-        <p className="chart-note">No untrusted source reaches a high-impact resource in this graph, so the max flow between them is zero. {by}</p>
+        <>
+          <p className="chart-note">No untrusted source reaches a high-impact resource in this graph, so the max flow between them is zero.</p>
+          {how}
+        </>
       ) : (
         <div className="chart-note cut-note">
           <p>
@@ -127,12 +142,7 @@ export function CutBlock({ c, scenario, compact = false }: { c: DeVries; scenari
               <p>A guide like the cut itself: a rule is safe only once a sandbox has passed the plan it stands for.</p>
             </details>
           )}
-          {!compact && (
-            <p>
-              {by} It is a guide, not a verdict: it knows nothing about which workflows need what, and a trifecta is not a cut.
-              A fix is real only once a sandbox has passed it; the plans that were tested are under <a href={href(scenario, "fixes")}>Fixes</a>.
-            </p>
-          )}
+          {how}
         </div>
       )}
     </section>
@@ -142,7 +152,7 @@ export function CutBlock({ c, scenario, compact = false }: { c: DeVries; scenari
 export function WhatIfPage({ c, scenario }: { c: DeVries; scenario: string }) {
   return (
     <PageBody>
-      <PageHeader eyebrow="What if" title="Ask the sandbox before you change anything." meta="A grant or a delegation that is not in the config yet, tested on a copy of the graph that is deleted afterwards; and the cheapest cut, from max flow, as rules." />
+      <PageHeader eyebrow="What if" title="Ask the sandbox before you change anything." meta="A grant or a delegation that is not in the config yet, tested on a copy of the graph that is deleted afterwards. Under it, the cheapest cut, from max flow, as rules a gateway could enforce." />
       {c.flow ? <WhatIfLine c={c} scenario={scenario} /> : <Loading label="Reading the graph" />}
       <CutBlock c={c} scenario={scenario} />
     </PageBody>
