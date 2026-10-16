@@ -2,7 +2,7 @@
 // in the rail; a passing plan that is still waiting can be approved from here. The page is Manthan's
 // approval ledger (filters, table, selection rail, the bar underneath); see ui/THIRD_PARTY_NOTICES.md.
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { api, type Graph, type Mitigation, type Preview } from "../api";
 import { ApprovalBar } from "../ApprovalBar";
 import { best, isLive, patchText, recommendation, type Tone } from "../desk";
@@ -74,8 +74,9 @@ function Selection({ m, c, scenario, superseded }: { m: Mitigation; c: DeVries; 
   );
 }
 
-/** The selected plan's target, drawn with the plan applied: read from a sandbox, or from the graph once it is applied. */
-export function After({ m, c, scenario, renderer = "devries", layout = "tree" }: { m: Mitigation; c: DeVries; scenario: string; renderer?: Renderer; layout?: "force" | "tree" }) {
+/** The selected plan's target, drawn with the plan applied: read from a sandbox, or from the graph once it is applied.
+ *  `controls` is the renderer switch, when the page wants it over this chart; `link` names the finding, off on its own page. */
+export function After({ m, c, scenario, renderer = "devries", layout = "tree", controls, link = true }: { m: Mitigation; c: DeVries; scenario: string; renderer?: Renderer; layout?: "force" | "tree"; controls?: ReactNode; link?: boolean }) {
   const [shown, setShown] = useState<{ preview?: Preview; error?: string } | null>(null);
   const stamp = `${m.id}/${m.status}/${c.configHash}`;      // ask again when the plan or the config has moved
   useEffect(() => {
@@ -104,6 +105,7 @@ export function After({ m, c, scenario, renderer = "devries", layout = "tree" }:
         <Eyebrow>{shown?.preview?.applied ? "As applied" : "With this plan, in a sandbox"}</Eyebrow>
         <span><a className="id" href={href(scenario, "finding", target.id)}>{target.id}</a></span>
       </div>
+      {controls && <div className="chart-controls">{controls}</div>}
       {graph ? (
         <>
           <Chart renderer={renderer} layout={layout} graph={graph} names={c.names} focus={focus} only height={300} idle="The path of the finding this plan is meant to close, as the plan would leave it." />
@@ -140,7 +142,7 @@ export function Fixes({ c, scenario, selectedId }: { c: DeVries; scenario: strin
             <PageHeader
               eyebrow="Fixes"
               title={plans.length ? `${capital(plural(plans.length, "plan", "plans"))} tested, ${passed ? countWord(passed) : "none"} passed.` : "No plan has been tested yet."}
-              meta="Every plan a sandbox was asked about, passed or not. A plan changes the graph only after a person approves it."
+              meta="Every plan a sandbox was asked about, passed or not. Select one to read its verdict and see the path as it would leave it. A plan changes the graph only after a person approves it."
               actions={<>{canAudit && <Button variant="primary" size="lg" onClick={c.startAudit} disabled={c.busy}>Run audit</Button>}</>}
             />
             {!c.findings ? <Loading /> : plans.length ? (
@@ -173,12 +175,7 @@ export function Fixes({ c, scenario, selectedId }: { c: DeVries; scenario: strin
                   </tbody>
                 </table>
                 {!rows.length && <Empty>No plan has this status.</Empty>}
-                {selected && (
-                  <>
-                    <div className="chart-controls"><RendererSwitch value={renderer} onChange={setRenderer} /></div>
-                    <After m={selected} c={c} scenario={scenario} renderer={renderer} />
-                  </>
-                )}
+                {selected && <After m={selected} c={c} scenario={scenario} renderer={renderer} controls={<RendererSwitch value={renderer} onChange={setRenderer} />} />}
               </>
             ) : (
               <Empty>An audit tries the candidate fixes for a finding on a sandbox copy of the graph, cheapest first. Each one it tries lands here.</Empty>
