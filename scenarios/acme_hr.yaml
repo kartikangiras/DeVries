@@ -1,0 +1,69 @@
+# A recruiting assistant that screens applications. Everything here is synthetic.
+#
+# The planted risk: the assistant was set up from a general HR template, so
+# beside the applicant tracker it holds the HR system's tools, among them one
+# that changes pay. It reads applications, which anyone on the internet can
+# send. Four hops, and a cover letter can change someone's salary.
+#
+# Least privilege comes first here. No workflow needs set_compensation, so the
+# cheapest fix of all, revoking it, passes and closes the injection. The
+# assistant is still a trifecta, since it reads applications and employee
+# records and emails candidates; screening is supervised, so the next round
+# puts a gate on the candidate email.
+scenario: acme_hr
+title: Acme people team
+order: 6
+description: A recruiting assistant that screens applications and emails candidates
+
+servers:
+  - {id: srv:ats, name: Applicant tracking, manifest: manifests/ats.tools.json, synthetic: true}
+  - {id: srv:hris, name: HR system, manifest: manifests/hris.tools.json, synthetic: true}
+
+tools:                                   # list_applications returns ids and stages only, so it reads nothing here
+  - id: tool:ats.get_application
+    reads: [src:applications]
+  - id: tool:ats.email_candidate
+    writes: [res:candidate-email]
+  - id: tool:ats.move_stage
+    writes: [res:pipeline]
+  - id: tool:hris.get_employee
+    reads: [src:employee-records]
+  - id: tool:hris.set_compensation
+    writes: [res:payroll]
+
+data_sources:
+  - {id: src:applications, name: Job applications, trust: untrusted}
+  - {id: src:employee-records, name: Employee records, trust: private}
+
+resources:
+  - {id: res:payroll, name: Payroll, impact: high, external: false}
+  - {id: res:candidate-email, name: Email to candidates, impact: medium, external: true}
+  - {id: res:pipeline, name: Hiring pipeline, impact: low, external: false}
+
+agents:
+  - id: agent:recruiter-bot
+    name: Recruiting assistant
+    owner: people-team
+    can_call:
+      - tool:ats.list_applications
+      - tool:ats.get_application
+      - tool:ats.email_candidate
+      - tool:ats.move_stage
+      - tool:hris.get_employee
+      - tool:hris.set_compensation       # from the template; nothing here needs it
+
+workflows:
+  - id: wf:screen-applicants
+    name: Screen applicants
+    description: Read each new application, check whether an employee referred the person, move it to the right stage and email the candidate.
+    run_by: agent:recruiter-bot
+    mode: supervised                     # a recruiter reads every email before it goes
+    needs: [tool:ats.get_application, tool:ats.move_stage, tool:ats.email_candidate]
+    reads: [src:applications, src:employee-records]
+
+expect:
+  injection: [[src:applications, res:payroll]]
+  trifecta: [agent:recruiter-bot]
+  best_fix_kind: revoke_call
+  rejected:
+    - {kind: drop_read, reason_contains: "wf:screen-applicants"}

@@ -1,0 +1,55 @@
+{
+  "server": "hris",
+  "synthetic": true,
+  "note": "Synthetic manifest in the shape of an MCP tools/list result. No public server stands behind it.",
+  "tools": [
+    {
+      "name": "get_employee",
+      "description": "Fetch an employee's record: role, manager, team, start date and compensation band.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "employee_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "employee_id"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": true
+      }
+    },
+    {
+      "name": "set_compensation",
+      "description": "Set an employee's salary and bonus target, effective from a date.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "employee_id": {
+            "type": "string"
+          },
+          "salary": {
+            "type": "integer"
+          },
+          "bonus_target": {
+            "type": "integer"
+          },
+          "effective": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "employee_id",
+          "salary",
+          "effective"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true
+      }
+    }
+  ]
+}
