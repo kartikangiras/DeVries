@@ -15,7 +15,7 @@ import { useDeVries } from "./state";
 import { Empty, Loading, PageBody } from "./ui";
 
 const PLACE: Record<string, string> = {
-  inbox: "Inbox", done: "Done", finding: "Finding", fixes: "Fixes", whatif: "What if", graph: "Graph", servers: "Servers", audit: "Audit", queries: "Queries", import: "Import",
+  inbox: "Open", done: "Closed", finding: "Finding", fixes: "Fixes", whatif: "What if", graph: "Graph", servers: "Servers", audit: "Audit", queries: "Queries", import: "Import",
 };
 
 export default function App() {

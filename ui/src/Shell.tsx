@@ -10,7 +10,7 @@ import { Icon, Mark, type IconName } from "./ui";
 
 type Row = { page: Page; label: string; icon: IconName };
 const GROUPS: { label: string; rows: Row[] }[] = [
-  { label: "Findings", rows: [{ page: "inbox", label: "Inbox", icon: "inbox" }, { page: "done", label: "Done", icon: "done" }] },
+  { label: "Findings", rows: [{ page: "inbox", label: "Open", icon: "inbox" }, { page: "done", label: "Closed", icon: "done" }] },
   { label: "Fixes", rows: [{ page: "fixes", label: "Ledger", icon: "fixes" }, { page: "whatif", label: "What if", icon: "whatif" }] },
   { label: "System", rows: [{ page: "graph", label: "Graph", icon: "graph" }, { page: "servers", label: "Servers", icon: "servers" }, { page: "queries", label: "Queries", icon: "queries" }] },
   { label: "Audit", rows: [{ page: "audit", label: "Runs", icon: "audit" }, { page: "import", label: "Import", icon: "import" }] },

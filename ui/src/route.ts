@@ -1,7 +1,7 @@
 // Where the visitor is. Routes live in the hash, so the app is one static page behind any server.
 //
-//   #/acme_support                      the inbox
-//   #/acme_support/done                 findings that are closed
+//   #/acme_support                      the open findings
+//   #/acme_support/done                 the closed ones
 //   #/acme_support/finding/fnd:…        one finding: the problem, the fix, the options, the trace
 //   #/acme_support/fixes[/mit:…]        every plan that was tested
 //   #/acme_support/whatif               a change tested in a sandbox, and the cheapest cut as rules
@@ -11,8 +11,8 @@
 //   #/acme_support/queries[/name]       the Cypher behind all of it, as a drawer over the page
 //   #/acme_support/import               paste a config or a tools/list and audit your own
 //
-// The nav groups them: Findings (Inbox, Done), Fixes (Ledger, What if), System (Graph, Servers, Queries),
-// Audit (Runs, Import). The addresses stay, so links in the README and the tests survive.
+// The nav groups them: Findings (Open, Closed), Fixes (Ledger, What if), System (Graph, Servers, Queries),
+// Audit (Runs, Import). The addresses keep their old words (inbox, done), so links in the README and the tests survive.
 
 export const PAGES = ["inbox", "done", "finding", "fixes", "whatif", "graph", "servers", "audit", "queries", "import"] as const;
 export type Page = (typeof PAGES)[number];
