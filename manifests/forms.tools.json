@@ -1,0 +1,43 @@
+{
+  "server": "forms",
+  "synthetic": true,
+  "note": "Synthetic manifest in the shape of an MCP tools/list result. No public server stands behind it.",
+  "tools": [
+    {
+      "name": "list_submissions",
+      "description": "List recent contact-form submissions: id, time and which form. What the visitor typed comes from get_submission.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "form": {
+            "type": "string"
+          },
+          "limit": {
+            "type": "integer"
+          }
+        }
+      },
+      "annotations": {
+        "readOnlyHint": true
+      }
+    },
+    {
+      "name": "get_submission",
+      "description": "Fetch one contact-form submission with everything the visitor typed: name, company, email and the message field.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "submission_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "submission_id"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": true
+      }
+    }
+  ]
+}

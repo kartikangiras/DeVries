@@ -1,0 +1,72 @@
+# A sales development rep that answers inbound leads. Everything here is synthetic.
+#
+# The planted risk: the rep reads what people type into the website's contact
+# form, looks the company up in the CRM, and emails them back within minutes,
+# round the clock. Anyone can fill in the form; the CRM holds every deal; the
+# email goes out of the building. Untrusted text, private data and a way out in
+# one context, with no person awake to check.
+#
+# No cheap fix survives the workflow. The follow-up runs unattended and needs
+# the email and the calendar, so a gate and a revoke both break it; it needs the
+# form text and the CRM record, so dropping either read breaks it too. What
+# works is a split: a quarantined reader takes over the two reading tools, and
+# the rep is handed fields, not the text a stranger wrote.
+scenario: acme_sales
+title: Acme sales team
+order: 4
+description: A sales rep that answers website leads from the CRM, round the clock
+
+servers:
+  - {id: srv:forms, name: Web forms, manifest: manifests/forms.tools.json, synthetic: true}
+  - {id: srv:crm, name: CRM, manifest: manifests/crm.tools.json, synthetic: true}
+  - {id: srv:outreach, name: Outreach, manifest: manifests/outreach.tools.json, synthetic: true}
+
+tools:                                   # list_submissions returns ids and dates only, so it reads nothing here
+  - id: tool:forms.get_submission
+    reads: [src:web-form-leads]
+  - id: tool:crm.search_contacts
+    reads: [src:crm-records]
+  - id: tool:crm.get_account
+    reads: [src:crm-records]
+  - id: tool:outreach.send_email
+    writes: [res:prospect-email]
+  - id: tool:outreach.book_meeting
+    writes: [res:calendar-invites]
+
+data_sources:
+  - {id: src:web-form-leads, name: Website form leads, trust: untrusted}
+  - {id: src:crm-records, name: CRM records, trust: private}
+
+resources:
+  - {id: res:prospect-email, name: Email to prospects, impact: medium, external: true}
+  - {id: res:calendar-invites, name: Calendar invites, impact: low, external: true}
+
+agents:
+  - id: agent:sdr
+    name: Sales development rep
+    owner: sales
+    can_call:
+      - tool:forms.list_submissions
+      - tool:forms.get_submission
+      - tool:crm.get_account
+      - tool:outreach.send_email
+      - tool:outreach.book_meeting
+    delegates_to: []
+
+workflows:
+  - id: wf:lead-followup
+    name: Lead follow-up
+    description: Answer every new website lead within five minutes with a note that fits their account, and offer a meeting.
+    run_by: agent:sdr
+    mode: autonomous                     # it answers at 3 am too; nobody approves each email
+    needs: [tool:outreach.send_email, tool:outreach.book_meeting]
+    reads: [src:web-form-leads, src:crm-records]
+
+expect:
+  injection: []
+  trifecta: [agent:sdr]
+  best_fix_kind: split_agent
+  rejected:
+    - {kind: gate_call, reason_contains: "wf:lead-followup"}
+    - {kind: revoke_call, reason_contains: "wf:lead-followup"}
+    - {kind: drop_read, reason_contains: "wf:lead-followup"}
