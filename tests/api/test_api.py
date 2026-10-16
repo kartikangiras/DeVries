@@ -106,7 +106,8 @@ async def test_health_reports_the_graph_the_model_and_how_sandboxes_are_made(bas
     async with visitor(base) as http:
         body = (await http.get("/api/health")).json()
         assert body["ok"] and body["canary"]["ok"]
-        assert body["scenarios"] == {"acme_dev": True, "acme_exec": True, "acme_support": True, "devries_self": True}
+        assert body["scenarios"] == {name: True for name in (
+            "acme_data", "acme_dev", "acme_exec", "acme_finance", "acme_hr", "acme_ops", "acme_sales", "acme_support", "devries_self")}
         assert body["model"] == {"configured": False, "name": None, "budget_spent": False, "spent_today_usd": 0.0}
         assert body["sessions"]["max"] == 30
 

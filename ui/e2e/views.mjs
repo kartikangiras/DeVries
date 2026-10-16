@@ -163,12 +163,14 @@ const stepTo = (page, name) => page.locator(".workflow-step", { hasText: name })
   await shot(page, "views-queries");
   await page.keyboard.press("Escape");
   await page.waitForSelector(".case");                                        // a deep link's drawer lies over the inbox
+  await page.waitForSelector(".drawer", { state: "detached" });
   need((await page.locator(".drawer").count()) === 0 && /#\/acme_exec$/.test(await page.evaluate(() => location.hash)), "Escape should close the drawer onto the page under it: " + await page.evaluate(() => location.hash));
 
   // the scenario switch with its way to an import, and a deep link straight to a finding
   await page.locator(".switch-button").click();
   out.scenarios = await page.locator(".switch-menu li:not(.switch-import) .switch-name").allInnerTexts();
-  need(out.scenarios.length === 4 && out.scenarios.includes("DeVries itself"), "the switch should list the four scenarios by their titles: " + out.scenarios);
+  const listed = (await (await page.request.get(`${base}/api/scenarios`)).json()).scenarios.length;
+  need(out.scenarios.length === listed && out.scenarios.includes("DeVries itself"), `the switch should list all ${listed} scenarios by their titles: ` + out.scenarios);
   need((await page.locator(".switch-menu .switch-import").count()) === 1, "the switch should offer an import of your own config");
   await page.locator(".switch-menu button", { hasText: "Acme support" }).click();
   await page.waitForFunction(() => location.hash === "#/acme_support");
