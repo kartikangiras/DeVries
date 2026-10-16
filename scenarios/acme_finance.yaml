@@ -1,0 +1,60 @@
+# An accounts payable bot that pays approved invoices overnight. Everything here is synthetic.
+#
+# The planted risk is in the shape of one tool. get_vendor returns a vendor's
+# record, bank details included, and, because someone found it handy, the
+# vendor's latest messages from the supplier portal. Anyone who registers as a
+# supplier can write those. The bot that reads them is the bot that pays.
+#
+# The payment run is unattended and needs pay_invoice, so a gate and a revoke
+# both break it, and it needs the vendor record, so get_vendor cannot go. What
+# works is to stop get_vendor reading the portal: nothing needs those messages.
+# One change closes the injection and the trifecta at once.
+scenario: acme_finance
+title: Acme finance
+order: 5
+description: An accounts payable bot that pays approved invoices overnight
+
+servers:
+  - {id: srv:erp, name: ERP, manifest: manifests/erp.tools.json, synthetic: true}
+
+tools:
+  - id: tool:erp.list_approved_invoices
+    reads: [src:approved-invoices]
+  - id: tool:erp.get_vendor
+    reads: [src:vendor-master, src:vendor-portal-messages]
+  - id: tool:erp.pay_invoice
+    writes: [res:bank-payments]
+  - id: tool:erp.hold_invoice
+    writes: [res:invoice-queue]
+
+data_sources:
+  - {id: src:approved-invoices, name: Approved invoices, trust: internal}
+  - {id: src:vendor-master, name: Vendor master records, trust: private}
+  - {id: src:vendor-portal-messages, name: Supplier portal messages, trust: untrusted}
+
+resources:
+  - {id: res:bank-payments, name: Bank payments, impact: high, external: true}
+  - {id: res:invoice-queue, name: Invoice queue, impact: low, external: false}
+
+agents:
+  - id: agent:ap-bot
+    name: Accounts payable bot
+    owner: finance
+    can_call: [tool:erp.list_approved_invoices, tool:erp.get_vendor, tool:erp.pay_invoice, tool:erp.hold_invoice]
+
+workflows:
+  - id: wf:nightly-payment-run
+    name: Nightly payment run
+    description: Every night, pay each approved invoice to the bank account on the vendor's record, or hold it if the two disagree.
+    run_by: agent:ap-bot
+    mode: autonomous                     # it runs at 2 am; nobody approves each payment
+    needs: [tool:erp.pay_invoice, tool:erp.hold_invoice]
+    reads: [src:approved-invoices, src:vendor-master]
+
+expect:
+  injection: [[src:vendor-portal-messages, res:bank-payments]]
+  trifecta: [agent:ap-bot]
+  best_fix_kind: drop_read
+  rejected:
+    - {kind: revoke_call, reason_contains: "wf:nightly-payment-run"}
+    - {kind: gate_call, reason_contains: "wf:nightly-payment-run"}

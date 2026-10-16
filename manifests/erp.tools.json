@@ -1,0 +1,82 @@
+{
+  "server": "erp",
+  "synthetic": true,
+  "note": "Synthetic manifest in the shape of an MCP tools/list result. No public server stands behind it.",
+  "tools": [
+    {
+      "name": "list_approved_invoices",
+      "description": "List invoices approved for payment: vendor id, amount, currency and due date.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "due_before": {
+            "type": "string"
+          }
+        }
+      },
+      "annotations": {
+        "readOnlyHint": true
+      }
+    },
+    {
+      "name": "get_vendor",
+      "description": "Fetch a vendor's record: legal name, bank account, payment terms, and the vendor's latest messages from the supplier portal.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "vendor_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "vendor_id"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": true
+      }
+    },
+    {
+      "name": "pay_invoice",
+      "description": "Pay an approved invoice to the bank account on the vendor's record.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "invoice_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "invoice_id"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true
+      }
+    },
+    {
+      "name": "hold_invoice",
+      "description": "Put an invoice on hold with a reason, for a person in finance to look at.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "invoice_id": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "invoice_id",
+          "reason"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false
+      }
+    }
+  ]
+}
