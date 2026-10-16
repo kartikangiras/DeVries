@@ -1,8 +1,12 @@
 // DeVries's own chart, drawn with React Flow and laid out by ELK: every node a card in its lane, every hop a
 // labelled arc, a finding's path lit, a plan's cuts marked, the most central ringed, communities coloured.
 // What a card says is FalkorDB's answer (tainted, trust, impact, gates); the page only draws it.
+//
+// Motion says what the chart means: cards arrive lane by lane in the order text travels; a lit hop
+// carries a spark along it, hop after hop, and the spark stops where a gate stops the text; a hovered
+// card lifts its own arcs. All of it is off under prefers-reduced-motion.
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import {
   BaseEdge, EdgeLabelRenderer, Handle, Position, ReactFlow, ReactFlowProvider, getBezierPath, useReactFlow,
   type Edge, type EdgeProps, type Node, type NodeProps,
@@ -39,10 +43,12 @@ export type FlowProps = {
 };
 
 type CardData = {
-  id: string; name: string; kind: string; fact: string; mark: "hot" | "private" | "plain"; code: boolean;
+  id: string; name: string; kind: string; fact: string; mark: "hot" | "private" | "plain"; code: boolean; lane: number;
   lit: boolean; dim: boolean; picked: boolean; cite?: number; badge?: string; rank?: number; community?: number;
 };
-type ArcData = { key: string; word: string; sentence: string; gated: boolean; gate: string | null; series: Series | null; onFocus: boolean; cut: boolean; dim: boolean };
+/** Where a hop stands in its chain of lit hops: the i-th of n, so a spark can run them in order. */
+type Link = { i: number; n: number };
+type ArcData = { key: string; word: string; sentence: string; gated: boolean; gate: string | null; series: Series | null; onFocus: boolean; cut: boolean; dim: boolean; near: boolean; chain: Link | null };
 type Card = Node<CardData, "card">;
 type Arc = Edge<ArcData, "arc">;
 type LaneNode = Node<{ label: string }, "lane">;
@@ -55,7 +61,7 @@ function CardView({ data }: NodeProps<Card>) {
   const cls = ["dot", "fcard", `k-${data.kind}`, data.mark, data.lit ? "lit" : "", data.dim ? "dim" : "", data.picked ? "picked" : "",
     data.rank != null ? "central" : "", data.community != null ? `c${data.community % 6}` : ""].filter(Boolean).join(" ");
   return (
-    <div className={cls} data-id={data.id} title={data.id}>
+    <div className={cls} data-id={data.id} title={data.id} style={{ "--lane": data.lane } as CSSProperties}>
       <Handle type="target" position={Position.Left} className="fport" />
       <span className="mark" aria-hidden />
       <span className="fcard-text">
@@ -73,19 +79,41 @@ function CardView({ data }: NodeProps<Card>) {
 }
 
 function LaneView({ data }: NodeProps<LaneNode>) {
-  return <div className="lane"><text>{data.label}</text></div>;
+  return <div className="lane"><span>{data.label}</span></div>;
+}
+
+/** When the spark is on this hop: the i-th slot of n in one period, as SMIL key times without repeated stamps. */
+function sparkTiming({ i, n }: Link) {
+  const s = i / n, e = (i + 1) / n;
+  const motion: [number, number][] = [[0, 0], [s, 0], [e, 1], [1, 1]];
+  const shown: [number, number][] = [[0, 0], [s, 1], [e, 0]];
+  const dedupe = (pairs: [number, number][]) => pairs.filter(([t], k) => k === 0 || t > pairs[k - 1][0]);
+  const m = dedupe(motion), o = dedupe(shown);
+  return {
+    period: `${Math.max(1.6, n * 0.75)}s`,
+    keyTimes: m.map(([t]) => t).join(";"), keyPoints: m.map(([, p]) => p).join(";"),
+    showTimes: o.map(([t]) => t).join(";"), showValues: o.map(([, v]) => v).join(";"),
+  };
 }
 
 function ArcView({ id, sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, data, markerEnd }: EdgeProps<Arc>) {
   const [path, labelX, labelY] = getBezierPath({ sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, curvature: 0.35 });
   const d = data!;
-  const cls = ["wire", d.series ? `s-${d.series}` : "", d.gated ? "gated" : "", d.onFocus ? "traced" : "", d.dim ? "dim" : "", d.cut ? "cut" : ""].filter(Boolean).join(" ");
+  const cls = ["wire", d.series ? `s-${d.series}` : "", d.gated ? "gated" : "", d.onFocus ? "traced" : "", d.dim ? "dim" : "", d.cut ? "cut" : "", d.near ? "near" : ""].filter(Boolean).join(" ");
+  // the spark runs along a lit hop that is open; a gate is where the text stops, so the spark stops before it
+  const spark = d.chain && d.series && !d.gated ? sparkTiming(d.chain) : null;
   return (
     <g className={cls} data-hop={d.key}>
       <BaseEdge id={id} path={path} markerEnd={markerEnd} className="line" />
       <EdgeLabelRenderer>
-        <div className={`wire-label${d.dim ? " dim" : ""}`} style={{ transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY - 11}px)` }}>
+        <div className={`wire-label${d.dim ? " dim" : ""}${d.near ? " near" : ""}`} style={{ transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY - 11}px)` }}>
           {d.word}
+      {spark && (
+        <circle className="spark" r={3.2} opacity={0}>
+          <animateMotion dur={spark.period} repeatCount="indefinite" path={path} calcMode="linear" keyPoints={spark.keyPoints} keyTimes={spark.keyTimes} />
+          <animate attributeName="opacity" dur={spark.period} repeatCount="indefinite" calcMode="discrete" values={spark.showValues} keyTimes={spark.showTimes} />
+        </circle>
+      )}
           {d.cut && <span className="cut-mark" aria-label="where the plan cuts">‖</span>}
         </div>
       </EdgeLabelRenderer>
@@ -123,6 +151,30 @@ async function place(cards: { id: string; width: number; height: number; lane: n
 function Inner(props: FlowProps) {
   const { graph, names, focus, only, cuts, cutsMean, rings, communities, cites, badges, picked, onPick, idle, height } = props;
   const [positions, setPositions] = useState<Map<string, { x: number; y: number }> | null>(null);
+type Hop = { key: string; from: string; to: string; series: Series | null; gated: boolean };
+
+/** The lit hops in the order the text travels, one chain per series. A chain ends at a gate, where the text does. */
+function chainsOf(hops: Hop[]): Map<string, Link> {
+  const out = new Map<string, Link>();
+  for (const series of ["hot", "private", "exit"] as Series[]) {
+    const mine = hops.filter((h) => h.series === series);
+    if (!mine.length) continue;
+    const tos = new Set(mine.map((h) => h.to));
+    const byFrom = new Map(mine.map((h) => [h.from, h]));
+    const chain: Hop[] = [];
+    const seen = new Set<string>();
+    let at: Hop | undefined = mine.find((h) => !tos.has(h.from)) ?? mine[0];
+    while (at && !seen.has(at.key)) {
+      seen.add(at.key);
+      chain.push(at);
+      if (at.gated) break;
+      at = byFrom.get(at.to);
+    }
+    chain.forEach((h, i) => out.set(h.key, { i, n: chain.length }));
+  }
+  return out;
+}
+
   const [over, setOver] = useState<string | null>(null);
   const [boxWidth, setBoxWidth] = useState(900);
   const box = useRef<HTMLDivElement>(null);
@@ -156,19 +208,29 @@ function Inner(props: FlowProps) {
   useEffect(() => {
     let wanted = true;
     const m = latest.current;
+  // The layout is asked for again only when what is drawn changes: which cards, how wide, which arcs. A page that
+  // rebuilds its graph object on every render, or hovers, or picks, must not cancel a layout that is under way.
+  const layoutKey = useMemo(
+    () => `${graph.scenario}/${graph.layer}/${model.cards.map((c) => `${c.id}:${c.width}:${c.height}`).join(",")}/${model.links.map((l) => `${l.data.from_id}>${l.data.to_id}`).join(",")}`,
+    [graph.scenario, graph.layer, model],
+  );
+  const latest = useRef(model);
+  latest.current = model;
     place(m.cards.map(({ id, width, height, lane }) => ({ id, width, height, lane })), m.links.map((l) => ({ id: String(l.id), source: l.data.from_id, target: l.data.to_id })))
       .then((laid) => { if (wanted) setPositions(laid); })
       .catch(() => { if (wanted) setPositions(new Map(m.cards.map((c, i) => [c.id, { x: c.lane * 220, y: i * 64 }]))); });
     return () => { wanted = false; };
   }, [layoutKey]);
 
-  const { nodes, edges, extent } = useMemo(() => {
-    if (!positions) return { nodes: [] as (Card | LaneNode)[], edges: [] as Arc[], extent: { w: 900, h: 320 } };
+  const overCard = over && model.cards.some((c) => c.id === over) ? over : null;
+
+  const { nodes, extent } = useMemo(() => {
+    if (!positions) return { nodes: [] as (Card | LaneNode)[], extent: { w: 900, h: 320 } };
     const lit = focus?.nodes ?? null;
-    const cards: Card[] = model.cards.map(({ id, node, name, fact, width, height }) => ({
+    const cards: Card[] = model.cards.map(({ id, node, name, fact, width, height, lane }) => ({
       id, type: "card", position: positions.get(id) ?? { x: 0, y: 0 }, width, height, draggable: false, connectable: false, selectable: false,
       data: {
-        id, name, fact, kind: node.label, mark: markOf(node), code: node.label === "Tool",
+        id, name, fact, kind: node.label, mark: markOf(node), code: node.label === "Tool", lane,
         lit: !!lit?.has(id), dim: !!lit && !lit.has(id) && !only, picked: picked === id, cite: cites?.get(id), badge: badges?.get(id), rank: rings?.get(id),
         community: communities ? node.data.community : undefined,
       },
@@ -187,11 +249,11 @@ function Inner(props: FlowProps) {
     const byLane = new Map<number, number[]>();
     for (const c of model.cards) { const p = positions.get(c.id); if (p) byLane.set(c.lane, [...(byLane.get(c.lane) ?? []), p.x + c.width / 2]); }
     const laneNodes: LaneNode[] = [...byLane].map(([lane, xs]) => ({
-      id: `lane:${lane}`, type: "lane", position: { x: xs.reduce((a, b) => a + b, 0) / xs.length - 70, y: minY - 44 }, width: 140, height: 20,
+      id: `lane:${lane}`, type: "lane", position: { x: xs.reduce((a, b) => a + b, 0) / xs.length - 70, y: minY - 38 }, width: 140, height: 20,
       draggable: false, selectable: false, connectable: false, data: { label: LANES[lane] },
     }));
-    return { nodes: [...laneNodes, ...cards], edges: arcs, extent: { w: maxX, h: maxY - minY + 60 } };
-  }, [positions, model, focus, only, cuts, rings, communities, cites, badges, picked]);
+    return { nodes: [...laneNodes, ...cards], extent: { w: maxX, h: maxY - minY + 44 } };
+  }, [positions, model, focus, only, rings, communities, cites, badges, picked]);
 
   useEffect(() => {
     if (nodes.length) window.requestAnimationFrame(() => flow.fitView({ padding: 0.06, maxZoom: 1, duration: 0 }));

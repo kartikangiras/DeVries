@@ -25,7 +25,7 @@
 .flowchart .fit { position: absolute; right: 10px; top: 10px; z-index: 5; width: 28px; height: 28px; font-size: 14px; line-height: 1; color: var(--ink-faint); background: var(--surface); border: 1px solid var(--rule); border-radius: 6px; cursor: pointer; }
 .flowchart .fit:hover { color: var(--ink-strong); border-color: var(--rule-strong); }
 .flowchart .lane { width: 140px; text-align: center; font: 400 10.5px var(--mono); letter-spacing: 0.1em; text-transform: uppercase; color: var(--chart-ash); pointer-events: none; }
-.flowchart .lane text { display: inline; }
+.flowchart .lane span { display: inline; }
 
 .fcard { position: relative; display: flex; align-items: center; gap: 10px; box-sizing: border-box; height: 100%; padding: 0 14px 0 12px; background: var(--chart-tile); border: 1px solid var(--chart-line-strong); border-radius: 10px; color: var(--ink); transition: opacity 180ms var(--ease-out-quart), border-color 180ms var(--ease-out-quart), box-shadow 180ms var(--ease-out-quart); cursor: pointer; }
 .fcard .mark { flex: none; width: 10px; height: 10px; border-radius: 50%; background: var(--bg); border: 2px solid var(--chart-ash); }
@@ -53,8 +53,35 @@
 
 /* ---- the sankey overview */
 .sankey svg { overflow: visible; }
-.sankey .ov-ribbon .line { fill: none; stroke: var(--chart-hot); opacity: 0.42; stroke-linecap: butt; transition: opacity 180ms var(--ease-out-quart); }
+@keyframes ribbon-in { from { opacity: 0; } }
+.sankey .ov-ribbon .line { fill: none; stroke: var(--chart-hot); opacity: 0.42; stroke-linecap: butt; transition: opacity 180ms var(--ease-out-quart); animation: ribbon-in 900ms var(--ease-out-quart) both; }
 .sankey .ov-ribbon.trifecta .line { stroke: var(--chart-bone); }
+/* ---- motion on DeVries's chart. Cards arrive lane by lane, in the order text travels. A lit hop stays a solid
+   line (dashes mean a gate) and carries a spark along it, hop after hop; where a gate blocks the text the spark
+   stops. A hovered card lifts its own arcs and lets the rest fall back. Off under prefers-reduced-motion (tokens.css). */
+@keyframes card-in { from { opacity: 0; transform: translateY(6px) scale(0.985); } to { opacity: 1; transform: none; } }
+@keyframes arc-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes snip { 0% { opacity: 0; transform: scale(0.5); } 60% { opacity: 1; transform: scale(1.35); } 100% { opacity: 1; transform: none; } }
+@keyframes shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+.flowchart .fcard { animation: card-in 460ms var(--ease-out-quart) both; animation-delay: calc(var(--lane, 0) * 80ms); }
+.flowchart .lane { animation: arc-in 400ms var(--ease-out-quart) both; }
+.flowchart .react-flow__edge { animation: arc-in 420ms var(--ease-out-quart) 380ms both; }
+.flowchart .wire-label { animation: arc-in 300ms var(--ease-out-quart) 520ms both; }
+.flowchart .wire .spark { fill: var(--chart-ash); stroke: var(--bg); stroke-width: 1.5; pointer-events: none; }
+.flowchart .wire.s-hot .spark { fill: var(--chart-hot); }
+.flowchart .wire.s-private .spark { fill: var(--amber); }
+.flowchart .wire.s-exit .spark { fill: var(--accent); }
+.flowchart .wire-label .cut-mark { display: inline-block; animation: snip 700ms var(--ease-out-quart) 700ms both; }
+.flowchart.hovering .wire:not(.near) .react-flow__edge-path { opacity: 0.16; }
+.flowchart.hovering .wire:not(.near) .spark { visibility: hidden; }
+.flowchart.hovering .wire.near .react-flow__edge-path { opacity: 1; stroke: var(--chart-ash); }
+.flowchart.hovering .wire.near.s-hot .react-flow__edge-path { stroke: var(--chart-hot); }
+.flowchart.hovering .wire.near.s-private .react-flow__edge-path { stroke: var(--amber); }
+.flowchart.hovering .wire.near.s-exit .react-flow__edge-path { stroke: var(--accent); }
+.flowchart.hovering .wire-label:not(.near) { opacity: 0.25; }
+.flowchart.hovering .wire-label.near { opacity: 1; color: var(--ink-strong); }
+.flowchart.laying-out .flow-area::after { content: ""; position: absolute; inset: 18px; border-radius: 12px; background: linear-gradient(100deg, transparent 35%, rgb(181 209 204 / 0.05) 50%, transparent 65%); background-size: 220% 100%; animation: shimmer 1.6s linear infinite; pointer-events: none; }
+
 .sankey .ov-ribbon.lit .line { opacity: 0.9; }
 .sankey .ov-ribbon.dim .line { opacity: 0.1; }
 .sankey .ov-ribbon .hit { fill: none; stroke: transparent; }
