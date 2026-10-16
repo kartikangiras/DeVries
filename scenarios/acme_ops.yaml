@@ -1,0 +1,79 @@
+# A site reliability team's agents. Everything here is synthetic.
+#
+# The planted risk is stored taint (rule 7). The on-call bot reads request logs,
+# and a request log holds whatever a client sent: paths, headers, user agents.
+# It writes what it learns into the runbook wiki. The remediation bot reads the
+# runbooks before it acts on the cluster. So text in a request can become a
+# runbook step and then a rollback: nine hops, two agents, nothing in between.
+#
+# Triage runs unattended and needs the logs and the wiki, so nothing on the
+# first half can be cut. Remediation needs the runbooks and the rollback, but
+# an engineer confirms each rollback, so a gate on it passes.
+scenario: acme_ops
+title: Acme platform operations
+order: 7
+description: An on-call bot that writes runbooks and a remediation bot that follows them
+
+servers:
+  - {id: srv:obs, name: Observability, manifest: manifests/obs.tools.json, synthetic: true}
+  - {id: srv:wiki, name: Wiki, manifest: manifests/wiki.tools.json, synthetic: true}
+  - {id: srv:k8s, name: Kubernetes, manifest: manifests/k8s.tools.json, synthetic: true}
+
+tools:
+  - id: tool:obs.get_alert
+    reads: [src:alerts]
+  - id: tool:obs.search_logs
+    reads: [src:request-logs]
+  - id: tool:wiki.read_page
+    reads: [src:runbooks]
+  - id: tool:wiki.write_page
+    writes: [res:runbook-wiki]
+  - id: tool:k8s.get_pods
+    reads: [src:cluster-state]
+  - id: tool:k8s.rollback
+    writes: [res:production-cluster]
+
+data_sources:
+  - {id: src:alerts, name: Alerts, trust: internal}
+  - {id: src:request-logs, name: Request logs, trust: untrusted}
+  - {id: src:runbooks, name: Runbooks, trust: internal}
+  - {id: src:cluster-state, name: Cluster state, trust: internal}
+
+resources:
+  # stored taint: a page written here is what every later read of the runbooks returns
+  - {id: res:runbook-wiki, name: Runbook wiki, impact: low, external: false, feeds: [src:runbooks]}
+  - {id: res:production-cluster, name: Production cluster, impact: high, external: false}
+
+agents:
+  - id: agent:oncall-bot
+    name: On-call bot
+    owner: sre
+    can_call: [tool:obs.get_alert, tool:obs.search_logs, tool:k8s.get_pods, tool:wiki.read_page, tool:wiki.write_page]
+  - id: agent:remediator
+    name: Remediation bot
+    owner: sre
+    can_call: [tool:wiki.read_page, tool:k8s.get_pods, tool:k8s.rollback]
+
+workflows:
+  - id: wf:incident-triage
+    name: Incident triage
+    description: On every alert, read the logs around it, work out what changed and write the incident up in the runbook wiki.
+    run_by: agent:oncall-bot
+    mode: autonomous                     # alerts fire at night; nobody approves a wiki page
+    needs: [tool:obs.get_alert, tool:obs.search_logs, tool:wiki.write_page]
+    reads: [src:alerts, src:request-logs]
+  - id: wf:runbook-remediation
+    name: Runbook remediation
+    description: Follow the runbook for the failing service and roll it back to the last good revision.
+    run_by: agent:remediator
+    mode: supervised                     # an engineer confirms each rollback
+    needs: [tool:k8s.rollback]
+    reads: [src:runbooks, src:cluster-state]
+
+expect:
+  injection: [[src:request-logs, res:production-cluster]]
+  trifecta: []
+  best_fix_kind: gate_call
+  rejected:
+    - {kind: revoke_call, reason_contains: "wf:runbook-remediation"}
+    - {kind: drop_read, reason_contains: "wf:incident-triage"}

@@ -1,0 +1,52 @@
+{
+  "server": "obs",
+  "synthetic": true,
+  "note": "Synthetic manifest in the shape of an MCP tools/list result. No public server stands behind it.",
+  "tools": [
+    {
+      "name": "get_alert",
+      "description": "Fetch an alert: the rule that fired, the service, when, and the values that crossed the threshold.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "alert_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "alert_id"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": true
+      }
+    },
+    {
+      "name": "search_logs",
+      "description": "Search the request logs of a service over a time range. A line holds what the client sent: method, path, headers and user agent, with the response code.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "service": {
+            "type": "string"
+          },
+          "query": {
+            "type": "string"
+          },
+          "from": {
+            "type": "string"
+          },
+          "to": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "service"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": true
+      }
+    }
+  ]
+}

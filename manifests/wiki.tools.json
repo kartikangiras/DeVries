@@ -1,0 +1,48 @@
+{
+  "server": "wiki",
+  "synthetic": true,
+  "note": "Synthetic manifest in the shape of an MCP tools/list result. No public server stands behind it.",
+  "tools": [
+    {
+      "name": "read_page",
+      "description": "Read a wiki page as text. Runbooks live under /runbooks.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "path"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": true
+      }
+    },
+    {
+      "name": "write_page",
+      "description": "Create or replace a wiki page with new text.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "path",
+          "text"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false
+      }
+    }
+  ]
+}

@@ -1,0 +1,53 @@
+{
+  "server": "k8s",
+  "synthetic": true,
+  "note": "Synthetic manifest in the shape of an MCP tools/list result. No public server stands behind it.",
+  "tools": [
+    {
+      "name": "get_pods",
+      "description": "List the pods of a deployment with their status and image revision.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "namespace": {
+            "type": "string"
+          },
+          "deployment": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "deployment"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": true
+      }
+    },
+    {
+      "name": "rollback",
+      "description": "Roll a deployment back to a previous revision.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "namespace": {
+            "type": "string"
+          },
+          "deployment": {
+            "type": "string"
+          },
+          "revision": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "deployment"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true
+      }
+    }
+  ]
+}
