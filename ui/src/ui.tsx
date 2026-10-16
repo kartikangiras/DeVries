@@ -1,7 +1,7 @@
 // The small pieces every page is made of. Their shapes and sizes follow Manthan's page, button and
 // badge components (see ui/THIRD_PARTY_NOTICES.md); the code and the icons are DeVries's own.
 
-import type { ButtonHTMLAttributes, ReactNode } from "react";
+import { useState, type ButtonHTMLAttributes, type ReactNode } from "react";
 import type { Tone } from "./desk";
 
 export function Eyebrow({ children, tone, className = "" }: { children: ReactNode; tone?: Tone; className?: string }) {
@@ -58,6 +58,33 @@ export function Loading({ label = "Loading" }: { label?: string }) {
 
 export function Empty({ children }: { children: ReactNode }) {
   return <p className="empty">{children}</p>;
+}
+
+/** A section of a page: a small label, at most one line of fact beside it, then what it holds. */
+export function Block({ eyebrow, aside, className = "", children }: { eyebrow: ReactNode; aside?: ReactNode; className?: string; children: ReactNode }) {
+  return (
+    <section className={`block ${className}`}>
+      <div className="block-head">
+        <Eyebrow>{eyebrow}</Eyebrow>
+        {aside && <span>{aside}</span>}
+      </div>
+      {children}
+    </section>
+  );
+}
+
+/** Something a person can ask for but need not read: folded under one line, and made only once it is opened. */
+export function Fold({ summary, sub, open: initially = false, className = "", children }: { summary: ReactNode; sub?: ReactNode; open?: boolean; className?: string; children: ReactNode }) {
+  const [open, setOpen] = useState(initially);
+  return (
+    <details className={`fold ${className}`} open={open} onToggle={(e) => setOpen((e.target as HTMLDetailsElement).open)}>
+      <summary>
+        <span className="eyebrow">{summary}</span>
+        {sub && <span className="fold-sub">{sub}</span>}
+      </summary>
+      {open && <div className="fold-body">{children}</div>}
+    </details>
+  );
 }
 
 /** A label and its value on one line, the value to the right. */
