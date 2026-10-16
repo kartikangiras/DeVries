@@ -31,7 +31,7 @@
 .flowchart .lane { width: 140px; text-align: center; font: 400 10.5px var(--mono); letter-spacing: 0.1em; text-transform: uppercase; color: var(--chart-ash); pointer-events: none; }
 .flowchart .lane span { display: inline; }
 
-.fcard { position: relative; display: flex; align-items: center; gap: 10px; box-sizing: border-box; height: 100%; padding: 0 14px 0 12px; background: var(--chart-tile); border: 1px solid var(--chart-line-strong); border-radius: 10px; color: var(--ink); transition: opacity 180ms var(--ease-out-quart), border-color 180ms var(--ease-out-quart), box-shadow 180ms var(--ease-out-quart); cursor: pointer; }
+.fcard { position: relative; display: flex; align-items: center; gap: 9px; box-sizing: border-box; height: 100%; padding: 0 12px 0 10px; background: var(--chart-tile); border: 1px solid var(--chart-line-strong); border-radius: 10px; color: var(--ink); transition: opacity 180ms var(--ease-out-quart), border-color 180ms var(--ease-out-quart), box-shadow 180ms var(--ease-out-quart); cursor: pointer; }
 .fcard .mark { flex: none; width: 10px; height: 10px; border-radius: 50%; background: var(--bg); border: 2px solid var(--chart-ash); }
 .fcard.hot .mark { background: var(--chart-hot); border-color: var(--chart-hot); }
 .fcard.private .mark { background: var(--amber); border-color: var(--amber); }
@@ -55,11 +55,6 @@
 .chart-key i.k-c0 { background: oklch(0.72 0.14 285); } .chart-key i.k-c1 { background: oklch(0.72 0.14 60); } .chart-key i.k-c2 { background: oklch(0.72 0.14 160); }
 .chart-key i.k-c3 { background: oklch(0.72 0.14 340); } .chart-key i.k-c4 { background: oklch(0.72 0.14 210); } .chart-key i.k-c5 { background: oklch(0.72 0.14 110); }
 
-/* ---- the sankey overview */
-.sankey svg { overflow: visible; }
-@keyframes ribbon-in { from { opacity: 0; } }
-.sankey .ov-ribbon .line { fill: none; stroke: var(--chart-hot); opacity: 0.42; stroke-linecap: butt; transition: opacity 180ms var(--ease-out-quart); animation: ribbon-in 900ms var(--ease-out-quart) both; }
-.sankey .ov-ribbon.trifecta .line { stroke: var(--chart-bone); }
 /* ---- motion on DeVries's chart. Cards arrive lane by lane, in the order text travels. A lit hop stays a solid
    line (dashes mean a gate) and carries a spark along it, hop after hop; where a gate blocks the text the spark
    stops. A hovered card lifts its own arcs and lets the rest fall back. Off under prefers-reduced-motion (tokens.css). */
@@ -86,6 +81,11 @@
 .flowchart.hovering .wire-label.near { opacity: 1; color: var(--ink-strong); }
 .flowchart.laying-out .flow-area::after { content: ""; position: absolute; inset: 18px; border-radius: 12px; background: linear-gradient(100deg, transparent 35%, rgb(181 209 204 / 0.05) 50%, transparent 65%); background-size: 220% 100%; animation: shimmer 1.6s linear infinite; pointer-events: none; }
 
+/* ---- the sankey overview */
+.sankey svg { overflow: visible; }
+@keyframes ribbon-in { from { opacity: 0; } }
+.sankey .ov-ribbon .line { fill: none; stroke: var(--chart-hot); opacity: 0.42; stroke-linecap: butt; transition: opacity 180ms var(--ease-out-quart); animation: ribbon-in 900ms var(--ease-out-quart) both; }
+.sankey .ov-ribbon.trifecta .line { stroke: var(--chart-bone); }
 .sankey .ov-ribbon.lit .line { opacity: 0.9; }
 .sankey .ov-ribbon.dim .line { opacity: 0.1; }
 .sankey .ov-ribbon .hit { fill: none; stroke: transparent; }

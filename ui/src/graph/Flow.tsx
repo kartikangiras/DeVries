@@ -108,15 +108,15 @@ function ArcView({ id, sourceX, sourceY, targetX, targetY, sourcePosition, targe
   return (
     <g className={cls} data-hop={d.key}>
       <BaseEdge id={id} path={path} markerEnd={markerEnd} className="line" />
-      <EdgeLabelRenderer>
-        <div className={`wire-label${d.dim ? " dim" : ""}${d.near ? " near" : ""}`} style={{ transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY - 11}px)` }}>
-          {d.word}
       {spark && (
         <circle className="spark" r={3.2} opacity={0}>
           <animateMotion dur={spark.period} repeatCount="indefinite" path={path} calcMode="linear" keyPoints={spark.keyPoints} keyTimes={spark.keyTimes} />
           <animate attributeName="opacity" dur={spark.period} repeatCount="indefinite" calcMode="discrete" values={spark.showValues} keyTimes={spark.showTimes} />
         </circle>
       )}
+      <EdgeLabelRenderer>
+        <div className={`wire-label${d.dim ? " dim" : ""}${d.near ? " near" : ""}`} style={{ transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY - 11}px)` }}>
+          {d.word}
           {d.cut && <span className="cut-mark" aria-label="where the plan cuts">‖</span>}
         </div>
       </EdgeLabelRenderer>
@@ -138,7 +138,7 @@ async function place(cards: { id: string; width: number; height: number; lane: n
       "elk.direction": "RIGHT",
       "elk.partitioning.activate": "true",
       "elk.spacing.nodeNode": "20",
-      "elk.layered.spacing.nodeNodeBetweenLayers": "84",
+      "elk.layered.spacing.nodeNodeBetweenLayers": "70",
       "elk.layered.spacing.edgeNodeBetweenLayers": "30",
       "elk.layered.crossingMinimization.strategy": "LAYER_SWEEP",
       "elk.layered.nodePlacement.strategy": "BRANDES_KOEPF",
@@ -238,14 +238,6 @@ function Inner(props: FlowProps) {
         community: communities ? node.data.community : undefined,
       },
     }));
-    const arcs: Arc[] = model.links.map((l) => {
-      const f = edgeFacts(l, focus);
-      return {
-        id: String(l.id), type: "arc", source: l.data.from_id, target: l.data.to_id, selectable: false, focusable: false,
-        data: { key: f.key, word: edgeWord(l), sentence: f.sentence, gated: f.gated, gate: f.gate, series: f.series, onFocus: f.onFocus, cut: !!cuts?.has(f.key), dim: !!focus && !f.onFocus && !only },
-        zIndex: f.onFocus ? 2 : 1,
-      };
-    });
     // one caption per lane that has a card in it, above the cards
     let minY = Infinity, maxY = -Infinity, maxX = 0;
     for (const c of cards) { minY = Math.min(minY, c.position.y); maxY = Math.max(maxY, c.position.y + (c.height ?? CARD_H)); maxX = Math.max(maxX, c.position.x + (c.width ?? 120)); }
@@ -258,31 +250,45 @@ function Inner(props: FlowProps) {
     return { nodes: [...laneNodes, ...cards], extent: { w: maxX, h: maxY - minY + 44 } };
   }, [positions, model, focus, only, rings, communities, cites, badges, picked]);
 
-  useEffect(() => {
-    if (nodes.length) window.requestAnimationFrame(() => flow.fitView({ padding: 0.06, maxZoom: 1, duration: 0 }));
-  }, [nodes, flow]);
+  // the arcs are cheap to rebuild, so a hover may: a hovered card's arcs come forward, the rest fall back
+  const edges = useMemo(() => {
+    if (!positions) return [] as Arc[];
+    const facts = model.links.map((l) => ({ l, f: edgeFacts(l, focus) }));
+    const chains = chainsOf(facts.map(({ l, f }) => ({ key: f.key, from: l.data.from_id, to: l.data.to_id, series: f.series, gated: f.gated })));
+    return facts.map(({ l, f }): Arc => ({
+      id: String(l.id), type: "arc", source: l.data.from_id, target: l.data.to_id, selectable: false, focusable: false,
+      data: {
+        key: f.key, word: edgeWord(l), sentence: f.sentence, gated: f.gated, gate: f.gate, series: f.series, onFocus: f.onFocus,
+        cut: !!cuts?.has(f.key), dim: !!focus && !f.onFocus && !only, near: !!overCard && (l.data.from_id === overCard || l.data.to_id === overCard), chain: chains.get(f.key) ?? null,
+      },
+      zIndex: f.onFocus ? 2 : 1,
+    }));
+  }, [positions, model, focus, only, cuts, overCard]);
 
-  // the chart is drawn at the scale the box's width allows, never larger than life, and the box is as tall as that needs
-  const scale = Math.min(1, (boxWidth - 24) / Math.max(extent.w, 1));
-  const boxHeight = height ?? Math.max(300, Math.min(760, Math.round(extent.h * scale + 76)));
-  const overNode = over ? model.cards.find((c) => c.id === over) : null;
+  // The chart fills the width it has, the way FalkorDB's canvas fills its box: a small graph is drawn larger than
+  // life, up to FIT_ZOOM, a wide one is shrunk to fit. The drawing area is then exactly as tall as that needs, so a
+  // path of five cards is a band of cards, not a strip across an empty box; the key and the hover line sit under it.
+  const zoom = Math.min(FIT_ZOOM, (boxWidth - 40) / Math.max(extent.w, 1));
+  const areaHeight = height ?? (positions ? Math.max(124, Math.min(640, Math.round(extent.h * zoom) + 44)) : 220);
+  useEffect(() => {
+    if (!nodes.length) return;
+    // the box takes its final height in the same commit the cards land in: fit once the browser has laid that out
+    let frame = window.requestAnimationFrame(() => {
+      frame = window.requestAnimationFrame(() => flow.fitView({ padding: FIT_PAD, maxZoom: FIT_ZOOM, duration: 0 }));
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [nodes, areaHeight, flow]);
+  const overNode = overCard ? model.cards.find((c) => c.id === overCard) : null;
   const overEdge = over && !overNode ? model.links.find((l) => String(l.id) === over) : null;
   const anyPrivate = model.cards.some((c) => markOf(c.node) === "private");
   const anyGated = model.links.some((l) => edgeFacts(l).gated);
 
-  // The layout is asked for again only when what is drawn changes: which cards, how wide, which arcs. A page that
-  // rebuilds its graph object on every render, or hovers, or picks, must not cancel a layout that is under way.
-  const layoutKey = useMemo(
-    () => `${graph.scenario}/${graph.layer}/${model.cards.map((c) => `${c.id}:${c.width}:${c.height}`).join(",")}/${model.links.map((l) => `${l.data.from_id}>${l.data.to_id}`).join(",")}`,
-    [graph.scenario, graph.layer, model],
-  );
-  const latest = useRef(model);
-  latest.current = model;
   return (
-    <div className={`chart flowchart${positions ? "" : " laying-out"}`} style={{ height: boxHeight }} ref={box}>
+    <div className={`chart flowchart${positions ? "" : " laying-out"}${overNode ? " hovering" : ""}`} ref={box}>
+      <div className="flow-area" style={{ height: areaHeight }}>
       <ReactFlow
         nodes={nodes} edges={edges} nodeTypes={NODE_TYPES} edgeTypes={EDGE_TYPES}
-        fitView fitViewOptions={{ padding: 0.06, maxZoom: 1 }} minZoom={0.3} maxZoom={1.8}
+        fitView fitViewOptions={{ padding: FIT_PAD, maxZoom: FIT_ZOOM }} minZoom={0.3} maxZoom={2.6}
         nodesDraggable={false} nodesConnectable={false} elementsSelectable={false} zoomOnScroll={false} zoomOnDoubleClick={false} preventScrolling={false} panOnScroll={false}
         proOptions={{ hideAttribution: true }} colorMode="dark"
         onNodeMouseEnter={(_, n) => n.type === "card" && setOver(n.id)} onNodeMouseLeave={() => setOver(null)}
@@ -291,8 +297,13 @@ function Inner(props: FlowProps) {
         onEdgeClick={() => undefined}                                  /* with a click handler the arcs take the pointer, so they can be hovered */
         onPaneClick={() => onPick?.(null)}
       >
-        <button className="fit" onClick={() => flow.fitView({ padding: 0.06, maxZoom: 1, duration: 200 })} title="Fit the chart to the box" aria-label="Fit">⤢</button>
+        <div className="zoom" role="group" aria-label="Zoom">
+          <button onClick={() => flow.zoomIn({ duration: 200 })} title="Zoom in" aria-label="Zoom in">+</button>
+          <button onClick={() => flow.zoomOut({ duration: 200 })} title="Zoom out" aria-label="Zoom out">−</button>
+          <button className="fit" onClick={() => flow.fitView({ padding: FIT_PAD, maxZoom: FIT_ZOOM, duration: 200 })} title="Fit the chart to the box" aria-label="Fit">⤢</button>
+        </div>
       </ReactFlow>
+      </div>
       <div className="chart-key" aria-hidden>
         <span><i className="k-hot" />reached by untrusted text</span>
         {anyPrivate && <span><i className="k-private" />private data</span>}
