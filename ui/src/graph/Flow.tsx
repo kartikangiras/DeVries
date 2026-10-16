@@ -127,7 +127,6 @@ function Inner(props: FlowProps) {
   const [boxWidth, setBoxWidth] = useState(900);
   const box = useRef<HTMLDivElement>(null);
   const flow = useReactFlow();
-  const stamp = useRef("");
   useEffect(() => {
     const el = box.current;
     if (!el) return;
@@ -155,16 +154,13 @@ function Inner(props: FlowProps) {
   }, [graph, names, focus, only, badges]);
 
   useEffect(() => {
-    const key = `${graph.scenario}/${graph.layer}/${model.cards.map((c) => c.id).join(",")}/${model.links.length}`;
-    if (stamp.current === key) return;
-    stamp.current = key;
     let wanted = true;
-    place(model.cards.map(({ id, width, height, lane }) => ({ id, width, height, lane })),
-      model.links.map((l) => ({ id: String(l.id), source: l.data.from_id, target: l.data.to_id })))
+    const m = latest.current;
+    place(m.cards.map(({ id, width, height, lane }) => ({ id, width, height, lane })), m.links.map((l) => ({ id: String(l.id), source: l.data.from_id, target: l.data.to_id })))
       .then((laid) => { if (wanted) setPositions(laid); })
-      .catch(() => { if (wanted) setPositions(new Map(model.cards.map((c, i) => [c.id, { x: c.lane * 220, y: i * 64 }]))); });
+      .catch(() => { if (wanted) setPositions(new Map(m.cards.map((c, i) => [c.id, { x: c.lane * 220, y: i * 64 }]))); });
     return () => { wanted = false; };
-  }, [model, graph.scenario, graph.layer]);
+  }, [layoutKey]);
 
   const { nodes, edges, extent } = useMemo(() => {
     if (!positions) return { nodes: [] as (Card | LaneNode)[], edges: [] as Arc[], extent: { w: 900, h: 320 } };
@@ -209,6 +205,14 @@ function Inner(props: FlowProps) {
   const anyPrivate = model.cards.some((c) => markOf(c.node) === "private");
   const anyGated = model.links.some((l) => edgeFacts(l).gated);
 
+  // The layout is asked for again only when what is drawn changes: which cards, how wide, which arcs. A page that
+  // rebuilds its graph object on every render, or hovers, or picks, must not cancel a layout that is under way.
+  const layoutKey = useMemo(
+    () => `${graph.scenario}/${graph.layer}/${model.cards.map((c) => `${c.id}:${c.width}:${c.height}`).join(",")}/${model.links.map((l) => `${l.data.from_id}>${l.data.to_id}`).join(",")}`,
+    [graph.scenario, graph.layer, model],
+  );
+  const latest = useRef(model);
+  latest.current = model;
   return (
     <div className={`chart flowchart${positions ? "" : " laying-out"}`} style={{ height: boxHeight }} ref={box}>
       <ReactFlow

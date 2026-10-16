@@ -93,7 +93,8 @@ export function After({ m, c, scenario, renderer = "devries", layout = "tree" }:
     () => [...(c.findings?.findings ?? []), ...(c.findings?.past ?? [])].find((f) => f.id === m.targets[0]) ?? null,
     [c.findings, m.targets],
   );
-  const graph = shown?.preview ? ({ ...shown.preview, own_copy: false, queries: [] } as Graph) : null;
+  // one object per answer: a chart lays itself out again only when the graph it is given changes
+  const graph = useMemo(() => (shown?.preview ? ({ ...shown.preview, own_copy: false, queries: [] } as Graph) : null), [shown]);
   const splits = m.plan.fixes.some((f) => f.kind === "split_agent");
   const focus = useMemo(() => (target ? withReaders(focusOf(target), m, shown?.preview) : null), [target, m, shown]);
   if (!target || !focus) return null;
