@@ -1,6 +1,6 @@
 // The Day 2 gate, from the browser: on each scenario the audit the app ran at start has found the
 // finding, tested fixes in sandbox graphs and proposed a verified one; after Approve the finding
-// closes. The finding is worked through in its three steps: the problem, the fix, the options.
+// closes. The finding is worked through in its five steps: the summary, the path, why, the fix, the options.
 // Drives the built UI in the Chrome installed on this machine, headless. Needs the app running.
 //
 //   node e2e/gate.mjs [app url]                     screenshots land in e2e/shots/
@@ -57,37 +57,27 @@ for (const [scenario, fix, cut] of [["acme_support", "gate one call", "set gate 
   need((await page.locator(".case .owasp").count()) === r.openBefore, `${scenario}: each open row should carry its OWASP class`);
   await shot(`${scenario}-1-inbox`);
 
-  // step 1, the problem: the brief, the path on DeVries's chart, the evidence it cites, the hops, the analysis
+  // step 1, the summary: the brief, the path on DeVries's chart, the evidence it cites; nothing about a fix yet
   await page.locator(".case").first().click();
   await page.waitForSelector(".brief-title");
   await page.waitForSelector(".chart .fcard", { timeout: 60000 });
-  await page.waitForSelector(".approval");
-  await unfold();
-  await page.waitForSelector(".hops li");
   r.finding = await first(".brief-title");
   r.tldr = await first(".tldr p");
-  r.hops = await texts(".hops li");
   r.cards = await page.locator(".chart .fcard").count();
   r.evidence = await page.locator(".evidence li").count();
-  r.restsOn = await texts(".rests-on li");
   r.takeaway = await first(".takeaway");
-  r.analysis = await texts(".analysis-rows li");
   r.workflow = await texts(".workflow-step .workflow-label");
-  need(r.workflow.join() === "Problem,Fix,Options,Trace", `${scenario}: the finding should be worked through in three steps and a trace, got ${r.workflow}`);
-  need(r.hops.every((h) => /(cut by|cannot be cut|no fix yet|blocked by)/.test(h)), `${scenario}: a hop row does not say whether it can be cut`);
+  need(r.workflow.join() === "Summary,Path,Why,Fix,Options,Trace", `${scenario}: the finding should be worked through in five steps and a trace, got ${r.workflow}`);
   need(r.evidence === r.cards && r.cards >= 5, `${scenario}: the chart draws ${r.cards} cards and the rail cites ${r.evidence}`);
+  need((await page.locator(".approval").count()) === 0, `${scenario}: the approval belongs to the fix step, not the summary`);
   r.cited = await page.locator(".tldr sup.ref").count();
   need(r.cited >= 4 && r.cited <= r.evidence, `${scenario}: the brief cites ${r.cited} of ${r.evidence} pieces of evidence`);
-  need(r.restsOn.length === 2 && r.restsOn.every((q) => /algo\./.test(q)), `${scenario}: the queries a finding rests on should name their algorithm`);
-  need(/Source: the flow layer/.test(await first(".chart-note")), `${scenario}: the chart has no source note`);
   need(/brief as Markdown/.test(r.takeaway) && /OWASP ASI0\d/.test(r.takeaway), `${scenario}: the rail should offer the brief and name the OWASP class: ${r.takeaway}`);
-  need(r.analysis.length >= 2 && r.analysis.some((a) => /Rule of Two/.test(a)) && r.analysis.some((a) => /OWASP/.test(a)), `${scenario}: the analysis should read the agents against the Rule of Two and name the OWASP class: ${r.analysis}`);
   const brief = await page.request.get(`${base}/api/scenarios/${scenario}/findings/${await page.evaluate(() => location.hash.split("/").pop())}/brief.md`);
   need(brief.ok() && /^# /.test(await brief.text()), `${scenario}: the brief should download as Markdown`);
   await page.locator(".tldr sup.ref").first().click();
   need((await page.locator(".evidence li.lit").count()) === 1, `${scenario}: a footnote marker did not mark its evidence row`);
   need((await page.locator(".chart .fcard.picked").count()) === 1, `${scenario}: a footnote marker did not mark its card on the chart`);
-  await page.waitForSelector(".chart .cut-mark", { timeout: 60000 }).catch(() => problems.push(`${scenario}: the chart does not mark where the fix cuts`));
   // the same path on FalkorDB's canvas, then back
   await page.getByRole("tab", { name: "FalkorDB canvas" }).click();
   await page.waitForSelector("falkordb-canvas");
@@ -99,12 +89,41 @@ for (const [scenario, fix, cut] of [["acme_support", "gate one call", "set gate 
   await shot(`${scenario}-2-finding`);
 
   r.state = await first(".strip .phase");
-  need(r.state === "AWAITING NOD", `${scenario}: the finding should be awaiting a person, got ${r.state}`);
+  need(r.state === "AWAITING APPROVAL", `${scenario}: the finding should be awaiting a person, got ${r.state}`);
 
-  // step 2, the fix: the drafted change, the preview with the plan applied, the change to the file in the bar
+  // step 2, the path: the chart with the whole system a click away, the hops with their rules, the source note, the queries
+  await step("Path").click();
+  await page.waitForSelector(".chart .fcard", { timeout: 60000 });
+  await unfold();
+  await page.waitForSelector(".hops li");
+  r.hops = await texts(".hops li");
+  r.restsOn = await texts(".rests-on li");
+  need(r.hops.every((h) => /(cut by|cannot be cut|no fix yet|blocked by)/.test(h)), `${scenario}: a hop row does not say whether it can be cut`);
+  need(r.restsOn.length === 2 && r.restsOn.every((q) => /algo\./.test(q)), `${scenario}: the queries a finding rests on should name their algorithm`);
+  // the source note is folded under the chart; opened, it names the layer and the queries
+  await page.locator(".figure .fold.source summary").click();
+  await page.waitForSelector(".figure .fold.source .chart-note");
+  need(/Source: the flow layer/.test(await first(".figure .fold.source .chart-note")), `${scenario}: the chart has no source note`);
+  await shot(`${scenario}-2b-path`);
+
+  // step 3, why: each agent on the path against Meta's Rule of Two, the workflows that constrain a fix, the OWASP class
+  await step("Why").click();
+  await page.waitForSelector(".rot-row[data-agent]");
+  r.rule = await texts(".rot-row[data-agent] .rot-agent");
+  r.analysis = await texts(".analysis-rows li");
+  need(r.rule.length >= 1 && r.rule.every((a) => /of three|all three/.test(a)), `${scenario}: the Rule of Two grid should count each agent's properties: ${r.rule}`);
+  need(r.analysis.length >= 2 && r.analysis.some((a) => /OWASP/.test(a)), `${scenario}: the analysis should name the OWASP class: ${r.analysis}`);
+  need((await page.locator(".approval").count()) === 0, `${scenario}: the approval belongs to the fix step, not the analysis`);
+  await shot(`${scenario}-2c-why`);
+
+  // step 4, the fix: the verdict in figures, the drafted change, the path with the cut marked, the preview with the plan applied, the bar
   await step("Fix").click();
+  await page.waitForSelector(".approval");
   await page.waitForSelector(".drafted .patch");
+  await page.waitForSelector(".before .chart .cut-mark", { timeout: 60000 }).catch(() => problems.push(`${scenario}: the chart does not mark where the fix cuts`));
   await page.waitForSelector(".after .chart .wire.gated", { state: "attached", timeout: 60000 });
+  r.figures = await texts(".figures dd");
+  need(r.figures.length >= 4, `${scenario}: the fix should be summed up in figures, got ${r.figures}`);
   r.change = await first(".approval .approval-change");
   r.numbers = await first(".approval .approval-numbers");
   r.patch = await texts(".drafted .patch");
@@ -123,9 +142,12 @@ for (const [scenario, fix, cut] of [["acme_support", "gate one call", "set gate 
   await shot(`${scenario}-3-fix`);
   await page.locator(".approval-see").click();
 
-  // step 3, the options: every plan that was tried, with its verdict; the what-if line; the cut as rules
+  // step 5, the options: every plan that was tried as one chart, with its verdict; folded under them, the what-if line, the cut as rules, the servers
   await step("Options").click();
   await page.waitForSelector(".tested .verdict");
+  need((await page.locator(".tested .verdict .bar").count()) === (await page.locator(".tested .verdict").count()), `${scenario}: every plan should carry its cost as a bar`);
+  need((await page.locator(".tested .verdict .cell.closed").count()) >= 1, `${scenario}: the plan chart should show which plan closes this finding`);
+  for (const fold of await page.locator(".more > .fold > summary").all()) await fold.click();   // the cut has a fold of its own inside; only the four outer ones
   await page.waitForSelector(".cut-block", { timeout: 60000 });
   await page.waitForSelector(".servers", { timeout: 60000 });
   r.failed = await texts(".tested .verdict.fail");
@@ -154,14 +176,15 @@ for (const [scenario, fix, cut] of [["acme_support", "gate one call", "set gate 
   need(r.applied.length >= 3 && /Approved by Kartik/.test(r.applied[0]), `${scenario}: what happened after Approve is not listed`);
   need((await page.locator(".approval").count()) === 0, `${scenario}: the approval bar should leave once a person has decided`);
   need(/Your sandbox copy/.test(await first(".session-name")), `${scenario}: approving should have made a sandbox copy for this session`);
-  await step("Problem").click();
+  await step("Summary").click();
   await page.waitForSelector(".chart .fcard", { timeout: 60000 });
+  await page.waitForSelector(".chart .wire.gated", { state: "attached", timeout: 60000 }).catch(() => problems.push(`${scenario}: the chart does not show the hop as blocked`));
+  need(/no longer holds/.test(await first(".tldr p")), `${scenario}: the brief of a closed finding should say it no longer holds`);
+  await shot(`${scenario}-5-applied`);
+  await step("Path").click();
   await unfold();
   await page.waitForSelector(".hops li.blocked");
   r.blockedHop = await first(".hops li.blocked");
-  need((await page.locator(".chart .wire.gated").count()) >= 1, `${scenario}: the chart does not show the hop as blocked`);
-  need(/no longer holds/.test(await first(".tldr p")), `${scenario}: the brief of a closed finding should say it no longer holds`);
-  await shot(`${scenario}-5-applied`);
 
   // nothing open: the list says so, and the finding is under Closed
   await place("Open").click();
