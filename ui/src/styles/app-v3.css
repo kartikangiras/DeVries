@@ -134,3 +134,78 @@
   .workflow { padding: 0 16px; overflow-x: auto; }
   .workflow-sub { display: none; }
 }
+
+/* ---- revision 5: the finding in five steps, each about one thing, with its own figures */
+.workflow-step { margin-right: 14px; padding-right: 12px; }
+.brief-inner { max-width: 940px; padding-left: 36px; padding-right: 36px; }
+.brief-inner .claim-sub { max-width: 72ch; margin-top: -8px; font-size: 14px; line-height: 1.55; }
+
+/* a verdict in figures */
+.figures { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 8px 18px; margin: 0; padding: 14px 18px; border: 1px solid var(--chart-line); border-radius: 14px; }
+.figures div { display: flex; flex-direction: column; gap: 3px; }
+.figures dd { font: 400 26px/1 var(--mono); letter-spacing: -0.03em; font-variant-numeric: tabular-nums; color: var(--ink-strong); }
+.figures dt { font: 400 10.5px var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--chart-ash); }
+.figures div.good dd { color: var(--accent); }
+.figures div.bad dd { color: var(--danger); }
+
+/* Meta's Rule of Two as a grid: agents down, the three properties across */
+.rot { display: flex; flex-direction: column; border: 1px solid var(--chart-line); border-radius: 14px; overflow: hidden; }
+.rot-row { display: grid; grid-template-columns: minmax(150px, 1.1fr) repeat(3, minmax(0, 1fr)); align-items: stretch; }
+.rot-row + .rot-row { border-top: 1px solid var(--chart-line); }
+.rot-row > span { display: flex; flex-direction: column; justify-content: center; gap: 3px; min-width: 0; padding: 12px 14px; }
+.rot-row > span + span { border-left: 1px solid var(--chart-line); }
+.rot-head { background: var(--chart-tile); }
+.rot-head > span { flex-direction: row; align-items: baseline; gap: 8px; font: 400 10.5px var(--mono); letter-spacing: 0.1em; text-transform: uppercase; color: var(--chart-ash); }
+.rot-head b { font-weight: 500; font-size: 12px; letter-spacing: 0; color: var(--ink); }
+.rot-head .s-hot b { color: var(--chart-hot); }
+.rot-head .s-private b { color: var(--amber); }
+.rot-head .s-exit b { color: var(--accent); }
+.rot-agent strong { font-size: 14px; font-weight: 500; color: var(--ink-strong); }
+.rot-sub { font: 400 11px var(--mono); color: var(--ink-faint); }
+.rot-cell { position: relative; flex-direction: row !important; align-items: center !important; gap: 10px !important; color: var(--ink-ghost); }
+.rot-cell i { flex: none; width: 10px; height: 10px; border-radius: 50%; border: 1.5px solid var(--chart-line-strong); background: transparent; }
+.rot-cell.on { color: var(--ink); }
+.rot-cell.on.s-hot { background: rgb(224 87 63 / 0.07); }
+.rot-cell.on.s-hot i { background: var(--chart-hot); border-color: var(--chart-hot); }
+.rot-cell.on.s-private { background: oklch(0.78 0.13 75 / 0.07); }
+.rot-cell.on.s-private i { background: var(--amber); border-color: var(--amber); }
+.rot-cell.on.s-exit { background: var(--accent-tint); }
+.rot-cell.on.s-exit i { background: var(--accent); border-color: var(--accent); }
+.rot-what { font-size: 12.5px; line-height: 1.4; color: inherit; overflow-wrap: anywhere; }
+.rot-row.all .rot-agent strong { color: var(--chart-hot); }
+@keyframes cell-in { from { opacity: 0; transform: scale(0.6); } to { opacity: 1; transform: none; } }
+.rot-cell.on i { animation: cell-in 420ms var(--ease-out-quart) both; }
+.rot-row:nth-child(2) .rot-cell.on i { animation-delay: 120ms; } .rot-row:nth-child(3) .rot-cell.on i { animation-delay: 220ms; } .rot-row:nth-child(4) .rot-cell.on i { animation-delay: 320ms; }
+
+/* the plans as one chart: a bar for cost, a cell per finding, counts for what each would open and break */
+.matrix .matrix-head, .matrix .verdict { grid-template-columns: 18px minmax(0, 1fr) 118px auto; }
+.matrix .matrix-head { display: grid; gap: 3px 12px; align-items: baseline; padding: 0 0 8px; font: 400 10.5px var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--chart-ash); border-bottom: 1px solid var(--rule-soft); }
+.matrix .matrix-head .verdict-plan, .matrix .matrix-head .verdict-cost { font: inherit; color: inherit; }
+.matrix .verdict-cost { position: relative; display: flex; align-items: center; gap: 8px; }
+.matrix .verdict-cost .bar { display: block; flex: none; width: 0; height: 6px; max-width: 64px; border-radius: 3px; background: var(--rule-strong); transition: width 600ms var(--ease-out-quart); }
+.matrix .verdict.pass .verdict-cost .bar { background: var(--accent); }
+.matrix .verdict.fail .verdict-cost .bar { background: var(--danger); opacity: 0.55; }
+.verdict-cells { display: inline-flex; align-items: center; gap: 6px; justify-self: end; }
+.verdict-cells i.cell { display: block; width: 14px; height: 14px; border-radius: 3px; border: 1.5px solid var(--chart-line-strong); }
+.verdict-cells i.cell.closed { background: var(--accent); border-color: var(--accent); }
+.verdict-cells i.cell.none { border-style: dotted; opacity: 0.5; }
+.verdict-cells b, .verdict-cells em { display: inline-block; width: 14px; text-align: center; font: 400 10.5px var(--mono); font-style: normal; color: var(--chart-ash); }
+.verdict-cells .n { width: 44px; }
+.verdict-cells em.n { color: var(--ink-muted); font-size: 12px; }
+.verdict-cells em.bad { color: var(--danger); }
+.matrix .verdict-why { grid-column: 2 / -1; }
+.analysis-rows.columns li::before { display: none; }
+.analysis-rows.columns li { padding-left: 0; }
+.analysis-rows.columns strong { display: inline-block; width: 22px; font-family: var(--mono); font-weight: 400; color: var(--ink-faint); }
+
+/* two charts on the fix step: where it cuts, then the path as the plan would leave it */
+.before .chart-controls { margin-top: -4px; }
+.brief-inner .after { padding-top: 4px; }
+
+@media (max-width: 860px) {
+  .rot-row { grid-template-columns: 1fr; }
+  .rot-row > span + span { border-left: 0; border-top: 1px solid var(--chart-line); }
+  .rot-head > span:not(:first-child) { display: none; }
+  .matrix .matrix-head, .matrix .verdict { grid-template-columns: 18px minmax(0, 1fr) auto; }
+  .verdict-cells { grid-column: 2 / -1; justify-self: start; }
+}
