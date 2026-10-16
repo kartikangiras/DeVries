@@ -1,5 +1,4 @@
-// The desk: every open finding as a small memo of its own, and the same list for the ones that are
-// closed. The row is Manthan's inbox row (strip, headline with its figure, footer with what happens
+// The open findings, each a small memo of its own, and the same list for the ones that are closed. The row is Manthan's inbox row (strip, headline with its figure, footer with what happens
 // next), holding a finding instead of a case (see ui/THIRD_PARTY_NOTICES.md).
 
 import type { Finding } from "../api";
@@ -150,17 +149,17 @@ export function Inbox({ c, scenario, done = false }: { c: DeVries; scenario: str
   const waiting = c.run?.status === "awaiting_approval";
   const n = desks.length;
 
-  const title = !list ? (done ? "Done." : "The desk.")
+  const title = !list ? (done ? "Closed." : "Findings.")
     : done ? (n ? `${capital(plural(n, "finding", "findings"))} closed.` : "Nothing closed yet.")
-    : n ? `${capital(plural(n, "finding", "findings"))} on your desk.` : "Inbox zero.";
+    : n ? `${capital(plural(n, "finding", "findings"))} open.` : "Nothing open.";
 
   const meta = !list ? null : done ? (
     n ? <>Closed by a fix, accepted, or no longer true of the graph. Each still opens, and shows where it was cut.</> : <>A finding lands here once a fix closes it.</>
   ) : n ? (
     <>
-      {awaiting > 0 && <span className="t-amber">{awaiting} awaiting your nod</span>}
+      {awaiting > 0 && <span className="t-amber">{awaiting} awaiting your approval</span>}
       {awaiting > 0 && running && <i>·</i>}
-      {running && <span className="t-info">one audit in flight</span>}
+      {running && <span className="t-info">an audit is running</span>}
       {!awaiting && !running && <span>{n === 1 ? "It has" : `${capital(countWord(n))} have`} no tested fix yet. An audit tries the candidate fixes on a sandbox copy of the graph.</span>}
     </>
   ) : (
@@ -170,7 +169,7 @@ export function Inbox({ c, scenario, done = false }: { c: DeVries; scenario: str
   return (
     <PageBody>
       <PageHeader
-        eyebrow={done ? "Done" : "Inbox"}
+        eyebrow={done ? "Closed findings" : "Open findings"}
         title={title}
         meta={meta}
         actions={!done && n > 0 && !waiting && !awaiting && (

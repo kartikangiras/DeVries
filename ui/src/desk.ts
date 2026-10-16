@@ -48,17 +48,17 @@ export function deskOf(finding: Finding, plans: Mitigation[], run: Run | null, o
   const applied = tested.find((m) => m.status === "applied" && m.resolved?.includes(finding.id)) ?? null;
   const base = { proposal: null, applied, tested, pulse: false, nextLabel: "Next" };
 
-  if (finding.status === "mitigated") return { ...base, word: "Mitigated", tone: "accent", nextLabel: "Closed by", next: applied ? applied.id : "a fix" };
+  if (finding.status === "mitigated") return { ...base, word: "Mitigated", tone: "accent", nextLabel: "Closed by", next: applied ? recommendation(applied) : "a fix" };
   if (finding.status === "accepted") return { ...base, word: "Accepted", tone: "muted", nextLabel: "Accepted by", next: finding.accepted_by ?? "a person" };
   if (finding.kind === "drift") return { ...base, word: "Open", tone: "danger", nextLabel: "Next", next: "read what changed, then accept it" };
   if (finding.kind === "poisoned_description") return { ...base, word: "Open", tone: "danger", nextLabel: "Next", next: "read the description, then accept it or fix the manifest" };
   if (finding.status === "closed") return { ...base, word: "Closed", tone: "muted", nextLabel: "Now", next: "no longer holds in the graph" };
 
   const approved = tested.find((m) => m.status === "approved");
-  if (approved) return { ...base, word: "Applying", tone: "accent", pulse: true, next: `applying ${approved.id}` };
+  if (approved) return { ...base, word: "Applying", tone: "accent", pulse: true, next: "applying the fix" };
 
   const proposal = best(tested.filter((m) => isLive(m, open)), run);
-  if (proposal) return { ...base, proposal, word: "Awaiting nod", tone: "amber", pulse: true, next: `approve ${proposal.id}` };
+  if (proposal) return { ...base, proposal, word: "Awaiting approval", tone: "amber", pulse: true, next: "approve the fix" };
 
   if (run?.kind === "audit" && run.status === "running") {
     return { ...base, word: "Investigating", tone: "info", pulse: true, next: RUN_PHASE[run.phase] ?? run.phase };

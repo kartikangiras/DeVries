@@ -141,13 +141,13 @@ export function HeroDemo({ appHref }: { appHref: string }) {
     if (phase === "explaining") return `Hop ${pad(Math.min(HOPS.length, Math.floor(elapsed / (DUR.explaining / HOPS.length)) + 1))} of ${pad(HOPS.length)}`;
     if (phase === "testing") return `Sandbox ${pad(Math.min(CANDIDATES.length, Math.floor(elapsed / (DUR.testing / CANDIDATES.length)) + 1))} of ${pad(CANDIDATES.length)}`;
     if (phase === "applying") return `Step ${pad(Math.min(APPLY.length, Math.floor(elapsed / (DUR.applying / APPLY.length)) + 1))} of ${pad(APPLY.length)}`;
-    if (phase === "brief") return "Awaiting your nod";
+    if (phase === "brief") return "Awaiting your approval";
     if (phase === "closed") return "Finding closed";
     return "Scanning…";
   })();
 
   const tone = playback === "awaiting" ? " amber" : glass || phase === "closed" ? " quiet" : " accent";
-  const headWord = playback === "awaiting" ? "Awaiting your nod" : playback === "idle" ? "Tap to play" : playback === "finished" ? "Closed" : LABEL[phase];
+  const headWord = playback === "awaiting" ? "Awaiting your approval" : playback === "idle" ? "Tap to play" : playback === "finished" ? "Closed" : LABEL[phase];
 
   return (
     <div ref={wrap} className={`ld${glass ? " glass" : ""}`}>
@@ -178,7 +178,7 @@ export function HeroDemo({ appHref }: { appHref: string }) {
           <button type="button" className="ld-overlay ld-play" onClick={start} aria-label="Play the demo">
             <span className="ld-play-glyph"><PlayGlyph /></span>
             <span className="ld-play-say">Watch a finding close</span>
-            <span className="ld-play-sub">60 seconds · scan → your nod → closed</span>
+            <span className="ld-play-sub">60 seconds · scan → your approval → closed</span>
           </button>
         )}
         {playback === "finished" && (

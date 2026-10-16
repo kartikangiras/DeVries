@@ -16,7 +16,7 @@ import { Button, Empty, Eyebrow, KV, Loading, PageHeader, Status, Tabs } from ".
 type Filter = "all" | "waiting" | "applied" | "failed" | "rejected" | "superseded";
 
 const STATE: Record<Mitigation["status"], { word: string; tone: Tone; pulse?: boolean; filter: Filter }> = {
-  proposed: { word: "Awaiting nod", tone: "amber", pulse: true, filter: "waiting" },
+  proposed: { word: "Awaiting approval", tone: "amber", pulse: true, filter: "waiting" },
   approved: { word: "Applying", tone: "accent", pulse: true, filter: "waiting" },
   applied: { word: "Applied", tone: "accent", filter: "applied" },
   rejected: { word: "Rejected", tone: "muted", filter: "rejected" },

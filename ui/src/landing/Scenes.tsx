@@ -157,7 +157,7 @@ export function FixScene() {
           );
         })}
       </div>
-      <div className="lf-count">{passed} of {FIXES.length} passed · the cheapest waits for your nod</div>
+      <div className="lf-count">{passed} of {FIXES.length} passed · the cheapest waits for your approval</div>
     </div>
   );
 }
