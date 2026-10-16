@@ -54,6 +54,9 @@ type Arc = Edge<ArcData, "arc">;
 type LaneNode = Node<{ label: string }, "lane">;
 
 const SANS = '500 12.5px "Geist Sans", ui-sans-serif, system-ui, sans-serif';
+/** How far a small graph is enlarged to fill its box, and the margin left around it. */
+const FIT_ZOOM = 1.5;
+const FIT_PAD = 0.05;
 const MONO = '400 11px "Geist Mono", ui-monospace, monospace';
 const CARD_H = 46;
 
@@ -148,9 +151,6 @@ async function place(cards: { id: string; width: number; height: number; lane: n
   return new Map((laid.children ?? []).map((c) => [c.id, { x: c.x ?? 0, y: c.y ?? 0 }]));
 }
 
-function Inner(props: FlowProps) {
-  const { graph, names, focus, only, cuts, cutsMean, rings, communities, cites, badges, picked, onPick, idle, height } = props;
-  const [positions, setPositions] = useState<Map<string, { x: number; y: number }> | null>(null);
 type Hop = { key: string; from: string; to: string; series: Series | null; gated: boolean };
 
 /** The lit hops in the order the text travels, one chain per series. A chain ends at a gate, where the text does. */
@@ -175,6 +175,9 @@ function chainsOf(hops: Hop[]): Map<string, Link> {
   return out;
 }
 
+function Inner(props: FlowProps) {
+  const { graph, names, focus, only, cuts, cutsMean, rings, communities, cites, badges, picked, onPick, idle, height } = props;
+  const [positions, setPositions] = useState<Map<string, { x: number; y: number }> | null>(null);
   const [over, setOver] = useState<string | null>(null);
   const [boxWidth, setBoxWidth] = useState(900);
   const box = useRef<HTMLDivElement>(null);
@@ -199,15 +202,12 @@ function chainsOf(hops: Hop[]): Map<string, Link> {
       const id = n.data.id;
       const name = names[id] ?? n.data.name ?? id;
       const fact = factOf(n);
-      const width = Math.max(128, Math.round(Math.max(textWidth(name, SANS) + 16, textWidth(fact, MONO)) + 58 + (badges?.get(id) ? 44 : 0)));
+      const width = Math.max(116, Math.round(Math.max(textWidth(name, SANS) + 16, textWidth(fact, MONO)) + 50 + (badges?.get(id) ? 44 : 0)));
       return { id, lane: lanes.get(id) ?? 3, width, height: fact ? CARD_H + 14 : CARD_H, node: n, name, fact };
     });
     return { cards, links, lanes };
   }, [graph, names, focus, only, badges]);
 
-  useEffect(() => {
-    let wanted = true;
-    const m = latest.current;
   // The layout is asked for again only when what is drawn changes: which cards, how wide, which arcs. A page that
   // rebuilds its graph object on every render, or hovers, or picks, must not cancel a layout that is under way.
   const layoutKey = useMemo(
@@ -216,6 +216,9 @@ function chainsOf(hops: Hop[]): Map<string, Link> {
   );
   const latest = useRef(model);
   latest.current = model;
+  useEffect(() => {
+    let wanted = true;
+    const m = latest.current;
     place(m.cards.map(({ id, width, height, lane }) => ({ id, width, height, lane })), m.links.map((l) => ({ id: String(l.id), source: l.data.from_id, target: l.data.to_id })))
       .then((laid) => { if (wanted) setPositions(laid); })
       .catch(() => { if (wanted) setPositions(new Map(m.cards.map((c, i) => [c.id, { x: c.lane * 220, y: i * 64 }]))); });
