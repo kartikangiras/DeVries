@@ -27,6 +27,8 @@ export function useDeVries(scenario: string | null) {
   const [scannedAt, setScannedAt] = useState<number | null>(null);
   const [scorecard, setScorecard] = useState<Scorecard | null>(null);
   const [overview, setOverview] = useState<Overview | null>(null);
+  /** Which scenario the loaded state belongs to. Between a switch and its load the pages see nothing, not the old one. */
+  const [owner, setOwner] = useState<string | null>(null);
   const [connected, setConnected] = useState(true);
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
@@ -61,6 +63,7 @@ export function useDeVries(scenario: string | null) {
       api.overview(name).catch(() => null),
     ]);
     if (live.current.scenario !== name) return; // the visitor moved on while this was loading
+    setOwner(name);
     setGraphs({ flow, config }); // a config layer that was not refetched is dropped, not left stale
     setScorecard(cards);
     setOverview(picture);
@@ -145,6 +148,7 @@ export function useDeVries(scenario: string | null) {
   // A different scenario: drop what belonged to the old one, then load.
   useEffect(() => {
     if (!ready || !scenario) return;
+    setOwner(null);
     setGraphs({});
     setFindings(null);
     setRun(null);
@@ -257,13 +261,15 @@ export function useDeVries(scenario: string | null) {
 
   // ---- what the pages read
 
-  const flow = graphs.flow;
+  // a render between a scenario switch and its load must not show, or fetch for, the scenario just left
+  const fresh = owner === scenario;
+  const flow = fresh ? graphs.flow : undefined;
   const names = useMemo(
     () => ({ ...(findings?.names ?? {}), ...Object.fromEntries((flow?.nodes ?? []).map((n) => [n.data.id, n.data.name ?? n.data.id])), ...Object.fromEntries((flow?.workflows ?? []).map((w) => [w.id, w.name])) }),
     [findings, flow],
   );
-  const plans = useMemo(() => Object.values(mitigations).sort((a, b) => a.created_at - b.created_at), [mitigations]);
-  const openIds = useMemo(() => new Set((findings?.findings ?? []).filter((f) => f.status === "open").map((f) => f.id)), [findings]);
+  const plans = useMemo(() => (fresh ? Object.values(mitigations).sort((a, b) => a.created_at - b.created_at) : []), [mitigations, fresh]);
+  const openIds = useMemo(() => new Set((fresh ? findings?.findings ?? [] : []).filter((f) => f.status === "open").map((f) => f.id)), [findings, fresh]);
   const current = scenarios.find((s) => s.id === scenario) ?? null;
   /** A scenario's name as people see it: its title if its file gives one, else a name made from its id. */
   const titleOf = useCallback((id: string) => {
@@ -273,10 +279,10 @@ export function useDeVries(scenario: string | null) {
 
   return {
     ready, connected, busy, problem, dismiss: () => setProblem(null),
-    session, health, scenarios, current, titleOf, catalog, scannedAt, scorecard, overview,
-    flow, config: graphs.config, needConfig,
-    findings, openIds, names, mitigations, plans, configHash,
-    run, runList, showRun,
+    session, health, scenarios, current, titleOf, catalog, scannedAt, scorecard: fresh ? scorecard : null, overview: fresh ? overview : null,
+    flow, config: fresh ? graphs.config : undefined, needConfig,
+    findings: fresh ? findings : null, openIds, names, mitigations: fresh ? mitigations : {}, plans, configHash: fresh ? configHash : null,
+    run: fresh ? run : null, runList: fresh ? runList : [], showRun,
     startAudit, ask, approve, acceptFinding, setLabels, reject, reset, importConfig,
   };
 }
