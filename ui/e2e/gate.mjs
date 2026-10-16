@@ -44,16 +44,16 @@ for (const [scenario, fix, cut] of [["acme_support", "gate one call", "set gate 
   await page.waitForSelector(".case .transform-to");
   r.title = await first(".page-head h1");
   r.openBefore = await page.locator(".case.status-open").count();
-  r.inboxCount = await place("Inbox").locator(".nav-count").innerText();
+  r.inboxCount = await place("Open").locator(".nav-count").innerText();
   r.session = await first(".session");
   r.recommended = await first(".case .transform-to");
   r.next = await first(".case .case-next");
-  need(/on your desk/.test(r.title), `${scenario}: the inbox does not say what is on the desk`);
+  need(/ open\.$/.test(r.title), `${scenario}: the list does not say how many findings are open: ${r.title}`);
   need(Number(r.inboxCount) === r.openBefore && r.openBefore > 0, `${scenario}: the inbox count and its rows disagree`);
   need(r.recommended === fix, `${scenario}: expected the plan "${fix}", got "${r.recommended}"`);
-  need(/approve mit:/.test(r.next), `${scenario}: the row should say the next step is a person's approval`);
+  need(/approve the fix/.test(r.next), `${scenario}: the row should say the next step is a person's approval: ${r.next}`);
   need((await page.getByRole("button", { name: "Run audit" }).count()) === 0, `${scenario}: a second audit should not be on offer while one waits`);
-  need((await place("Inbox").locator(".nav-count.alert").count()) === 1, `${scenario}: the inbox count should say something waits for a person`);
+  need((await place("Open").locator(".nav-count.alert").count()) === 1, `${scenario}: the inbox count should say something waits for a person`);
   need((await page.locator(".case .owasp").count()) === r.openBefore, `${scenario}: each open row should carry its OWASP class`);
   await shot(`${scenario}-1-inbox`);
 
@@ -163,15 +163,15 @@ for (const [scenario, fix, cut] of [["acme_support", "gate one call", "set gate 
   need(/no longer holds/.test(await first(".tldr p")), `${scenario}: the brief of a closed finding should say it no longer holds`);
   await shot(`${scenario}-5-applied`);
 
-  // nothing open: the inbox says so, and the finding is under Done
-  await place("Inbox").click();
-  await page.waitForFunction(() => document.querySelector(".page-head h1")?.textContent === "Inbox zero.", null, { timeout: 240000 });
+  // nothing open: the list says so, and the finding is under Closed
+  await place("Open").click();
+  await page.waitForFunction(() => document.querySelector(".page-head h1")?.textContent === "Nothing open.", null, { timeout: 240000 });
   need((await page.getByRole("button", { name: "Run audit" }).count()) === 0, `${scenario}: with nothing open there is nothing to audit`);
   await shot(`${scenario}-6-inbox-zero`);
-  await place("Done").click();
+  await place("Closed").click();
   await page.waitForSelector(".case.status-mitigated");
   r.mitigated = await page.locator(".case.status-mitigated").count();
-  need(r.mitigated >= 1, `${scenario}: the closed finding is not listed under Done`);
+  need(r.mitigated >= 1, `${scenario}: the closed finding is not listed under Closed`);
 
   // the audit log: the run's report cites the steps its ids came from
   await place("Runs").click();
@@ -198,13 +198,13 @@ for (const [scenario, fix, cut] of [["acme_support", "gate one call", "set gate 
 // the nav, in its four groups
 out.nav = await texts(".nav-row .nav-label");
 out.groups = await texts(".nav-group-label");
-need(out.nav.join() === "Inbox,Done,Ledger,What if,Graph,Servers,Queries,Runs,Import", `the nav should hold nine places, got ${out.nav}`);
+need(out.nav.join() === "Open,Closed,Ledger,What if,Graph,Servers,Queries,Runs,Import", `the nav should hold nine places, got ${out.nav}`);
 need(out.groups.join().toLowerCase() === "findings,fixes,system,audit", `the nav should be in four groups, got ${out.groups}`);
 
 // Reset gives the shared scenarios back
 await page.getByRole("button", { name: "Reset" }).click();
 await page.waitForFunction(() => document.querySelector(".session-name")?.textContent === "Shared scenario", null, { timeout: 240000 });
-await place("Inbox").click();
+await place("Open").click();
 await page.waitForSelector(".case.status-open");
 out.afterReset = await first(".page-head h1");
 
