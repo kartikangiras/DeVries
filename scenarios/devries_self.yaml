@@ -11,7 +11,7 @@
 # a tool, so it is not drawn. It would add nothing: manifest text already taints the auditor.
 scenario: devries_self
 title: DeVries itself
-order: 4
+order: 9
 description: DeVries's own auditor and its eleven tools, held to the rules it checks
 
 servers:
