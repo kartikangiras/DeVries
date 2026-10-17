@@ -525,7 +525,7 @@ function Rail({ step, finding, plan, desk, cites, picked, onPick, c, scenario }:
           const algos = entry ? [...new Set(entry.cypher.match(/algo\.\w+/g) ?? [])] : [];
           return (
             <li key={q}>
-              <a href={href(scenario, "queries", q)}>{q}</a>
+              <a href={href(scenario, "method", "queries", q)}>{q}</a>
               {algos.map((a) => <span className="algo" key={a}>{a}</span>)}
               {entry && <p>{entry.doc}</p>}
             </li>
@@ -542,7 +542,7 @@ function Rail({ step, finding, plan, desk, cites, picked, onPick, c, scenario }:
         <li className="constraint"><p className="head"><strong>B · private data</strong></p><p>Data marked private reaches its context.</p></li>
         <li className="constraint"><p className="head"><strong>C · a way to act</strong></p><p>It can call a tool that changes a resource or sends something out of the organisation.</p></li>
       </ul>
-      <p className="rail-note">Meta's Agents Rule of Two: in one session an agent should hold at most two of the three, or a person approves what it does. <a href={href(scenario, "queries", "reach.agents_from_sources")}>How it is read</a>.</p>
+      <p className="rail-note"><a href={href(scenario, "method")}>How the rule is read →</a></p>
     </section>
   );
   const planFacts = plan && (
@@ -732,7 +732,7 @@ function StandingPage({ c, scenario, finding }: { c: DeVries; scenario: string; 
           <section>
             <Eyebrow>Queries</Eyebrow>
             <p className="rail-note">
-              {findingQueries(finding).map((q, i) => <span key={q}>{i > 0 && ", "}<a href={href(scenario, "queries", q)}>{q}</a></span>)}
+              {findingQueries(finding).map((q, i) => <span key={q}>{i > 0 && ", "}<a href={href(scenario, "method", "queries", q)}>{q}</a></span>)}
             </p>
           </section>
         </aside>
@@ -766,7 +766,6 @@ function FindingBody({ c, scenario, finding, step }: { c: DeVries; scenario: str
   const plan = desk.proposal ?? desk.applied;
   const approved = desk.tested.find((m) => m.status === "approved") ?? null;
   const canAudit = finding.status === "open" && !plan && !approved && !(c.run && (c.run.status === "running" || c.run.status === "awaiting_approval"));
-  const queries = findingQueries(finding);
   const agentIds = useMemo(() => {
     const ids = new Set<string>();
     for (const { path } of paths) for (const id of path.node_ids) if (id.startsWith("agent:")) ids.add(id);
@@ -882,16 +881,6 @@ function FindingBody({ c, scenario, finding, step }: { c: DeVries; scenario: str
               <RuleNeeds finding={finding} paths={paths} cards={cards} c={c} />
               {finding.kind === "trifecta" && (c.scorecard ? (cards.length ? <RuleOfTwo cards={cards} c={c} /> : <Empty>No agent on this path is in the scorecard.</Empty>) : <Loading label="Reading the scorecard" />)}
               <Analysis finding={finding} cards={cards} c={c} />
-              <Fold className="source" summary="Source and method" sub={`${queries[0]} · ${queries[1]} · reach.agents_from_sources`}>
-                <p className="chart-note">
-                  Source: the flow layer of {scenario}{c.current?.own_copy ? " (your sandbox copy)" : ""} in FalkorDB. The rule is decided by{" "}
-                  <a href={href(scenario, "queries", queries[0])}>{queries[0]}</a> (one BFS from each source, to a depth of the node count, so no route is too long to find); the evidence is traced by{" "}
-                  <a href={href(scenario, "queries", queries[1])}>{queries[1]}</a>, which never decides anything. Which sources reach each agent, and what it acts on, is read by{" "}
-                  <a href={href(scenario, "queries", "reach.agents_from_sources")}>reach.agents_from_sources</a>; the workflows are declared in the scenario.
-                  The seven flow rules: a tool returns what it reads (1); what it returns enters its caller's context (2); an agent's context decides its calls (3); context passes down to a delegate (4); a tool acts on its resource (5); a delegate's results come back (6); what was written is read back later (7).
-                  The rule is Meta's Agents Rule of Two (2025); the OWASP class is from the Top 10 for Agentic Applications (2026).
-                </p>
-              </Fold>
               {next("path", "the path, hop by hop")}
             </div>
           ) : step === "path" ? (
@@ -916,13 +905,6 @@ function FindingBody({ c, scenario, finding, step }: { c: DeVries; scenario: str
                     picked={picked} onPick={setPicked} idle="Hover a card to read it. Click it to find it in the evidence." />
                 ) : <Loading label="Reading the graph" />}
                 <figcaption>
-                  <Fold className="source" summary="Source and method" sub={`${queries[0]} · ${queries[1]} · ${renderer === "falkordb" ? "FalkorDB canvas" : "ELK and React Flow"}`}>
-                    <p className="chart-note">
-                      Source: the flow layer of {scenario}{c.current?.own_copy ? " (your sandbox copy)" : ""} in FalkorDB, found by{" "}
-                      <a href={href(scenario, "queries", queries[0])}>{queries[0]}</a> and traced by <a href={href(scenario, "queries", queries[1])}>{queries[1]}</a>.
-                      A card is filled when untrusted text reaches it, which FalkorDB works out (reach.untrusted_nodes); the page only colours it. A path means text can flow, not that it did.
-                    </p>
-                  </Fold>
                 </figcaption>
               </figure>
               {shown.map(({ label, path }) => (
