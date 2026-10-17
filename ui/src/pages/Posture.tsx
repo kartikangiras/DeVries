@@ -1,6 +1,7 @@
 // The scenario's standing, read from FalkorDB: how exposed it is, where the risk runs, what stands in its way, and
 // whether it is getting better. Five figures, the live flow, two bar charts, the choke points with the cut, the
-// history; the Rule of Two tally, the OWASP coverage and the method are folded under one line each.
+// history; the Rule of Two tally and the OWASP coverage are folded under one line each. How each figure is read
+// is on the Method page, not here.
 
 import { useState } from "react";
 import { api, type Mitigation, type Posture } from "../api";
@@ -115,6 +116,7 @@ export function PosturePage({ c, scenario }: { c: DeVries; scenario: string }) {
           {c.current?.description ? `${c.current.description}. ` : ""}
           {p?.facts.last_scan ? `Last scanned ${clock(p.facts.last_scan.at)}.` : "Not scanned yet."}
           {p?.own_copy ? " Your sandbox copy." : ""}
+          {" "}<a href={href(scenario, "method", "analytics")}>How each figure is read →</a>
           {c.current?.imported && !open.length && <> Label the sources and resources under <a href={href(scenario, "inbox")}>Open</a> for the scan to find anything.</>}
         </>}
         actions={canAudit && <Button variant="primary" size="lg" onClick={c.startAudit} disabled={c.busy}>Run audit</Button>}
@@ -185,7 +187,6 @@ export function PosturePage({ c, scenario }: { c: DeVries; scenario: string }) {
                 ))}
               </ul>
             ) : <Empty>No agent in this scenario.</Empty>}
-            <p className="chart-note">A, untrusted input reaches the agent; B, private data reaches it; C, it can reach a resource. Meta's rule: at most two of the three, or a person in the loop.</p>
           </Fold>
 
           <Fold className="posture-owasp" summary="OWASP Top 10 coverage" sub={`${p.owasp.filter((o) => o.checked).length} of 10 classes checked · ${p.owasp.reduce((n, o) => n + o.open, 0)} open`}>
@@ -198,17 +199,6 @@ export function PosturePage({ c, scenario }: { c: DeVries; scenario: string }) {
                 </li>
               ))}
             </ul>
-            <p className="chart-note">An injection path is ASI01 and ASI02; a trifecta ASI03 and ASI02; manifest drift ASI04; a poisoned description ASI04 and ASI01. The other six are about memory, code execution, inter-agent messaging, cascades, people and rogue agents, which a configuration graph does not see.</p>
-          </Fold>
-
-          <Fold className="source" summary="Source and method" sub={`${plural(p.queries.length, "FalkorDB query", "FalkorDB queries")} · algo.bfs · algo.betweenness · algo.maxFlow`}>
-            <p className="chart-note">
-              Every figure on this page is one named query's answer on {scenario}{p.own_copy ? " (your sandbox copy)" : ""}. Reach is <code>algo.bfs</code> over the flow layer:{" "}
-              <a href={href(scenario, "queries", "reach.from")}>reach.from</a> from each untrusted source for the blast radius, <a href={href(scenario, "queries", "reach.into")}>reach.into</a> for the exposure, three passes of{" "}
-              <a href={href(scenario, "queries", "reach.agents_from_sources")}>reach.agents_from_sources</a> for the Rule of Two. Choke points count the open findings' evidence paths through each node (<a href={href(scenario, "queries", "evidence.pair_paths")}>evidence.pair_paths</a>);
-              the cut is <a href={href(scenario, "queries", "choke.maxflow")}>choke.maxflow</a>, <code>algo.maxFlow</code> with each hop's capacity set to the cost of the cheapest fix that cuts it. The history is <a href={href(scenario, "queries", "scan.history")}>scan.history</a>, one record per scan.
-              Context for a person; the findings are the verdicts, and the sandbox decides what is safe. <a href={href(scenario, "queries")}>The catalogue</a>.
-            </p>
           </Fold>
         </>
       )}
