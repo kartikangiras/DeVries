@@ -872,6 +872,35 @@ ORDER BY lid
     ),
 
     NamedQuery(
+        name="inventory.rows", mode="ro", targets=WORKING, timeout_ms=2_000,
+        doc="Every agent, tool, data source and resource with its config-side counts in one pass: grants held and how "
+            "many are gated, grants on a tool and how many are gated, delegations, what a tool reads and acts on, what "
+            "reads a source, what acts on a resource, and the workflows an agent runs. Each relationship is counted in "
+            "its own step, so one kind never multiplies another.",
+        cypher="""
+MATCH (n) WHERE n:Agent OR n:Tool OR n:DataSource OR n:Resource
+OPTIONAL MATCH (n)-[g:CAN_CALL]->(:Tool)
+WITH n, count(g) AS grants, toInteger(sum(CASE WHEN g.gate IS NULL THEN 0 ELSE 1 END)) AS gated_grants
+OPTIONAL MATCH (:Agent)-[h:CAN_CALL]->(n)
+WITH n, grants, gated_grants, count(h) AS held_by, toInteger(sum(CASE WHEN h.gate IS NULL THEN 0 ELSE 1 END)) AS gated_holds
+OPTIONAL MATCH (n)-[d:DELEGATES_TO]->(:Agent)
+WITH n, grants, gated_grants, held_by, gated_holds, count(d) AS delegates_to
+OPTIONAL MATCH (n)-[r:READS]->(:DataSource)
+WITH n, grants, gated_grants, held_by, gated_holds, delegates_to, count(r) AS reads
+OPTIONAL MATCH (n)-[w:WRITES]->(:Resource)
+WITH n, grants, gated_grants, held_by, gated_holds, delegates_to, reads, count(w) AS acts_on
+OPTIONAL MATCH (:Tool)-[rb:READS]->(n)
+WITH n, grants, gated_grants, held_by, gated_holds, delegates_to, reads, acts_on, count(rb) AS read_by
+OPTIONAL MATCH (:Tool)-[wb:WRITES]->(n)
+WITH n, grants, gated_grants, held_by, gated_holds, delegates_to, reads, acts_on, read_by, count(wb) AS acted_on_by
+OPTIONAL MATCH (wf:Workflow)-[:RUN_BY]->(n)
+RETURN labels(n)[0] AS label, n.id AS id, n.name AS name, n.owner AS owner, n.trust AS trust, n.impact AS impact,
+       n.external AS external, n.server_id AS server_id, n.capability AS capability,
+       grants, gated_grants, held_by, gated_holds, delegates_to, reads, acts_on, read_by, acted_on_by, count(wf) AS workflows
+ORDER BY label, id
+""",
+    ),
+    NamedQuery(
         name="server.summary", mode="ro", targets=WORKING, timeout_ms=2_000,
         doc="Each MCP server with its tools, the agents that hold them, and the findings whose paths run through them.",
         cypher="""
