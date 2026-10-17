@@ -4,7 +4,6 @@
 
 import { useEffect, useState } from "react";
 import { api, type Servers as ServerList, type WhatIf } from "../api";
-import { href } from "../route";
 import type { DeVries } from "../state";
 import { Empty, Loading } from "../ui";
 
@@ -56,9 +55,6 @@ export function ServerTable({ c, scenario }: { c: DeVries; scenario: string }) {
           })}
         </tbody>
       </table>
-      <p className="chart-note">
-        Read by <a href={href(scenario, "queries", "server.summary")}>server.summary</a>; a removal is <a href={href(scenario, "queries", "whatif.drop_server")}>whatif.drop_server</a> on a copy of the graph, which is then deleted. Nothing here changes the scenario.
-      </p>
     </section>
   );
 }

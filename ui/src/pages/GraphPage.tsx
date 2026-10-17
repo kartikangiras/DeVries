@@ -10,7 +10,8 @@ import { KIND_OF, focusOf, nodeFacts, nodeIndex, nodesOn, type Focus, type Serie
 import { go, href } from "../route";
 import type { DeVries } from "../state";
 import { KIND_WORDS, WithNames, capital, findingTitle, plural } from "../text";
-import { Eyebrow, Fold, Loading, PageBody, PageHeader } from "../ui";
+import { Eyebrow, Loading, PageBody, PageHeader } from "../ui";
+import { InventoryTables } from "./Inventory";
 import { WhatIfLine } from "./WhatIf";
 
 const RELATION: Record<string, string> = { CAN_CALL: "can call", DELEGATES_TO: "delegates to", READS: "reads", WRITES: "acts on", FEEDS: "is read back as" };
@@ -89,7 +90,7 @@ function Read({ id, graph, c, scenario }: { id: string | null; graph: Graph; c: 
           <WhatIfLine c={c} scenario={scenario} agentId={node.data.id} head={false} />
         </>
       )}
-      <p className="read-none"><a href={href(scenario, "inventory", node.label === "Agent" ? null : node.label === "Tool" ? "tools" : node.label === "DataSource" ? "sources" : "resources")}>In the inventory →</a></p>
+      <p className="read-none"><a href={href(scenario, "graph", "tables", node.label === "Agent" ? null : node.label === "Tool" ? "tools" : node.label === "DataSource" ? "sources" : "resources")}>In the inventory →</a></p>
     </aside>
   );
 }
@@ -115,7 +116,7 @@ function openFocus(c: DeVries): Focus | null {
   return { order, nodes: new Set(order), hops, holder: null };
 }
 
-export function ExplorerPage({ c, scenario, id }: { c: DeVries; scenario: string; id: string | null }) {
+export function ExplorerPage({ c, scenario, id, sub }: { c: DeVries; scenario: string; id: string | null; sub: string | null }) {
   const litFinding = id?.startsWith("fnd:") ? [...(c.findings?.findings ?? []), ...(c.findings?.past ?? [])].find((f) => f.id === id) ?? null : null;
   const picked = id && !id.startsWith("fnd:") ? id : null;
   const [lens, setLens] = useState<Lens>("paths");
@@ -171,6 +172,25 @@ export function ExplorerPage({ c, scenario, id }: { c: DeVries; scenario: string
   }, []);
   const idle = litFinding ? `The path of ${findingTitle(litFinding, c.names)} is lit; the rest of the system is around it.` : lens === "paths" && focus ? "The open findings' paths are lit; everything else is drawn quiet. Click a card to read about it." : "Hover a card to read it. Click it to read about it beside the chart.";
 
+  const tables = id === "tables";
+  const view = (
+    <>
+      <span className="control">View</span>
+      <div className="pills" role="tablist" aria-label="View">
+        <button role="tab" aria-selected={!tables} className={!tables ? "on" : ""} onClick={() => go(scenario, "graph")}>Map</button>
+        <button role="tab" aria-selected={tables} className={tables ? "on" : ""} onClick={() => go(scenario, "graph", "tables")}>Tables</button>
+      </div>
+    </>
+  );
+  if (tables) {
+    return (
+      <PageBody width="full">
+        <PageHeader eyebrow="Explorer" title="Everything the system holds." meta="Each thing with what reaches it and what it reaches; a row opens it on the map." />
+        <div className="chart-controls">{view}</div>
+        <InventoryTables c={c} scenario={scenario} kind={sub} />
+      </PageBody>
+    );
+  }
   return (
     <PageBody width="full">
       <PageHeader
@@ -179,6 +199,7 @@ export function ExplorerPage({ c, scenario, id }: { c: DeVries; scenario: string
         meta={flow
           ? "Where text and data can travel: every arc comes from the config by one of seven rules, and a path means it can flow, not that it did."
           : "What is configured: which agent can call which tool, who delegates to whom, and what each tool reads and acts on."}
+        {view}
       />
       <div className="chart-controls">
         <span className="control">Lens</span>
