@@ -5,7 +5,7 @@
 import { useState } from "react";
 import { api, type Mitigation, type Posture } from "../api";
 import { useFetch } from "../fetch";
-import { OverviewSankey } from "../graph/Sankey";
+import { RiskFlow } from "../graph/RiskFlow";
 import { href } from "../route";
 import type { DeVries } from "../state";
 import { WithNames, capital, clock, countWord, plural } from "../text";
@@ -137,16 +137,16 @@ export function PosturePage({ c, scenario }: { c: DeVries; scenario: string }) {
             { n: p.cut.cost ?? "—", label: "cheapest cut, cost" },
           ]} />
 
-          <Block className="posture-picture" eyebrow="Where the risk is" aside="only the open paths are drawn: what outsiders write, the agents it reaches, the actions those agents can take">
+          <Block className="posture-picture" eyebrow="Where the risk is" aside="only the open paths are drawn: what outsiders write, the agents it reaches, the actions those agents can take · pan and zoom it like a map">
             {overview ? (
               <figure className="figure">
-                <OverviewSankey view={overview} names={c.names} scenario={scenario} />
+                <RiskFlow view={overview} posture={p} names={c.names} scenario={scenario} />
                 <figcaption>
-                  <Fold className="source" summary="Source and method" sub={`${plural(overview.queries.length, "FalkorDB query", "FalkorDB queries")} · d3-sankey`}>
+                  <Fold className="source" summary="Source and method" sub={`${plural(overview.queries.length, "FalkorDB query", "FalkorDB queries")} · React Flow`}>
                     <p className="chart-note">
                       Source: {scenario}{overview.own_copy ? " (your sandbox copy)" : ""} in FalkorDB, read by{" "}
                       {overview.queries.map((q, i) => <span key={q}>{i > 0 && ", "}<a href={href(scenario, "queries", q)}>{q}</a></span>)}.{" "}
-                      A ribbon is one open finding; its width is the number of routes; d3-sankey orders the columns so the ribbons cross least. An agent's line reads A · B · C for Meta's Rule of Two.
+                      Each path is one open finding, read from its evidence; the tokens running along it are the text an outsider can plant, one per route up to four, and they run for as long as the path is open. A card's figure is a BFS answer: what a source's text reaches, how many untrusted sources reach an action, which of Meta's three properties an agent holds. The columns are the order the text travels.
                       The whole system, every node and every flow, is in the <a href={href(scenario, "graph")}>Explorer</a>.
                     </p>
                   </Fold>

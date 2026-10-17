@@ -1,5 +1,5 @@
 /*
- * The three renderers of revision 3: DeVries's chart (React Flow laid out by ELK), the overview (d3-sankey)
+ * The three renderers of revision 3: DeVries's chart (React Flow laid out by ELK), the posture's flow (React Flow)
  * and FalkorDB's canvas. Same tokens as chart.css; the names of the marks (hot, private, plain, gated, cut,
  * central) are the same words the lane chart used, so the key reads the same on every chart.
  */
@@ -81,19 +81,54 @@
 .flowchart.hovering .wire-label.near { opacity: 1; color: var(--ink-strong); }
 .flowchart.laying-out .flow-area::after { content: ""; position: absolute; inset: 18px; border-radius: 12px; background: linear-gradient(100deg, transparent 35%, rgb(181 209 204 / 0.05) 50%, transparent 65%); background-size: 220% 100%; animation: shimmer 1.6s linear infinite; pointer-events: none; }
 
-/* ---- the sankey overview */
-.sankey svg { overflow: visible; }
-@keyframes ribbon-in { from { opacity: 0; } }
-.sankey .ov-ribbon .line { fill: none; stroke: var(--chart-hot); opacity: 0.42; stroke-linecap: butt; transition: opacity 180ms var(--ease-out-quart); animation: ribbon-in 900ms var(--ease-out-quart) both; }
-.sankey .ov-ribbon.trifecta .line { stroke: var(--chart-bone); }
-.sankey .ov-ribbon.lit .line { opacity: 0.9; }
-.sankey .ov-ribbon.dim .line { opacity: 0.1; }
-.sankey .ov-ribbon .hit { fill: none; stroke: transparent; }
-.sankey .ov-node .bar { fill: var(--chart-hot); }
-.sankey .ov-node.action .bar { fill: var(--chart-hot); opacity: 0.8; }
-.sankey .ov-node.agent rect { fill: var(--chart-tile); stroke: var(--chart-line-strong); }
-.sankey .ov-node.agent.worst rect { stroke: var(--chart-hot); }
-.sankey .ov-node.agent.worst .ov-sub { fill: var(--chart-hot); }
+/* ---- where the risk is: cards in columns on a dotted ground, the open paths between them carrying tokens */
+.riskflow { position: relative; display: flex; flex-direction: column; padding: 0; overflow: hidden; }
+.riskflow .flow-area { position: relative; flex: none; }
+.riskflow .react-flow { height: 100%; background: transparent; font-family: var(--sans); }
+.riskflow .react-flow__pane { cursor: grab; }
+.riskflow .chart-key { padding: 9px 12px 9px; border-top: 1px solid var(--chart-line); }
+.riskflow .chart-key .k-exit { background: var(--accent); }
+.riskflow .chart-key .reads { color: var(--chart-ash); white-space: normal; text-align: right; }
+.riskflow .chart-over { margin: 0 10px; }
+.riskflow .zoom { position: absolute; right: 10px; top: 10px; z-index: 5; display: flex; flex-direction: column; gap: 4px; }
+.riskflow .zoom button { width: 26px; height: 26px; font: 400 14px/1 var(--mono); color: var(--ink-faint); background: var(--surface); border: 1px solid var(--rule); border-radius: 6px; cursor: pointer; }
+.riskflow .zoom button:hover { color: var(--ink-strong); border-color: var(--rule-strong); }
+.riskflow .lane { width: 220px; text-align: center; font: 400 10.5px var(--mono); letter-spacing: 0.1em; text-transform: uppercase; color: var(--chart-ash); pointer-events: none; }
+.riskflow .fport { width: 1px; height: 1px; min-width: 0; min-height: 0; border: 0; background: transparent; opacity: 0; }
+.riskflow-empty { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; padding: 24px; text-align: center; font: 400 13px/1.6 var(--mono); color: var(--chart-ash); pointer-events: none; }
+.rcard { position: relative; display: flex; flex-direction: column; gap: 6px; box-sizing: border-box; padding: 12px 14px 13px; overflow: hidden; background: var(--surface); border: 1px solid var(--chart-line-strong); border-radius: 12px; box-shadow: 0 10px 28px rgb(0 0 0 / 0.28); cursor: pointer; transition: opacity 180ms var(--ease-out-quart), border-color 180ms var(--ease-out-quart), transform 180ms var(--ease-out-quart); }
+.rcard:hover { border-color: var(--chart-ash); transform: translateY(-1px); }
+.rcard-eyebrow { font: 500 9.5px var(--mono); letter-spacing: 0.14em; text-transform: uppercase; color: var(--chart-ash); }
+.rcard.t-hot .rcard-eyebrow { color: var(--chart-hot); }
+.rcard.t-private .rcard-eyebrow { color: var(--amber); }
+.rcard.t-accent .rcard-eyebrow { color: var(--accent); }
+.rcard-name { font: 600 14.5px/1.2 var(--sans); letter-spacing: -0.012em; color: var(--ink-strong); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rcard-sub { font: 400 10.5px/1.45 var(--mono); color: var(--ink-faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rcard-figure { display: flex; flex-direction: column; gap: 3px; margin-top: 4px; padding: 8px 10px 9px; background: var(--bg); border: 1px solid var(--chart-line); border-radius: 8px; }
+.rcard-figure .lbl { font: 400 9px var(--mono); letter-spacing: 0.14em; text-transform: uppercase; color: var(--chart-ash); }
+.rcard-figure .val { font: 500 20px/1.1 var(--mono); font-variant-numeric: tabular-nums; color: var(--ink-strong); }
+.rcard-figure .unit { font: 400 10px/1.4 var(--mono); color: var(--ink-faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rcard-letters { display: inline-flex; gap: 6px; padding: 2px 0; }
+.rcard-letters i { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; font: 500 10px var(--mono); font-style: normal; color: var(--ink-ghost); border: 1.5px solid var(--chart-line-strong); border-radius: 50%; }
+.rcard-letters i.on { color: var(--bg); }
+.rcard-letters i.on.s-hot { background: var(--chart-hot); border-color: var(--chart-hot); }
+.rcard-letters i.on.s-private { background: var(--amber); border-color: var(--amber); }
+.rcard-letters i.on.s-exit { background: var(--accent); border-color: var(--accent); }
+.rcard-badge { align-self: flex-start; padding: 2px 8px; font: 500 9.5px var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-muted); border: 1px solid var(--rule); border-radius: 999px; }
+.rcard.rk-agent { border-color: var(--accent-line); }
+.rcard.worst { border-color: var(--chart-hot); }
+.rcard.worst .rcard-badge { color: var(--chart-hot); border-color: var(--chart-hot); }
+.rcard.dim { opacity: 0.3; }
+.riskflow .river .react-flow__edge-path { stroke: var(--chart-line-strong); stroke-width: 1.4; fill: none; transition: opacity 180ms var(--ease-out-quart), stroke 180ms var(--ease-out-quart); }
+.riskflow .river.lit .react-flow__edge-path { stroke: var(--chart-ash); stroke-width: 1.8; }
+.riskflow .river.dim { opacity: 0.16; }
+.riskflow .react-flow__edge-interaction { stroke-width: 18; }
+.riskflow .river .token { fill: var(--chart-hot); stroke: var(--bg); stroke-width: 1.6; pointer-events: none; }
+.riskflow .river.s-private .token { fill: var(--amber); }
+.riskflow .river.s-exit .token { fill: var(--accent); }
+@keyframes rcard-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+.riskflow .rcard { animation: rcard-in 460ms var(--ease-out-quart) both; }
+.riskflow .react-flow__edge { animation: arc-in 420ms var(--ease-out-quart) 300ms both; }
 
 /* ---- FalkorDB's canvas */
 .canvas-chart { padding: 0; overflow: hidden; }
