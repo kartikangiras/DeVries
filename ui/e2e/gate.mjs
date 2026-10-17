@@ -1,9 +1,10 @@
-// The Day 2 gate, from the browser: on each scenario the audit the app ran at start has found the
-// finding, tested fixes in sandbox graphs and proposed a verified one; after Approve the finding
-// closes. The finding is worked through in its five steps: the summary, the path, why, the fix, the options.
-// Drives the built UI in the Chrome installed on this machine, headless. Needs the app running.
+// The gate: the one loop a judge will try, driven in a real browser against the running app. On two scenarios:
+// the open findings with a plan already waiting, the finding's five steps (Summary, Rule, Path, Fix, Options:
+// the chart on Path only, the approval on Fix only), an approval with a name, the finding closing on the rescan,
+// Activity recording the decision, Posture showing the drop, the inventory, the nav, and Reset. Needs the app
+// running; start it without a model key so the run costs nothing.
 //
-//   node e2e/gate.mjs [app url]                     screenshots land in e2e/shots/
+//   node e2e/gate.mjs [app url]                     exits 1 on any failed check; screenshots land in e2e/shots/
 import { mkdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright-core";
@@ -22,7 +23,7 @@ page.on("console", (m) => { if (m.type() === "error") problems.push("console: " 
 page.on("pageerror", (e) => problems.push("pageerror: " + e.message));
 page.on("requestfailed", (r) => { if (!r.url().includes("/api/events")) problems.push("requestfailed: " + r.url()); });
 page.on("response", (r) => { if (r.status() >= 400) problems.push(`http ${r.status()}: ${r.url()}`); });
-// the page asks no third party for anything: fonts, scripts and styles all come from the app
+// nothing leaves the machine: no font host, no analytics, no CDN
 page.on("request", (r) => { const u = new URL(r.url()); if (/^https?:$/.test(u.protocol) && u.origin !== origin) problems.push("request to another origin: " + u.origin); });
 
 const texts = (selector) => page.locator(selector).allInnerTexts().then((all) => all.map((t) => t.replace(/\s+/g, " ").trim()));
@@ -30,14 +31,30 @@ const first = async (selector) => (await texts(selector))[0] ?? "";
 const need = (ok, what) => { if (!ok) problems.push(what); };
 const shot = async (name) => { await page.mouse.move(700, 3); await page.waitForTimeout(350); await page.screenshot({ path: `${shots}/${name}.png` }); };
 const place = (name) => page.locator(".nav-row", { hasText: name });
-const step = (name) => page.locator(".workflow-step", { hasText: name });
-// the hop tables are folded under the chart; a trifecta has one per path
+const step = (name) => page.locator(".workflow-step", { has: page.locator(".workflow-label", { hasText: new RegExp(`^${name}$`) }) });
+/** The hops are folded under the chart, open by default; a visitor may have closed one, so make sure every fold is open. */
 const unfold = async () => { await page.waitForSelector(".hops-fold", { state: "attached" }); for (const fold of await page.locator(".hops-fold").all()) if (!(await fold.evaluate((d) => d.open))) await fold.locator("summary").click(); };
 
 const out = {};
 for (const [scenario, fix, cut] of [["acme_support", "gate one call", "set gate = human_approval"], ["acme_exec", "quarantine one delegation", "set gate = quarantine"]]) {
   const r = (out[scenario] = {});
+
+  // the posture is the home: the sentence, the figures, every block filled
   await page.goto(`${base}/#/${scenario}`);
+  await page.waitForSelector(".figures dd", { timeout: 240000 });
+  await page.waitForSelector(".tally-card");
+  await page.waitForSelector(".sankey .ov-ribbon", { state: "attached", timeout: 60000 });   // the picture arrives with the scenario, the figures with the posture
+  r.posture = await first(".page-head h1");
+  r.postureFigures = await texts(".figures dd");
+  r.scansBefore = await page.locator(".scans .scan").count();
+  need(r.postureFigures.length === 7, `${scenario}: the posture should open on seven figures, got ${r.postureFigures}`);
+  need((await page.locator(".bars li").count()) >= 2, `${scenario}: the posture should draw the blast radius and the exposure as bars`);
+  need((await page.locator(".chokes li").count()) >= 1, `${scenario}: the posture should rank the choke points`);
+  need((await page.locator(".owasp-code").count()) === 10, `${scenario}: the posture should list the ten OWASP classes`);
+  need((await page.locator(".sankey .ov-ribbon").count()) >= 1, `${scenario}: the posture should draw the open paths as ribbons`);
+  await shot(`${scenario}-0-posture`);
+
+  await place("Open").click();
   await page.waitForSelector(".case");
   // the audit ran at start: the row is already waiting for a person, with the recommendation as a figure
   await page.waitForSelector(".case .phase.t-amber", { timeout: 240000 });
@@ -57,80 +74,93 @@ for (const [scenario, fix, cut] of [["acme_support", "gate one call", "set gate 
   need((await page.locator(".case .owasp").count()) === r.openBefore, `${scenario}: each open row should carry its OWASP class`);
   await shot(`${scenario}-1-inbox`);
 
-  // step 1, the summary: the brief, the path on DeVries's chart, the evidence it cites; nothing about a fix yet
+  // step 1, the summary: the brief, the path in words, the figures; no chart, nothing about a fix yet
   await page.locator(".case").first().click();
   await page.waitForSelector(".brief-title");
-  await page.waitForSelector(".chart .fcard", { timeout: 60000 });
+  await page.waitForSelector(".path-words");
   r.finding = await first(".brief-title");
   r.tldr = await first(".tldr p");
-  r.cards = await page.locator(".chart .fcard").count();
-  r.evidence = await page.locator(".evidence li").count();
+  r.words = await texts(".path-words li");
+  r.summaryFigures = await texts(".figures dd");
   r.takeaway = await first(".takeaway");
   r.workflow = await texts(".workflow-step .workflow-label");
-  need(r.workflow.join() === "Summary,Path,Why,Fix,Options,Trace", `${scenario}: the finding should be worked through in five steps and a trace, got ${r.workflow}`);
-  need(r.evidence === r.cards && r.cards >= 5, `${scenario}: the chart draws ${r.cards} cards and the rail cites ${r.evidence}`);
+  need(r.workflow.join() === "Summary,Rule,Path,Fix,Options", `${scenario}: the finding should be worked through in five steps, got ${r.workflow}`);
+  need(r.words.length >= 1 && r.words.every((w) => /→/.test(w)), `${scenario}: the summary should give the path in words: ${r.words}`);
+  need(r.summaryFigures.length >= 5, `${scenario}: the summary should carry its figures, got ${r.summaryFigures}`);
+  need((await page.locator(".chart").count()) === 0, `${scenario}: the chart belongs to the path step, not the summary`);
   need((await page.locator(".approval").count()) === 0, `${scenario}: the approval belongs to the fix step, not the summary`);
   r.cited = await page.locator(".tldr sup.ref").count();
-  need(r.cited >= 4 && r.cited <= r.evidence, `${scenario}: the brief cites ${r.cited} of ${r.evidence} pieces of evidence`);
+  need(r.cited >= 4, `${scenario}: the brief cites ${r.cited} pieces of evidence`);
   need(/brief as Markdown/.test(r.takeaway) && /OWASP ASI0\d/.test(r.takeaway), `${scenario}: the rail should offer the brief and name the OWASP class: ${r.takeaway}`);
-  const brief = await page.request.get(`${base}/api/scenarios/${scenario}/findings/${await page.evaluate(() => location.hash.split("/").pop())}/brief.md`);
+  const brief = await page.request.get(`${base}/api/scenarios/${scenario}/findings/${await page.evaluate(() => location.hash.split("/")[3])}/brief.md`);
   need(brief.ok() && /^# /.test(await brief.text()), `${scenario}: the brief should download as Markdown`);
-  await page.locator(".tldr sup.ref").first().click();
-  need((await page.locator(".evidence li.lit").count()) === 1, `${scenario}: a footnote marker did not mark its evidence row`);
-  need((await page.locator(".chart .fcard.picked").count()) === 1, `${scenario}: a footnote marker did not mark its card on the chart`);
-  // the same path on FalkorDB's canvas, then back
-  await page.getByRole("tab", { name: "FalkorDB canvas" }).click();
-  await page.waitForSelector("falkordb-canvas");
-  await page.waitForTimeout(1200);
-  need(/FalkorDB's canvas/.test(await first(".canvas-chart .chart-over")), `${scenario}: the canvas renderer should say what it is`);
-  await shot(`${scenario}-2-finding-canvas`);
-  await page.getByRole("tab", { name: "DeVries" }).click();
-  await page.waitForSelector(".chart .fcard", { timeout: 60000 });
-  await shot(`${scenario}-2-finding`);
-
   r.state = await first(".strip .phase");
   need(r.state === "AWAITING APPROVAL", `${scenario}: the finding should be awaiting a person, got ${r.state}`);
+  await shot(`${scenario}-2-summary`);
+  // a footnote opens the path with that card lit
+  await page.locator(".tldr sup.ref").first().click();
+  await page.waitForSelector(".chart .fcard", { timeout: 60000 });
+  need(/\/path$/.test(await page.evaluate(() => location.hash)), `${scenario}: a footnote should open the path step: ${await page.evaluate(() => location.hash)}`);
+  need((await page.locator(".evidence li.lit").count()) === 1, `${scenario}: a footnote marker did not mark its evidence row`);
+  need((await page.locator(".chart .fcard.picked").count()) === 1, `${scenario}: a footnote marker did not mark its card on the chart`);
 
-  // step 2, the path: the chart with the whole system a click away, the hops with their rules, the source note, the queries
+  // step 2, the rule: which rule fired and what satisfies each of its needs; the analysis; no chart
+  await step("Rule").click();
+  await page.waitForSelector(".rule-needs li");
+  r.rule = await first(".brief-title");
+  r.needs = await texts(".rule-needs li");
+  r.analysis = await texts(".analysis-rows li");
+  need(/^Rule [12]/.test(r.rule), `${scenario}: the rule step should name the rule: ${r.rule}`);
+  need(r.needs.length === 4, `${scenario}: the rule has four needs, got ${r.needs.length}`);
+  if (scenario === "acme_exec") {
+    r.grid = await texts(".rot-row[data-agent] .rot-agent");
+    need(r.grid.length >= 1 && r.grid.every((a) => /of three|all three/.test(a)), `${scenario}: the Rule of Two grid should count each agent's properties: ${r.grid}`);
+  }
+  need(r.analysis.length >= 2 && r.analysis.some((a) => /OWASP/.test(a)), `${scenario}: the analysis should name the OWASP class: ${r.analysis}`);
+  need((await page.locator(".chart").count()) === 0 && (await page.locator(".approval").count()) === 0, `${scenario}: the rule step draws nothing and decides nothing`);
+  await shot(`${scenario}-2b-rule`);
+
+  // step 3, the path: the one chart on both renderers, the hops with their rules, the source note, the queries, the way into the explorer
   await step("Path").click();
   await page.waitForSelector(".chart .fcard", { timeout: 60000 });
+  r.cards = await page.locator(".chart .fcard").count();
+  r.evidence = await page.locator(".evidence li").count();
+  need(r.evidence === r.cards && r.cards >= 5, `${scenario}: the chart draws ${r.cards} cards and the rail cites ${r.evidence}`);
   await unfold();
   await page.waitForSelector(".hops li");
   r.hops = await texts(".hops li");
   r.restsOn = await texts(".rests-on li");
   need(r.hops.every((h) => /(cut by|cannot be cut|no fix yet|blocked by)/.test(h)), `${scenario}: a hop row does not say whether it can be cut`);
   need(r.restsOn.length === 2 && r.restsOn.every((q) => /algo\./.test(q)), `${scenario}: the queries a finding rests on should name their algorithm`);
-  // the source note is folded under the chart; opened, it names the layer and the queries
+  need(/graph\/fnd/.test(await page.locator(".chart-link").getAttribute("href")), `${scenario}: the path should open in the explorer with itself lit`);
   await page.locator(".figure .fold.source summary").click();
   await page.waitForSelector(".figure .fold.source .chart-note");
   need(/Source: the flow layer/.test(await first(".figure .fold.source .chart-note")), `${scenario}: the chart has no source note`);
-  await shot(`${scenario}-2b-path`);
+  await page.getByRole("tab", { name: "FalkorDB canvas" }).click();
+  await page.waitForSelector("falkordb-canvas");
+  await page.waitForTimeout(1200);
+  need(/FalkorDB's canvas/.test(await first(".canvas-chart .chart-over")), `${scenario}: the canvas renderer should say what it is`);
+  await shot(`${scenario}-2c-path-canvas`);
+  await page.getByRole("tab", { name: "DeVries" }).click();
+  await page.waitForSelector(".chart .fcard", { timeout: 60000 });
+  await shot(`${scenario}-2d-path`);
 
-  // step 3, why: each agent on the path against Meta's Rule of Two, the workflows that constrain a fix, the OWASP class
-  await step("Why").click();
-  await page.waitForSelector(".rot-row[data-agent]");
-  r.rule = await texts(".rot-row[data-agent] .rot-agent");
-  r.analysis = await texts(".analysis-rows li");
-  need(r.rule.length >= 1 && r.rule.every((a) => /of three|all three/.test(a)), `${scenario}: the Rule of Two grid should count each agent's properties: ${r.rule}`);
-  need(r.analysis.length >= 2 && r.analysis.some((a) => /OWASP/.test(a)), `${scenario}: the analysis should name the OWASP class: ${r.analysis}`);
-  need((await page.locator(".approval").count()) === 0, `${scenario}: the approval belongs to the fix step, not the analysis`);
-  await shot(`${scenario}-2c-why`);
-
-  // step 4, the fix: the verdict in figures, the drafted change, the path with the cut marked, the preview with the plan applied, the bar
+  // step 4, the fix: the verdict in figures, the change, the path after as the sandbox reads it, and the one decision
   await step("Fix").click();
   await page.waitForSelector(".approval");
   await page.waitForSelector(".drafted .patch");
-  await page.waitForSelector(".before .chart .cut-mark", { timeout: 60000 }).catch(() => problems.push(`${scenario}: the chart does not mark where the fix cuts`));
-  await page.waitForSelector(".after .chart .wire.gated", { state: "attached", timeout: 60000 });
+  await page.waitForSelector(".hops-after li.changed", { timeout: 60000 });
   r.figures = await texts(".figures dd");
   need(r.figures.length >= 4, `${scenario}: the fix should be summed up in figures, got ${r.figures}`);
   r.change = await first(".approval .approval-change");
   r.numbers = await first(".approval .approval-numbers");
   r.patch = await texts(".drafted .patch");
-  r.provenance = await first(".drafted .provenance");
+  r.after = await texts(".hops-after li.changed .now");
   need(r.patch.length >= 1 && r.patch[0].includes(cut), `${scenario}: the drafted change does not show the literal change`);
   need(/resolves \d+ · introduces 0 · breaks 0/.test(r.numbers), `${scenario}: the approval bar does not carry the sandbox verdict`);
-  need(/sandbox/.test(await first(".after .chart-note")), `${scenario}: the preview should say it was read from a sandbox`);
+  need(r.after.some((t) => /gated|quarantined|gone/.test(t)), `${scenario}: the path after should say what the plan does to a hop: ${r.after}`);
+  need(/sandbox/.test(await first(".path-after .chart-note")), `${scenario}: the path after should say it was read from a sandbox`);
+  need((await page.locator(".chart").count()) === 0, `${scenario}: the fix step reads the path as hops, it does not draw it again`);
   await page.locator(".approval-see").click();
   await page.waitForSelector(".approval-draft .draft-diff");
   r.draftPath = await first(".approval-draft .draft-path");
@@ -142,31 +172,27 @@ for (const [scenario, fix, cut] of [["acme_support", "gate one call", "set gate 
   await shot(`${scenario}-3-fix`);
   await page.locator(".approval-see").click();
 
-  // step 5, the options: every plan that was tried as one chart, with its verdict; folded under them, the what-if line, the cut as rules, the servers
+  // step 5, the options: every plan that was tried as one chart, with its verdict; any of them can be read on the fix step
   await step("Options").click();
   await page.waitForSelector(".tested .verdict");
   need((await page.locator(".tested .verdict .bar").count()) === (await page.locator(".tested .verdict").count()), `${scenario}: every plan should carry its cost as a bar`);
   need((await page.locator(".tested .verdict .cell.closed").count()) >= 1, `${scenario}: the plan chart should show which plan closes this finding`);
-  for (const fold of await page.locator(".more > .fold > summary").all()) await fold.click();   // the cut has a fold of its own inside; only the four outer ones
-  await page.waitForSelector(".cut-block", { timeout: 60000 });
-  await page.waitForSelector(".servers", { timeout: 60000 });
   r.failed = await texts(".tested .verdict.fail");
   r.passed = await texts(".tested .verdict.pass");
-  // a scripted run tries every candidate cheapest first, so revokes fail before the gate passes; a model may go straight to the plan that passes
   need(r.passed.length >= 1 && (withModel || r.failed.length >= 2), `${scenario}: expected rejected and passing verdict rows, got ${r.failed.length} and ${r.passed.length}`);
   need(r.failed.every((v) => /(breaks|leaves open)/.test(v)), `${scenario}: a rejected plan does not say why`);
-  need((await page.locator(".whatif-line").count()) === 1 && (await page.locator(".cut-block").count()) === 1 && (await page.locator(".servers").count()) === 1, `${scenario}: the options should hold the what-if line, the cut and the servers`);
+  need((await page.locator(".approval").count()) === 0 && (await page.locator(".chart").count()) === 0, `${scenario}: the options step decides nothing and draws nothing`);
+  if (r.failed.length) {
+    await page.locator(".tested .verdict.fail .verdict-why .link").first().click();
+    await page.waitForSelector(".reading-other");
+    need(/failed its sandbox/.test(await first(".brief-title")), `${scenario}: reading a failed plan should say so on the fix step`);
+    need((await page.locator(".approval").count()) === 1, `${scenario}: the decision on the recommended plan stays while another is read`);
+    await page.locator(".reading-other .link").click();
+  }
   await shot(`${scenario}-4-options`);
 
-  // the trace behind the brief: every step, who decided it, and the verdicts unfolded
-  await step("Trace").click();
-  await page.waitForSelector(".trace-row");
-  r.driver = await first(".run-driver");
-  r.steps = await page.locator(".trace-row").count();
-  need(r.steps >= 6, `${scenario}: the trace shows ${r.steps} steps`);
-  need((await page.locator(".trace-row .verdict").count()) >= (withModel ? 1 : 3), `${scenario}: the trace folds the sandbox verdicts away`);
   await step("Fix").click();
-
+  await page.waitForSelector(".approval");
   await page.getByLabel("Your name").fill("Kartik");
   await page.getByRole("button", { name: "Approve · Apply" }).click();
   await page.waitForSelector(".applied", { timeout: 240000 });
@@ -177,30 +203,47 @@ for (const [scenario, fix, cut] of [["acme_support", "gate one call", "set gate 
   need((await page.locator(".approval").count()) === 0, `${scenario}: the approval bar should leave once a person has decided`);
   need(/Your sandbox copy/.test(await first(".session-name")), `${scenario}: approving should have made a sandbox copy for this session`);
   await step("Summary").click();
+  await page.waitForSelector(".tldr p");
+  need(/no longer holds/.test(await first(".tldr p")), `${scenario}: the brief of a closed finding should say it no longer holds`);
+  await step("Path").click();
   await page.waitForSelector(".chart .fcard", { timeout: 60000 });
   await page.waitForSelector(".chart .wire.gated", { state: "attached", timeout: 60000 }).catch(() => problems.push(`${scenario}: the chart does not show the hop as blocked`));
-  need(/no longer holds/.test(await first(".tldr p")), `${scenario}: the brief of a closed finding should say it no longer holds`);
-  await shot(`${scenario}-5-applied`);
-  await step("Path").click();
   await unfold();
   await page.waitForSelector(".hops li.blocked");
   r.blockedHop = await first(".hops li.blocked");
+  await shot(`${scenario}-5-applied`);
 
   // nothing open: the list says so, and the finding is under Closed
   await place("Open").click();
   await page.waitForFunction(() => document.querySelector(".page-head h1")?.textContent === "Nothing open.", null, { timeout: 240000 });
   need((await page.getByRole("button", { name: "Run audit" }).count()) === 0, `${scenario}: with nothing open there is nothing to audit`);
-  await shot(`${scenario}-6-inbox-zero`);
   await place("Closed").click();
   await page.waitForSelector(".case.status-mitigated");
   r.mitigated = await page.locator(".case.status-mitigated").count();
   need(r.mitigated >= 1, `${scenario}: the closed finding is not listed under Closed`);
 
-  // the audit log: the run's report cites the steps its ids came from
-  await place("Runs").click();
-  await page.waitForSelector(".report");
+  // the posture after the fix: one more scan, the drop, nothing exposed
+  await place("Posture").click();
+  await page.waitForSelector(".figures dd", { timeout: 240000 });
+  await page.waitForFunction((before) => document.querySelectorAll(".scans .scan").length > before, r.scansBefore, { timeout: 240000 });
+  r.scansAfter = await texts(".scans .scan .scan-n");
+  r.postureAfter = await texts(".figures dd");
+  need(r.scansAfter[r.scansAfter.length - 1] === "0", `${scenario}: the latest scan should show nothing open: ${r.scansAfter}`);
+  need(r.postureAfter[0] === "0", `${scenario}: the posture should count no open finding after the fix: ${r.postureAfter}`);
+  await shot(`${scenario}-6-posture-after`);
+
+  // activity: the scan, the run, the plans, the decision and the application, in order; the run opens to its trace and its report cites its steps
+  await place("Activity").click();
+  await page.waitForSelector(".activity-row", { timeout: 240000 });
+  await page.waitForSelector(".activity-row.kind-applied", { timeout: 240000 });
+  r.kinds = [...new Set((await page.locator(".activity-row .activity-kind").allInnerTexts()).map((k) => k.trim().toLowerCase()))];   // innerText carries the uppercase the style gives it
+  r.decision = await first(".activity-row.kind-decision");
+  need(["scan", "run", "proposed", "decision", "applied"].every((k) => r.kinds.includes(k)) && (withModel || r.kinds.includes("tested")), `${scenario}: activity should hold every kind of line, got ${r.kinds}`);
+  need(/Kartik/.test(r.decision) && /APPROVED/.test(r.decision), `${scenario}: the decision line should name who decided: ${r.decision}`);
+  need(/fix$/.test(await page.locator(".activity-row.kind-decision a").first().getAttribute("href")), `${scenario}: a decision should link to its finding's fix step`);
+  if ((await page.locator(".activity-trace").count()) === 0) await page.locator(".kind-run .link-plain").first().click();   // the latest run opens by itself
+  await page.waitForSelector(".activity-trace .report", { timeout: 60000 });
   r.report = await first(".report .report-text");
-  r.byline = await first(".report .byline");
   const markers = await texts(".report-text sup.ref");
   const rows = await page.locator(".report-cites li").count();
   r.citations = { markers: markers.length, rows };
@@ -208,21 +251,25 @@ for (const [scenario, fix, cut] of [["acme_support", "gate one call", "set gate 
   need(markers.every((m) => Number(m.replace(/\D/g, "")) <= rows), `${scenario}: a citation marker has no row`);
   await page.locator(".report-text sup.ref").first().click();
   need((await page.locator(".trace-row.lit").count()) === 1, `${scenario}: a citation did not mark the step it came from`);
-  await shot(`${scenario}-7-audit`);
+  need((await page.locator(".trace-row .verdict").count()) >= (withModel ? 1 : 3), `${scenario}: the trace folds the sandbox verdicts away`);
+  await shot(`${scenario}-7-activity`);
 
-  // the ledger: every plan that was tested, the applied one among them
-  await place("Ledger").click();
-  await page.waitForSelector(".ledger .table tbody tr");
-  r.ledger = await texts(".ledger .table tbody tr");
-  need(r.ledger.some((row) => /APPLIED/.test(row)) && (withModel || r.ledger.some((row) => /FAILED/.test(row))), `${scenario}: the ledger should hold the applied plan and the ones that failed`);
-  await shot(`${scenario}-8-fixes`);
+  // the inventory: every kind of thing, a row each, and the servers with their test
+  await place("Inventory").click();
+  await page.waitForSelector(".inventory .table tbody tr", { timeout: 60000 });
+  r.inventory = await page.locator(".inventory .table tbody tr").count();
+  need(r.inventory >= 1, `${scenario}: the inventory should list the agents`);
+  await page.getByRole("tab", { name: /Servers/ }).click();
+  await page.waitForSelector(".servers .table tbody tr", { timeout: 60000 });
+  need((await page.locator(".servers .table tbody tr").count()) >= 1, `${scenario}: the inventory should list the servers`);
+  await shot(`${scenario}-8-inventory`);
 }
 
 // the nav, in its four groups
 out.nav = await texts(".nav-row .nav-label");
 out.groups = await texts(".nav-group-label");
-need(out.nav.join() === "Open,Closed,Ledger,What if,Graph,Servers,Queries,Runs,Import", `the nav should hold nine places, got ${out.nav}`);
-need(out.groups.join().toLowerCase() === "findings,fixes,system,audit", `the nav should be in four groups, got ${out.groups}`);
+need(out.nav.join() === "Posture,Open,Closed,Explorer,Inventory,Queries,Activity,Import", `the nav should hold eight places, got ${out.nav}`);
+need(out.groups.join().toLowerCase() === "posture,findings,system,record", `the nav should be in four groups, got ${out.groups}`);
 
 // Reset gives the shared scenarios back
 await page.getByRole("button", { name: "Reset" }).click();
