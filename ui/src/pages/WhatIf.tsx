@@ -1,13 +1,13 @@
 // Questions answered in a sandbox, none of which changes the scenario: what one more grant or delegation
-// would open, close and break; and the cheapest set of hops that separates every untrusted source from
-// every high-impact resource, as rules a gateway or a client could enforce.
+// would open, close and break (asked from the Explorer's reader); and the cheapest set of hops that separates
+// every untrusted source from every high-impact resource, as rules a gateway or a client could enforce (on Posture).
 
 import { useEffect, useState } from "react";
 import { api, type Change, type Cut, type Policy, type WhatIf } from "../api";
 import { href } from "../route";
 import type { DeVries } from "../state";
 import { KIND_WORDS, WithNames, capital, findingTitle, plural } from "../text";
-import { Button, Eyebrow, Fold, Loading, PageBody, PageHeader } from "../ui";
+import { Button, Eyebrow, Fold, Loading } from "../ui";
 
 /** One change, asked as a question: what would it open, close and break? Answered from a sandbox. `head` is off where a fold already names it. */
 export function WhatIfLine({ c, scenario, agentId, head = true }: { c: DeVries; scenario: string; agentId?: string | null; head?: boolean }) {
@@ -101,7 +101,7 @@ export function CutBlock({ c, scenario, compact = false, head = true }: { c: DeV
     <Fold summary="How it was worked out" sub="choke.maxflow · algo.maxFlow">
       <p className="chart-note">
         {by} It is a guide, not a verdict: it knows nothing about which workflows need what, and a trifecta is not a cut.
-        A fix is real only once a sandbox has passed it; the plans that were tested are under <a href={href(scenario, "fixes")}>Fixes</a>.
+        A fix is real only once a sandbox has passed it; every plan that was tested is on its finding's options step.
       </p>
     </Fold>
   );
@@ -146,15 +146,5 @@ export function CutBlock({ c, scenario, compact = false, head = true }: { c: DeV
         </div>
       )}
     </section>
-  );
-}
-
-export function WhatIfPage({ c, scenario }: { c: DeVries; scenario: string }) {
-  return (
-    <PageBody>
-      <PageHeader eyebrow="What if" title="Ask the sandbox before you change anything." meta="A grant or a delegation that is not in the config yet, tested on a copy of the graph that is deleted afterwards. Under it, the cheapest cut, from max flow, as rules a gateway could enforce." />
-      {c.flow ? <WhatIfLine c={c} scenario={scenario} /> : <Loading label="Reading the graph" />}
-      <CutBlock c={c} scenario={scenario} />
-    </PageBody>
   );
 }
