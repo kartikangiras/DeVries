@@ -1,7 +1,7 @@
 // The gate: the one loop a judge will try, driven in a real browser against the running app. On two scenarios:
 // the open findings with a plan already waiting, the finding's five steps (Summary, Rule, Path, Fix, Options:
 // the chart on Path only, the approval on Fix only), an approval with a name, the finding closing on the rescan,
-// Activity recording the decision, Posture showing the drop, the inventory, the nav, and Reset. Needs the app
+// Activity recording the decision, Posture showing the drop, the explorer's tables, the method page, the nav, and Reset. Needs the app
 // running; start it without a model key so the run costs nothing.
 //
 //   node e2e/gate.mjs [app url]                     exits 1 on any failed check; screenshots land in e2e/shots/
@@ -124,7 +124,7 @@ for (const [scenario, fix, cut] of [["acme_support", "gate one call", "set gate 
   need((await page.locator(".chart").count()) === 0 && (await page.locator(".approval").count()) === 0, `${scenario}: the rule step draws nothing and decides nothing`);
   await shot(`${scenario}-2b-rule`);
 
-  // step 3, the path: the one chart on both renderers, the hops with their rules, the source note, the queries, the way into the explorer
+  // step 3, the path: the one chart on both renderers, the hops with their rules, the queries, the way into the explorer
   await step("Path").click();
   await page.waitForSelector(".chart .fcard", { timeout: 60000 });
   r.cards = await page.locator(".chart .fcard").count();
@@ -137,9 +137,7 @@ for (const [scenario, fix, cut] of [["acme_support", "gate one call", "set gate 
   need(r.hops.every((h) => /(cut by|cannot be cut|no fix yet|blocked by)/.test(h)), `${scenario}: a hop row does not say whether it can be cut`);
   need(r.restsOn.length === 2 && r.restsOn.every((q) => /algo\./.test(q)), `${scenario}: the queries a finding rests on should name their algorithm`);
   need(/graph\/fnd/.test(await page.locator(".chart-link").getAttribute("href")), `${scenario}: the path should open in the explorer with itself lit`);
-  await page.locator(".figure .fold.source summary").click();
-  await page.waitForSelector(".figure .fold.source .chart-note");
-  need(/Source: the flow layer/.test(await first(".figure .fold.source .chart-note")), `${scenario}: the chart has no source note`);
+  need((await page.locator(".fold.source").count()) === 0, `${scenario}: the path step should not explain itself; the method page does`);
   await page.getByRole("tab", { name: "FalkorDB canvas" }).click();
   await page.waitForSelector("falkordb-canvas");
   await page.waitForTimeout(1200);
@@ -258,22 +256,31 @@ for (const [scenario, fix, cut] of [["acme_support", "gate one call", "set gate 
   need((await page.locator(".trace-row .verdict").count()) >= (withModel ? 1 : 3), `${scenario}: the trace folds the sandbox verdicts away`);
   await shot(`${scenario}-7-activity`);
 
-  // the inventory: every kind of thing, a row each, and the servers with their test
-  await place("Inventory").click();
+  // the explorer's tables: every kind of thing, a row each, and the servers with their test
+  await place("Explorer").click();
+  await page.getByRole("tab", { name: "Tables" }).click();
   await page.waitForSelector(".inventory .table tbody tr", { timeout: 60000 });
   r.inventory = await page.locator(".inventory .table tbody tr").count();
-  need(r.inventory >= 1, `${scenario}: the inventory should list the agents`);
+  need(r.inventory >= 1, `${scenario}: the tables should list the agents`);
   await page.getByRole("tab", { name: /Servers/ }).click();
   await page.waitForSelector(".servers .table tbody tr", { timeout: 60000 });
-  need((await page.locator(".servers .table tbody tr").count()) >= 1, `${scenario}: the inventory should list the servers`);
-  await shot(`${scenario}-8-inventory`);
+  need((await page.locator(".servers .table tbody tr").count()) >= 1, `${scenario}: the tables should list the servers`);
+  await shot(`${scenario}-8-tables`);
+  // the method page: the rules with their statements, and the catalogue
+  await place("Method").click();
+  await page.waitForSelector(".method-block .statement .cypher", { timeout: 60000 });
+  need((await page.locator(".method-block").count()) >= 4, `${scenario}: the method page should open on the rules`);
+  await page.getByRole("tab", { name: /^Queries/ }).click();
+  await page.waitForSelector(".catalog .cypher", { timeout: 60000 });
+  need((await page.locator(".catalog-group a").count()) > 50, `${scenario}: the method page should list the whole catalogue`);
+  await shot(`${scenario}-9-method`);
 }
 
-// the nav, in its four groups
+// the nav, in its three groups
 out.nav = await texts(".nav-row .nav-label");
 out.groups = await texts(".nav-group-label");
-need(out.nav.join() === "Posture,Open,Closed,Explorer,Inventory,Queries,Activity,Import", `the nav should hold eight places, got ${out.nav}`);
-need(out.groups.join().toLowerCase() === "posture,findings,system,record", `the nav should be in four groups, got ${out.groups}`);
+need(out.nav.join() === "Posture,Open,Closed,Explorer,Method,Activity,Import", `the nav should hold seven places, got ${out.nav}`);
+need(out.groups.join().toLowerCase() === "findings,system,record", `the nav should be in three groups, got ${out.groups}`);
 
 // Reset gives the shared scenarios back
 await page.getByRole("button", { name: "Reset" }).click();
