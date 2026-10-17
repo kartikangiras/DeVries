@@ -25,7 +25,7 @@ export function Button({ variant = "secondary", size = "md", className = "", ...
 }
 
 /** A page's outer measure and rhythm. */
-export function PageBody({ children, width = "default" }: { children: ReactNode; width?: "default" | "wide" }) {
+export function PageBody({ children, width = "default" }: { children: ReactNode; width?: "default" | "wide" | "full" }) {
   return (
     <div className="scroll">
       <div className={`page page-${width}`}>{children}</div>

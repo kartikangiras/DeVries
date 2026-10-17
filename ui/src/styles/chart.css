@@ -129,7 +129,8 @@
 .as-table .table td { padding: 10px 12px; font-size: 13px; }
 
 /* the whole graph, and the panel that reads a dot */
-.graph-split { display: grid; grid-template-columns: minmax(0, 1fr) 328px; gap: 24px; align-items: start; }
+.graph-split { display: grid; grid-template-columns: minmax(0, 1fr); gap: 24px; align-items: start; }
+.graph-split.reading { grid-template-columns: minmax(0, 1fr) 340px; }
 .read { position: sticky; top: 0; display: flex; flex-direction: column; gap: 10px; padding: 22px 22px 24px; background: var(--chart-tile); border: 1px solid var(--chart-line); border-radius: 18px; }
 .read-idle { font-size: 15px; line-height: 1.5; color: var(--chart-ash); }
 .read h2 { font-size: 20px; font-weight: 500; letter-spacing: -0.016em; line-height: 1.2; }
@@ -150,6 +151,6 @@
 .card.finding-mitigated { border-left-color: var(--accent); }
 
 @media (max-width: 1180px) {
-  .graph-split { grid-template-columns: minmax(0, 1fr); }
+  .graph-split, .graph-split.reading { grid-template-columns: minmax(0, 1fr); }
   .read { position: static; }
 }

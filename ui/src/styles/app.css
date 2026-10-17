@@ -128,6 +128,7 @@ a.id:hover { color: var(--ink-strong); text-decoration-color: var(--accent); }
 .page { margin: 0 auto; padding: 44px 36px 72px; display: flex; flex-direction: column; gap: 30px; }
 .page-default { max-width: 1040px; }
 .page-wide { max-width: 1320px; }
+.page-full { max-width: none; }
 
 .page-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; }
 .page-head h1 { margin-top: 18px; font: 600 clamp(26px, 2.4vw, 32px)/1.14 var(--sans); letter-spacing: -0.026em; color: var(--ink-strong); text-wrap: balance; }

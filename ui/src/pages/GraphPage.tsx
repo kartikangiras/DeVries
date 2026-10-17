@@ -162,10 +162,17 @@ export function ExplorerPage({ c, scenario, id }: { c: DeVries; scenario: string
   const total = graph?.nodes.length ?? 0;
   const openCount = c.findings?.findings.filter((f) => f.status === "open").length ?? 0;
   const pick = (node: string | null) => go(scenario, "graph", node);
+  // the map takes the room the window gives it: as tall as what is left under the header and the controls
+  const [chartHeight, setChartHeight] = useState(() => (typeof window === "undefined" ? 560 : Math.max(480, Math.min(960, window.innerHeight - 330))));
+  useEffect(() => {
+    const read = () => setChartHeight(Math.max(480, Math.min(960, window.innerHeight - 330)));
+    window.addEventListener("resize", read);
+    return () => window.removeEventListener("resize", read);
+  }, []);
   const idle = litFinding ? `The path of ${findingTitle(litFinding, c.names)} is lit; the rest of the system is around it.` : lens === "paths" && focus ? "The open findings' paths are lit; everything else is drawn quiet. Click a card to read about it." : "Hover a card to read it. Click it to read about it beside the chart.";
 
   return (
-    <PageBody width="wide">
+    <PageBody width="full">
       <PageHeader
         eyebrow="Explorer"
         title={graph ? `${capital(plural(graph.nodes.length, "node", "nodes"))}, ${plural(graph.links.length, flow ? "flow" : "config edge", flow ? "flows" : "config edges")}${flow && openCount ? `, ${plural(openCount, "open path", "open paths")} lit` : ""}.` : "The whole system."}
@@ -193,11 +200,11 @@ export function ExplorerPage({ c, scenario, id }: { c: DeVries; scenario: string
         <RendererSwitch value={renderer} onChange={setRenderer} layout={canvasLayout} onLayout={setCanvasLayout} />
       </div>
 
-      <div className="graph-split">
+      <div className={`graph-split${picked ? " reading" : ""}`}>
         <figure className="figure">
           {graph ? (
             <Chart renderer={renderer} layout={canvasLayout} graph={graph} names={c.names} focus={focus} only={false} communities={lens === "zones"}
-              cuts={cutting ? cutHops ?? undefined : undefined} cutsMean="on the cheapest cut" rings={rings} badges={badges} picked={picked} onPick={pick} idle={idle} />
+              cuts={cutting ? cutHops ?? undefined : undefined} cutsMean="on the cheapest cut" rings={rings} badges={badges} picked={picked} onPick={pick} idle={idle} heightRange={[360, chartHeight]} fitZoom={2.1} />
           ) : <Loading label={c.ready ? "Reading the graph" : "Connecting"} />}
           {cutting && (
             <p className="chart-note">
@@ -267,7 +274,7 @@ export function ExplorerPage({ c, scenario, id }: { c: DeVries; scenario: string
             </details>
           )}
         </figure>
-        {graph && <Read id={picked} graph={graph} c={c} scenario={scenario} />}
+        {graph && picked && <Read id={picked} graph={graph} c={c} scenario={scenario} />}
       </div>
     </PageBody>
   );

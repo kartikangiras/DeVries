@@ -41,7 +41,7 @@ export function RendererSwitch({ value, onChange, layout, onLayout }: { value: R
 /** The chart, drawn by whichever renderer is chosen; the switch is rendered by the page so it can sit with the page's other controls. */
 export function Chart({ renderer, layout = "force", ...props }: FlowProps & { renderer: Renderer; layout?: "force" | "tree" }) {
   if (renderer === "falkordb") {
-    return <GraphCanvas graph={props.graph} names={props.names} focus={props.focus} only={props.only} layout={layout} picked={props.picked} onPick={props.onPick} height={props.height ?? 460} />;
+    return <GraphCanvas graph={props.graph} names={props.names} focus={props.focus} only={props.only} layout={layout} picked={props.picked} onPick={props.onPick} height={props.height ?? props.heightRange?.[1] ?? 460} />;
   }
   return <Flow {...props} />;
 }

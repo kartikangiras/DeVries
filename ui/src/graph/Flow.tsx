@@ -40,6 +40,10 @@ export type FlowProps = {
   onPick?: (id: string | null) => void;
   idle?: string;
   height?: number;
+  /** Or a range: the box hugs the drawing between these heights, and a small graph is enlarged to fill the larger one. */
+  heightRange?: [number, number];
+  /** How far a small graph may be enlarged to fill its box; the finding's chart stops at 1.5, the explorer goes further. */
+  fitZoom?: number;
 };
 
 type CardData = {
@@ -137,8 +141,8 @@ async function place(cards: { id: string; width: number; height: number; lane: n
       "elk.algorithm": "layered",
       "elk.direction": "RIGHT",
       "elk.partitioning.activate": "true",
-      "elk.spacing.nodeNode": "20",
-      "elk.layered.spacing.nodeNodeBetweenLayers": "70",
+      "elk.spacing.nodeNode": "34",
+      "elk.layered.spacing.nodeNodeBetweenLayers": "58",
       "elk.layered.spacing.edgeNodeBetweenLayers": "30",
       "elk.layered.crossingMinimization.strategy": "LAYER_SWEEP",
       "elk.layered.nodePlacement.strategy": "BRANDES_KOEPF",
@@ -177,6 +181,7 @@ function chainsOf(hops: Hop[]): Map<string, Link> {
 
 function Inner(props: FlowProps) {
   const { graph, names, focus, only, cuts, cutsMean, rings, communities, cites, badges, picked, onPick, idle, height } = props;
+  const fitZoom = props.fitZoom ?? FIT_ZOOM;
   const [positions, setPositions] = useState<Map<string, { x: number; y: number }> | null>(null);
   const [over, setOver] = useState<string | null>(null);
   const [boxWidth, setBoxWidth] = useState(900);
@@ -268,16 +273,19 @@ function Inner(props: FlowProps) {
   // The chart fills the width it has, the way FalkorDB's canvas fills its box: a small graph is drawn larger than
   // life, up to FIT_ZOOM, a wide one is shrunk to fit. The drawing area is then exactly as tall as that needs, so a
   // path of five cards is a band of cards, not a strip across an empty box; the key and the hover line sit under it.
-  const zoom = Math.min(FIT_ZOOM, (boxWidth - 40) / Math.max(extent.w, 1));
-  const areaHeight = height ?? (positions ? Math.max(124, Math.min(640, Math.round(extent.h * zoom) + 44)) : 220);
+  const range = props.heightRange;
+  const zoom = Math.min(fitZoom, (boxWidth - 40) / Math.max(extent.w, 1), range ? (range[1] - 64) / Math.max(extent.h, 1) : Infinity);
+  const areaHeight = height ?? (range
+    ? (positions ? Math.max(range[0], Math.min(range[1], Math.round(extent.h * zoom) + 64)) : range[0])
+    : positions ? Math.max(124, Math.min(640, Math.round(extent.h * zoom) + 44)) : 220);
   useEffect(() => {
     if (!nodes.length) return;
     // the box takes its final height in the same commit the cards land in: fit once the browser has laid that out
     let frame = window.requestAnimationFrame(() => {
-      frame = window.requestAnimationFrame(() => flow.fitView({ padding: FIT_PAD, maxZoom: FIT_ZOOM, duration: 0 }));
+      frame = window.requestAnimationFrame(() => flow.fitView({ padding: FIT_PAD, maxZoom: fitZoom, duration: 0 }));
     });
     return () => window.cancelAnimationFrame(frame);
-  }, [nodes, areaHeight, flow]);
+  }, [nodes, areaHeight, flow, fitZoom]);
   const overNode = overCard ? model.cards.find((c) => c.id === overCard) : null;
   const overEdge = over && !overNode ? model.links.find((l) => String(l.id) === over) : null;
   const anyPrivate = model.cards.some((c) => markOf(c.node) === "private");
@@ -288,7 +296,7 @@ function Inner(props: FlowProps) {
       <div className="flow-area" style={{ height: areaHeight }}>
       <ReactFlow
         nodes={nodes} edges={edges} nodeTypes={NODE_TYPES} edgeTypes={EDGE_TYPES}
-        fitView fitViewOptions={{ padding: FIT_PAD, maxZoom: FIT_ZOOM }} minZoom={0.3} maxZoom={2.6}
+        fitView fitViewOptions={{ padding: FIT_PAD, maxZoom: fitZoom }} minZoom={0.3} maxZoom={3}
         nodesDraggable={false} nodesConnectable={false} elementsSelectable={false} zoomOnScroll={false} zoomOnDoubleClick={false} preventScrolling={false} panOnScroll={false}
         proOptions={{ hideAttribution: true }} colorMode="dark"
         onNodeMouseEnter={(_, n) => n.type === "card" && setOver(n.id)} onNodeMouseLeave={() => setOver(null)}
@@ -300,7 +308,7 @@ function Inner(props: FlowProps) {
         <div className="zoom" role="group" aria-label="Zoom">
           <button onClick={() => flow.zoomIn({ duration: 200 })} title="Zoom in" aria-label="Zoom in">+</button>
           <button onClick={() => flow.zoomOut({ duration: 200 })} title="Zoom out" aria-label="Zoom out">−</button>
-          <button className="fit" onClick={() => flow.fitView({ padding: FIT_PAD, maxZoom: FIT_ZOOM, duration: 200 })} title="Fit the chart to the box" aria-label="Fit">⤢</button>
+          <button className="fit" onClick={() => flow.fitView({ padding: FIT_PAD, maxZoom: fitZoom, duration: 200 })} title="Fit the chart to the box" aria-label="Fit">⤢</button>
         </div>
       </ReactFlow>
       </div>
