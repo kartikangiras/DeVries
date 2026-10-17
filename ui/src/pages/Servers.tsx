@@ -1,12 +1,12 @@
 // The MCP servers behind the tools, and the one question people ask of a scanner's report: which server
 // would I pull? Each row says what the server puts into the system and, on request, what a sandbox says
-// taking it out would close and break.
+// taking it out would close and break. The table is the Servers tab of the inventory.
 
 import { useEffect, useState } from "react";
 import { api, type Servers as ServerList, type WhatIf } from "../api";
 import { href } from "../route";
 import type { DeVries } from "../state";
-import { Empty, Eyebrow, Loading, PageBody, PageHeader } from "../ui";
+import { Empty, Loading } from "../ui";
 
 export function ServerTable({ c, scenario }: { c: DeVries; scenario: string }) {
   const [servers, setServers] = useState<ServerList | null>(null);
@@ -60,15 +60,5 @@ export function ServerTable({ c, scenario }: { c: DeVries; scenario: string }) {
         Read by <a href={href(scenario, "queries", "server.summary")}>server.summary</a>; a removal is <a href={href(scenario, "queries", "whatif.drop_server")}>whatif.drop_server</a> on a copy of the graph, which is then deleted. Nothing here changes the scenario.
       </p>
     </section>
-  );
-}
-
-export function ServersPage({ c, scenario }: { c: DeVries; scenario: string }) {
-  return (
-    <PageBody width="wide">
-      <PageHeader eyebrow="Servers" title="What each MCP server puts into the system." meta="Its tools, who holds them, the findings that run through it, and what a sandbox says removing it would do." />
-      <Eyebrow>Servers in {c.titleOf(scenario)}</Eyebrow>
-      <ServerTable c={c} scenario={scenario} />
-    </PageBody>
   );
 }
