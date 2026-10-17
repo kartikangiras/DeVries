@@ -14,8 +14,9 @@ type Shared = { names: Record<string, string>; mitigations: Record<string, Mitig
 const RUN_TONE: Record<string, Tone> = { failed: "danger", waiting: "amber", done: "accent", running: "info", "": "muted" };
 
 /** Where an id in a step leads: findings and plans have pages. */
-const linker = (scenario: string) => (id: string) =>
-  id.startsWith("fnd:") ? href(scenario, "finding", id) : id.startsWith("mit:") ? href(scenario, "fixes", id) : null;
+const linker = (scenario: string, mitigations: Record<string, Mitigation>) => (id: string) =>
+  id.startsWith("fnd:") ? href(scenario, "finding", id)
+    : id.startsWith("mit:") && mitigations[id]?.targets[0] ? href(scenario, "finding", mitigations[id].targets[0], "fix") : null;
 
 /** The sandbox verdicts of a step, one row a plan. They are never folded away. */
 export function Verdicts({ rows, names }: { rows: ReturnType<typeof verdictsOf>; names: Record<string, string> }) {
@@ -35,7 +36,7 @@ export function Verdicts({ rows, names }: { rows: ReturnType<typeof verdictsOf>;
 
 function StepRow({ step, lit, names, mitigations, scenario }: Shared & { step: Step; lit: boolean }) {
   const verdicts = verdictsOf(step, mitigations);
-  const link = linker(scenario);
+  const link = linker(scenario, mitigations);
   return (
     <li className={`trace-row by-${step.by}${step.error ? " failed" : ""}${lit ? " lit" : ""}`} id={`step-${step.n}`}>
       <span className="trace-at">{clock(step.at)}</span>
@@ -114,7 +115,7 @@ export function RunTrace({ run, ...shared }: Shared & { run: RunWithSteps }) {
         <section className="report">
           <Eyebrow>{run.kind === "ask" ? "Answer" : "Report"}</Eyebrow>
           {run.answer ? (
-            <p className="report-text"><WithNames text={run.answer} names={shared.names} cites={cited.cites} onCite={cite} link={linker(shared.scenario)} /></p>
+            <p className="report-text"><WithNames text={run.answer} names={shared.names} cites={cited.cites} onCite={cite} link={linker(shared.scenario, shared.mitigations)} /></p>
           ) : (
             <p className="report-text">{OUTCOME_SENTENCE[run.outcome!]}</p>
           )}
