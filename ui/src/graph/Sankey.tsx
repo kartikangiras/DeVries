@@ -102,7 +102,7 @@ export function OverviewSankey({ view, names, scenario }: { view: Overview; name
           {view.folded.sources.length ? `+ ${plural(view.folded.sources.length, "source", "sources")} not on an open path` : "every source is on a path"}
         </text>
         <text className="ov-fold" x={WIDTH / 2} y={built.height - 12} textAnchor="middle">
-          {`${plural(view.folded.tools.length, "tool", "tools")} between them`}{view.folded.agents.length ? ` · + ${plural(view.folded.agents.length, "agent", "agents")} off the paths` : ""}
+          {view.folded.agents.length ? `${plural(view.folded.tools.length, "tool", "tools")}, ${plural(view.folded.agents.length, "agent", "agents")} off the paths` : `${plural(view.folded.tools.length, "tool", "tools")} between them`}
         </text>
         <text className="ov-fold" x={WIDTH - 190} y={built.height - 12} textAnchor="middle">
           {view.folded.actions.length ? `+ ${plural(view.folded.actions.length, "resource", "resources")} not reached from outside` : "every resource is reached"}
