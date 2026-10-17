@@ -31,6 +31,7 @@ class Mitigation(BaseModel):
     approved_by: str | None = None
     decision_reason: str | None = None
     created_at: int | None = None
+    updated_at: int | None = None           # the last status change: the decision, when one was made
     applied_at: int | None = None
 
 
@@ -42,7 +43,7 @@ def _from_row(row: dict) -> Mitigation:
         passed=bool(row.get("passed")), reason=row.get("reason"), rationale=row.get("rationale"),
         source=row.get("source") or "search", config_hash=row.get("config_hash"),
         approved_by=row.get("approved_by"), decision_reason=row.get("decision_reason"),
-        created_at=row.get("created_at"), applied_at=row.get("applied_at"),
+        created_at=row.get("created_at"), updated_at=row.get("updated_at"), applied_at=row.get("applied_at"),
     )
 
 

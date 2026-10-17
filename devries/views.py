@@ -4,8 +4,10 @@ Everything here is built from our own ids. Names that came from a manifest are
 added by the caller, which knows whether its reader is a model or a person.
 """
 
+from collections import Counter
 from typing import Any
 
+from devries.agent.runs import Run
 from devries.analysis.models import EdgeScore, Finding, PathEvidence, finding_id
 from devries.mitigation.dsl import Broken, Diff, FindingRef, Verdict, config_patch, describe
 from devries.mitigation.store import Mitigation
@@ -70,8 +72,6 @@ TAXONOMY: dict[str, list[tuple[str, str]]] = {
 }
 
 
-def taxonomy_view(kind: str) -> list[dict[str, str]]:
-    return [{"code": code, "name": name} for code, name in TAXONOMY.get(kind, [])]
 # The whole list, so a page can say which classes DeVries looks for and which it does not.
 OWASP_TOP_10: list[tuple[str, str]] = [
     ("ASI01", "Agent goal hijack"), ("ASI02", "Tool misuse and exploitation"), ("ASI03", "Identity and privilege abuse"),
@@ -81,10 +81,10 @@ OWASP_TOP_10: list[tuple[str, str]] = [
 ]
 
 
+def taxonomy_view(kind: str) -> list[dict[str, str]]:
+    return [{"code": code, "name": name} for code, name in TAXONOMY.get(kind, [])]
 
 
-def finding_view(finding: Finding, max_paths: int | None = None) -> dict[str, Any]:
-    base: dict[str, Any] = {"id": finding.id, "kind": finding.kind, "severity": finding.severity, "status": finding.status,
 def owasp_coverage(findings: list[Finding]) -> list[dict[str, Any]]:
     """The ten classes: how many open findings fall in each, and whether any finding kind maps to it at all."""
     checked = {code for pairs in TAXONOMY.values() for code, _ in pairs}
@@ -92,6 +92,8 @@ def owasp_coverage(findings: list[Finding]) -> list[dict[str, Any]]:
     return [{"code": code, "name": name, "open": open_codes[code], "checked": code in checked} for code, name in OWASP_TOP_10]
 
 
+def finding_view(finding: Finding, max_paths: int | None = None) -> dict[str, Any]:
+    base: dict[str, Any] = {"id": finding.id, "kind": finding.kind, "severity": finding.severity, "status": finding.status,
                             "taxonomy": taxonomy_view(finding.kind)}
     if finding.kind == "drift":
         base |= {"server_id": finding.server_id, "drift": finding.drift or {}, "accepted_by": finding.accepted_by, "paths": []}
@@ -169,6 +171,57 @@ def mitigation_view(m: Mitigation) -> dict[str, Any]:
     if m.verdict is not None:
         out |= {k: v for k, v in diff_view(m.verdict.diff).items()}
     return out
+
+
+# ---------------------------------------------------------------------- the activity list
+
+RUN_OUTCOMES = {"clean": "nothing to fix", "proposed": "fix proposed", "applied": "fix applied", "rejected": "fix rejected",
+                "no_plan": "no plan passed", "undecided": "a plan waits for a decision", "answered": "answered"}
+RUN_STATES = {"running": "running", "awaiting_approval": "a plan waits for a decision", "done": "done", "failed": "failed"}
+SOURCE_WORDS = {"search": "the scripted search", "scripted": "the scripted search", "agent": "the auditor", "cut": "the cheapest cut"}
+
+
+def _item(at: int, kind: str, sentence: str, who: str | None, status: str, refs: dict[str, Any], **more: Any) -> dict[str, Any]:
+    return {"at": at, "kind": kind, "sentence": sentence, "who": who, "status": status, "refs": refs} | more
+
+
+def activity_of_scan(row: dict[str, Any]) -> dict[str, Any]:
+    n = row.get("open") or 0
+    return _item(row["at"], "scan", f"Scan found {n} open finding{'' if n == 1 else 's'} in {row['duration_ms']} ms", None, "open",
+                 {"scan_id": row["scan_id"], "finding_ids": []})
+
+
+def activity_of_run(run: Run) -> dict[str, Any]:
+    who = run.model if run.mode == "agent" else "scripted"
+    if run.kind == "ask":
+        sentence = f"A question: {(run.question or '')[:80]}"
+    else:
+        sentence = f"Audit run, {who}: {RUN_OUTCOMES.get(run.outcome or '', run.outcome or RUN_STATES[run.status])}"
+    return _item(run.started_at, "run", sentence, who, run.status, {"run_id": run.id, "mitigation_id": run.mitigation_id})
+
+
+def plan_summary(m: Mitigation) -> str:
+    """The plan in one clause, as the pages print it: each fix described, joined with 'and'."""
+    return ", and ".join(describe(f) for f in m.plan.fixes)
+
+
+def activity_of_mitigation(m: Mitigation, written: list[tuple[dict[str, Any], str | None]]) -> list[dict[str, Any]]:
+    """What happened to one plan: tested (or proposed, when it passed), decided, applied, and written to its file."""
+    summary = plan_summary(m)
+    refs = {"mitigation_id": m.id, "finding_ids": [finding_id(fp) for fp in m.targets]}
+    items = [_item(m.created_at or 0, "proposal" if m.passed else "tested",
+                   f"{summary[0].upper()}{summary[1:]}: {'passed' if m.passed else 'failed in a sandbox'}, cost {m.cost}",
+                   SOURCE_WORDS.get(m.source, m.source), "proposed" if m.passed else "failed", refs)]
+    if m.approved_by:
+        rejected = m.status == "rejected"
+        items.append(_item(m.updated_at or m.created_at or 0, "decision", f"{'Rejected' if rejected else 'Approved'}: {summary}",
+                           m.approved_by, "rejected" if rejected else "approved", refs, reason=m.decision_reason))
+    if m.applied_at:
+        items.append(_item(m.applied_at, "applied", f"Applied: {summary}", None, "applied", refs))
+    for draft, path in written:
+        items.append(_item(draft["written_at"], "written", f"Written to {path}, backup kept", draft.get("written_by"), "written",
+                           {"mitigation_id": m.id, "draft_id": draft["id"], "path": path}))
+    return items
 
 
 # ---------------------------------------------------------------------- a finding as a document, and as a picture

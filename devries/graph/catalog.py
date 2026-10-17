@@ -818,7 +818,8 @@ MATCH (m:Mitigation {id: $id})
 RETURN m.id AS id, m.status AS status, m.fix_json AS fix_json, m.cost AS cost, m.config_hash AS config_hash,
        m.target_fingerprints AS target_fingerprints, m.verdict_json AS verdict_json, m.passed AS passed,
        m.reason AS reason, m.rationale AS rationale, m.source AS source, m.approved_by AS approved_by,
-       m.decision_reason AS decision_reason, m.created_at AS created_at, m.applied_at AS applied_at
+       m.decision_reason AS decision_reason, m.created_at AS created_at, m.applied_at AS applied_at,
+       m.updated_at AS updated_at
 """,
     ),
     NamedQuery(
@@ -829,7 +830,8 @@ MATCH (m:Mitigation)
 RETURN m.id AS id, m.status AS status, m.fix_json AS fix_json, m.cost AS cost, m.config_hash AS config_hash,
        m.target_fingerprints AS target_fingerprints, m.verdict_json AS verdict_json, m.passed AS passed,
        m.reason AS reason, m.rationale AS rationale, m.source AS source, m.approved_by AS approved_by,
-       m.decision_reason AS decision_reason, m.created_at AS created_at, m.applied_at AS applied_at
+       m.decision_reason AS decision_reason, m.created_at AS created_at, m.applied_at AS applied_at,
+       m.updated_at AS updated_at
 ORDER BY m.created_at DESC, m.id
 """,
     ),
