@@ -10,9 +10,8 @@ import { Icon, Mark, type IconName } from "./ui";
 
 type Row = { page: Page; label: string; icon: IconName };
 const GROUPS: { label: string; rows: Row[] }[] = [
-  { label: "Posture", rows: [{ page: "posture", label: "Posture", icon: "posture" }] },
-  { label: "Findings", rows: [{ page: "inbox", label: "Open", icon: "inbox" }, { page: "done", label: "Closed", icon: "done" }] },
-  { label: "System", rows: [{ page: "graph", label: "Explorer", icon: "graph" }, { page: "inventory", label: "Inventory", icon: "inventory" }, { page: "queries", label: "Queries", icon: "queries" }] },
+  { label: "Findings", rows: [{ page: "posture", label: "Posture", icon: "posture" }, { page: "inbox", label: "Open", icon: "inbox" }, { page: "done", label: "Closed", icon: "done" }] },
+  { label: "System", rows: [{ page: "graph", label: "Explorer", icon: "graph" }, { page: "method", label: "Method", icon: "method" }] },
   { label: "Record", rows: [{ page: "audit", label: "Activity", icon: "audit" }, { page: "import", label: "Import", icon: "import" }] },
 ];
 
@@ -21,7 +20,8 @@ export function placeOf(route: Route, closed: boolean): Page {
   if (route.page === "finding") return closed ? "done" : "inbox";
   if (route.page === "fixes") return "audit";          // older addresses, kept so links survive
   if (route.page === "whatif") return "graph";
-  if (route.page === "servers") return "inventory";
+  if (route.page === "servers" || route.page === "inventory") return "graph";
+  if (route.page === "queries") return "method";
   return route.page;
 }
 
@@ -92,7 +92,7 @@ function Session({ c }: { c: DeVries }) {
   );
 }
 
-export function Shell({ c, route, closed = false, queriesOpen = false, children }: { c: DeVries; route: Route; closed?: boolean; queriesOpen?: boolean; children: ReactNode }) {
+export function Shell({ c, route, closed = false, children }: { c: DeVries; route: Route; closed?: boolean; children: ReactNode }) {
   const open = c.findings?.findings.filter((f) => f.status === "open") ?? [];
   const awaiting = open.some((f) => deskOf(f, c.plans, c.run, c.openIds).proposal);
   const counts: Partial<Record<Page, number | undefined>> = {
@@ -100,7 +100,7 @@ export function Shell({ c, route, closed = false, queriesOpen = false, children 
     done: c.findings ? c.findings.past.length : undefined,
     audit: c.runList.length || undefined,
   };
-  const at = queriesOpen ? "queries" : placeOf(route, closed);
+  const at = placeOf(route, closed);
   const runTone = c.run?.status === "running" ? "info" : c.run?.status === "awaiting_approval" ? "amber" : null;
 
   return (

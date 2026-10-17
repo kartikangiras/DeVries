@@ -5,16 +5,17 @@
 //   #/acme_support/done                 the closed ones
 //   #/acme_support/finding/fnd:…[/step] one finding: summary, rule, path, fix, options; the step is the fourth part
 //   #/acme_support/graph[/id]           the explorer: the whole system on either renderer, a node or a finding's path lit
-//   #/acme_support/inventory[/kind]     every agent, tool, source, resource and server, with what it reaches
+//   #/acme_support/graph/tables[/kind]  the same system as tables: agents, tools, sources, resources, servers
+//   #/acme_support/method[/section]     how DeVries decides: the rules, the flow layer, the fixes, the analytics
+//   #/acme_support/method/queries[/name] every Cypher statement, by name
 //   #/acme_support/audit[/run:…]        activity: scans, runs, proposals, decisions and writes, in order
-//   #/acme_support/queries[/name]       the Cypher behind all of it, as a drawer over the page
 //   #/acme_support/import               paste a config or a tools/list and audit your own
 //
-// Older addresses keep working: fixes/mit:… lands on the plan's finding, whatif on the explorer, servers on the
-// inventory's servers tab. The nav groups the places: Posture · Findings (Open, Closed) · System (Explorer,
-// Inventory, Queries) · Record (Activity, Import).
+// Older addresses keep working: fixes/mit:… lands on the plan's finding, whatif on the explorer, inventory and
+// servers on the explorer's tables, queries on the method page. The nav is three groups: Findings (Posture, Open,
+// Closed) · System (Explorer, Method) · Record (Activity, Import).
 
-export const PAGES = ["posture", "inbox", "done", "finding", "fixes", "whatif", "graph", "inventory", "servers", "audit", "queries", "import"] as const;
+export const PAGES = ["posture", "inbox", "done", "finding", "fixes", "whatif", "graph", "inventory", "servers", "audit", "queries", "method", "import"] as const;
 export type Page = (typeof PAGES)[number];
 export type Route = { scenario: string | null; page: Page; id: string | null; sub: string | null };
 

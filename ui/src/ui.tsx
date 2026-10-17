@@ -143,6 +143,7 @@ const ICONS = {
   import: <><path d="M12 4v10" /><path d="m8 10.5 4 4 4-4" /><path d="M4 15.5V18a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-2.5" /></>,
   posture: <><path d="M4 17.5a8 8 0 0 1 16 0" /><path d="M12 17.5 15.5 11" /><circle cx="12" cy="17.5" r="1.2" /></>,
   inventory: <><path d="M4.5 6.5h15M4.5 12h15M4.5 17.5h15" /><circle cx="4.5" cy="6.5" r="0.7" /><circle cx="4.5" cy="12" r="0.7" /><circle cx="4.5" cy="17.5" r="0.7" /></>,
+  method: <><path d="M4 5.5h6a2 2 0 0 1 2 2v12a2 2 0 0 0-2-2H4z" /><path d="M20 5.5h-6a2 2 0 0 0-2 2v12a2 2 0 0 1 2-2h6z" /></>,
 } as const;
 export type IconName = keyof typeof ICONS;
 
