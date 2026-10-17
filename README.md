@@ -107,7 +107,7 @@ To let a model drive the auditor, put `ANTHROPIC_API_KEY` in `.env`. `.env.examp
 
 ## A tour in five minutes
 
-The sidebar is in four groups: **Posture**; **Findings** (Open, Closed); **System** (Explorer, Inventory, Queries); **Record** (Activity, Import). The switch at its top changes scenario. Each place answers one question no other place answers, and the same thing is never drawn two ways: a finding's path is a chart once, on its Path step; a plan is a verdict row; an agent is a Rule of Two row; a run is a line on Activity; the system is figures on Posture and a map in the Explorer. A finding is worked through in five steps, each about one thing: **Summary**, **Rule**, **Path**, **Fix** (the approval lives only here) and **Options**. Every chart has two renderers: DeVries's own, laid out by ELK and drawn with React Flow, and FalkorDB's canvas component on the same nodes; the switch over each chart remembers your choice. Anything you change is changed in your own copy of the scenario; the arrow at the foot of the sidebar gives you the original back.
+The sidebar is in three groups: **Findings** (Posture, Open, Closed); **System** (Explorer, Method); **Record** (Activity, Import). The pages show results and nothing else; how every one of them is read is written once, on Method. The switch at its top changes scenario. Each place answers one question no other place answers, and the same thing is never drawn two ways: a finding's path is a chart once, on its Path step; a plan is a verdict row; an agent is a Rule of Two row; a run is a line on Activity; the system is figures on Posture and a map in the Explorer. A finding is worked through in five steps, each about one thing: **Summary**, **Rule**, **Path**, **Fix** (the approval lives only here) and **Options**. Every chart has two renderers: DeVries's own, laid out by ELK and drawn with React Flow, and FalkorDB's canvas component on the same nodes; the switch over each chart remembers your choice. Anything you change is changed in your own copy of the scenario; the arrow at the foot of the sidebar gives you the original back.
 
 1. **Acme support desk → Posture.** The home of a scenario: "One untrusted source reaches one high-impact resource through one agent, in 4 hops." Five figures (open findings; high-impact actions reached; agents holding all three of Meta's properties, and how many of them run unattended; the cheapest cut's cost); the open paths as a live flow between cards, with tokens running the paths for as long as they are open; the blast radius of each untrusted source and the exposure of each high-impact action, as bars; the choke points ranked by the open routes through them, with the cheapest cut by `algo.maxFlow` in one line and a button that proposes it as one plan for the sandbox to verify; the scans over time. Folded under one line each: the Rule of Two agent by agent, the ten OWASP classes with the four DeVries checks, and the source and method naming every FalkorDB query.
 2. **Open.** One finding: customer tickets can reach the payments API. The audit the app ran at start has already tested fixes for it in sandbox graphs: both revokes fail (the refund workflow needs those tools), stopping the tool reading tickets fails for the same reason, the gate passes and so does a split. The row reads "Awaiting approval". Open it.
@@ -122,9 +122,9 @@ The sidebar is in four groups: **Posture**; **Findings** (Open, Closed); **Syste
 11. **Acme executive office.** Here the gate fails, because the daily digest runs unattended and nobody is there to approve; the audit proposes quarantining the inbox reader instead, and that closes two findings at once. Its Posture tallies two agents holding all three, one of them unattended.
 12. **Acme dev team.** Seven findings, closed by two fixes in two rounds, each approved from its finding. One finding is the eleven-hop path: an issue is read by the triage agent, handed to the planner and the coder, pushed to the main branch, read back from the repository by the release bot, and deployed. Its Posture ranks the coder as the first choke point, with ten open routes through it.
 13. **Explorer.** The whole system as cards in lanes, on DeVries's chart or on FalkorDB's canvas (force or tree), the only place it is drawn. Lenses: the open paths lit over everything, Communities by `algo.labelPropagation`, the Cheapest cut marked on its hop, the Most central agents and tools by `algo.betweenness`; the Flow or the Config layer; the edges as a table. Click a card to read what reaches it, what it reaches and the findings through it, and, for an agent, to test one more grant in a sandbox: on the dev team, "Release bot could call request" opens one new finding.
-14. **Inventory.** Every agent, tool, source, resource and server, one table a kind, with what reaches each, what it reaches, its Rule of Two letters, its PageRank and the open findings through it. The Servers tab keeps "test removing it": on the dev team, removing the HTTP server closes five findings and breaks nothing. A row opens the thing in the Explorer.
+14. **Explorer → Tables.** The same system as tables, one a kind: every agent, tool, source, resource and server, with what reaches each, what it reaches, its Rule of Two letters, its PageRank and the open findings through it. The Servers tab keeps "test removing it": on the dev team, removing the HTTP server closes five findings and breaks nothing. A row opens the thing on the map.
 15. **DeVries itself.** DeVries's own MCP tools, loaded as a scenario. Nothing is open, and only because `apply_fix` needs a person: take that gate away and two injection paths open.
-16. **Queries.** Every figure and every chart note links to the query behind it, and the nav row opens the whole catalogue; either opens a drawer with the Cypher over the page you are on (`#/<scenario>/queries/<name>`), says where on screen the answer shows, and Escape closes it. Nothing in the app runs a query that is not in that list.
+16. **Method.** How DeVries decides, in five sections: the two rules and the two standing checks, each with the statement that decides it; the seven rules of the flow layer, gates and the two sides of a tool; the five fixes with their costs, the sandbox verdict and the approval; what every figure on Posture and every lens in the Explorer is, with the query behind it, and the OWASP table; and the whole catalogue, every statement by name (`#/<scenario>/method/queries/<name>`) with where on screen its answer shows. Nothing in the app runs a query that is not in that list, and nothing on the other pages explains itself.
 17. **Import.** The switch's last entry, or "Paste your config" on the landing page: paste a client config or a saved `tools/list`, say what is untrusted and what matters, and the audit runs by itself to its first proposal. See [Import your own install](#import-your-own-install).
 
 ## The graph data model
@@ -439,58 +439,10 @@ Two more kinds of finding come with it. **Manifest drift**: every tool definitio
 
 A scenario is a YAML file in `scenarios/` that points at manifests in `manifests/`. Each file carries an `expect` block with the findings it should produce and the kind of fix that should win; `make seed` fails if a scan disagrees with it.
 
-## Tests
-
-`make test` runs 304 tests against the running FalkorDB, in about two minutes:
-
-| Kind | Count | What it checks |
-| --- | ---: | --- |
-| Probes | 9 | The FalkorDB behaviours the design depends on: what `algo.bfs` and `algo.SPpaths` return, that every algorithm runs read-only, that a rebuild is atomic for concurrent readers, that `GRAPH.COPY` is consistent and carries indexes, that a slow read is cut off |
-| Unit | 154 | One test per taint rule, the invariants of the flow layer, each fix query, sandbox verdicts, the search, approval and apply, the catalog, the import of a config and its permission rules, the change compiler for each target, and a write to a file that closes the finding on the reload |
-| Golden | 33 | Each scenario: its findings, which fix wins, which are rejected and why |
-| MCP contract | 28 | Tool list and schemas, answers, structured errors, size limits, both transports, and a launch with no shell behind it |
-| Agent | 41 | The loop with a scripted stand-in for the model: phases, grounding, budgets, fallback, stopping at a proposal, the evaluation harness |
-| API | 39 | Routes, sessions and isolation, the event stream, what-if, previews, the cheapest cut and its policy, the overview, the posture, the scan history, the activity, the inventory, the cut as a plan, the brief and the figure, drafts and the write from the browser, pasted imports, the public mode, the audits the app runs at start |
-
-`make e2e` drives the running app in headless Chrome: the posture with its figures, bars and history, the plans the start-up audit proposed, the finding's five steps (the chart on Path only, the approval on Fix only), the review panel's diff, an approval and the finding closing on two scenarios, the posture's history dropping and Activity recording the decision; a rejection followed by approving the split; both fixes of `acme_dev` from their findings; the explorer on both renderers with its lenses, the cut proposed as a plan, the inventory and its servers, a what-if from the explorer's reader, the queries drawer, the import page, deep links and older addresses, and three screen widths. It fails on any console error, any 4xx or 5xx, and any request to another origin. Run it against an app started without a model key, so a run costs nothing:
-
 ```bash
 ANTHROPIC_API_KEY= uv run uvicorn devries.app:app --port 8010    # in one terminal
 make e2e APP_URL=http://127.0.0.1:8010                          # in another
 ```
-
-## Deployment
-
-**Nothing is deployed.** The owner decided not to host it for the event. What a public address needs in the app is built and tested: `DEVRIES_PUBLIC=true` (see [Run it](#run-it)), the retry for the database at start, the memory ceiling for visitor copies, and the per-address rationing.
-
-What exists: the `Dockerfile` builds the UI and the app into one image that runs as a non-root user with a health check, and `docker-compose.yml` runs it beside FalkorDB, with the database published on the local machine only. [deploy/](deploy/README.md) adds what a public address needs: a compose overlay that puts Caddy in front for HTTPS, turns on secure cookies, and refuses to start without a token for `/mcp`; and a script that checks `/api/health` from outside. The overlay was brought up on a laptop and the whole loop was driven through the proxy in a browser. It has not been run on a server.
-
-On a public address, each visitor works in their own copy of a scenario (at most 30 sessions, each kept for an hour), `/mcp` requires a bearer token, and a visitor gets three audit runs and ten questions with a model before runs become scripted.
-
-## What is not built
-
-- **A live deployment.** See above.
-- **A change-data-capture pipeline** (Postgres → Debezium → Kafka → FalkorDB's Kafka sink) was designed and then dropped; none of it was built. It showed plumbing rather than an agent deciding from a graph, and the what-if line already catches a risky grant before it ships. The design document records what was found in the sink's source.
-- **A try in Claude Desktop itself**, and a demo video.
-- **Watching an origin for drift** on a timer. Drift is found on each reload; nothing re-reads a config by itself.
-
-The design document (PLAN.md) and the pivot plans are working notes kept out of the repository; this README is the one document that ships. [docs/QUERIES.md](docs/QUERIES.md) is generated from the catalog and ships with it.
-
-## What was written before the event
-
-The event runs from 15 to 18 October 2026, and its rules ask that the main coding and design work begin after it starts. **That is not what happened here, and this section says so rather than leaving it to be inferred.**
-
-Everything in this repository was written before the event opened, and all of the code on 13 October 2026, two days before: the Python package, the UI (rebuilt twice that day; this is its third form), the first four scenarios, the tests and this README. Five scenarios were added on 16 October, during the event: sales, finance, people, operations and data. They are data files in the shape the other four already had, with their synthetic manifests, and no code changed for them beyond the scenario count in one API test, one browser check and the landing page's footer. The design document and the first probes of FalkorDB are a little older. Nothing was committed during that time; the folder held no git repository.
-
-The rules allow ideas, notes, graph model sketches and diagrams to be prepared beforehand. Of what was written then, only the design document is that kind of preparation. The code is not.
-
-## How AI tools were used
-
-Almost all of this repository was written by an AI coding assistant: [Claude Code](https://claude.com/claude-code), Anthropic's command-line tool, running Claude Opus models in the author's terminal. That covers the design document, the Python and TypeScript, the tests, the scenario files and this README.
-
-The author chose the problem and the track, set the constraints, directed the work turn by turn, and made the decisions recorded in the design document: among them the product's name, withdrawing the first UI redesign and rebuilding it on one reference, and when to build. The assistant wrote the code, ran the tests and the browser checks, and reported what passed and what did not.
-
-At run time the only model involved is the auditor's own use of Claude, described above, and it is optional.
 
 ## Layout
 
