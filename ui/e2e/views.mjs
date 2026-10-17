@@ -1,6 +1,6 @@
 // The screens beyond the gate: the posture's picture and its cut as rules, the explorer on both renderers
-// (hover line, click to read, the layers, the lenses, the edges as a table), the inventory's servers and
-// their test, the queries drawer, the scenario switch, a deep link, a plan that is rejected and the split
+// (hover line, click to read, the layers, the lenses, the edges as a table), its tables with the servers and
+// their test, the method page and its queries, the scenario switch, a deep link, a plan that is rejected and the split
 // that is approved in its place, DeVries's audit of itself, the two fixes of acme_dev approved from their
 // findings, a what-if asked in the explorer's reader, the ask box, the import page, and narrower screens.
 // Needs the app running.
@@ -115,8 +115,7 @@ const stepTo = (page, name) => page.locator(".workflow-step", { has: page.locato
   // the config layer and its edges as a table
   await tab(page, "Config").click();
   await page.waitForSelector(".chart .fcard", { timeout: 60000 });
-  await page.locator(".figure .fold.source summary").click();                   // the source note is folded under the chart
-  await page.waitForFunction(() => /Config edges are what a person set up/.test(document.querySelector(".figure .fold.source .chart-note")?.textContent ?? ""));
+  need((await page.locator(".fold.source").count()) === 0 && /What a person set up/.test(await text(page, ".page-head")), "the config layer should say what it is in one line and not explain itself");
   await page.locator("details.as-table summary").click();
   out.configTable = { rows: await page.locator("details.as-table tbody tr").count() };
   need(out.configTable.rows === 11, "the config edges as a table should have 11 rows, got " + out.configTable.rows);
@@ -135,7 +134,7 @@ const stepTo = (page, name) => page.locator(".workflow-step", { has: page.locato
   await page.waitForSelector(".central-note li");
   out.central = await page.locator(".chart .fcard.central").evaluateAll((cards) => cards.map((d) => d.getAttribute("data-id")));
   need(out.central.includes("agent:support-bot") && out.central.length <= 5, "the support bot should be among the most central nodes: " + out.central);
-  need(/algo\.betweenness/.test(await text(page, ".central-note")), "the note should name the algorithm");
+  need((await page.locator(".central-note li").count()) === out.central.length && !/algo\./.test(await text(page, ".central-note")), "the note should list the central nodes and leave the method to the Method page");
   await shot(page, "views-explorer-central");
   await tab(page, /Communities/).click();
   need(/one zone, and a blast zone/.test(await text(page, ".figure .chart-note")), "a one-zone graph should say so in words");
@@ -158,11 +157,12 @@ const stepTo = (page, name) => page.locator(".workflow-step", { has: page.locato
   await page.waitForSelector(".chart .wire.traced", { state: "attached", timeout: 60000 });   // the arcs are drawn a frame after the cards
   need((await page.locator(".chart .wire.traced").count()) >= 3, "the lit finding's hops should be traced on the chart");
 
-  // the inventory: every kind of thing, and the servers with what a sandbox says removing one would do
-  await page.goto(`${base}/#/acme_dev/inventory`);
+  // the explorer's tables: every kind of thing, and the servers with what a sandbox says removing one would do
+  await page.goto(`${base}/#/acme_dev/graph/tables`);
   await page.waitForSelector(".inventory .table tbody tr", { timeout: 60000 });
-  out.inventoryTitle = await text(page, ".page-head h1");
-  need(/Four agents/.test(out.inventoryTitle), "the inventory should count the dev team's agents: " + out.inventoryTitle);
+  out.inventoryTabs = await page.locator(".tabs [role=tab]").allInnerTexts();
+  need(/^Agents\s*4$/.test(out.inventoryTabs[0] ?? ""), "the agents tab should count the dev team's four agents: " + out.inventoryTabs);
+  need((await tab(page, /Tables/).getAttribute("class")).includes("on") && (await place(page, "Explorer").getAttribute("class")).includes("on"), "the tables should be a view of the Explorer");
   out.agentRow = await text(page, ".inventory .table tbody tr");
   need(/A · B · C/.test(out.agentRow) && /all three/.test(out.agentRow), "the first agent row should carry its three letters: " + out.agentRow);
   for (const kind of ["Tools", "Sources", "Resources"]) {
@@ -184,9 +184,21 @@ const stepTo = (page, name) => page.locator(".workflow-step", { has: page.locato
   await page.waitForSelector(".read.picked");
   need(/graph\/tool%3A/.test(await page.evaluate(() => location.hash)), "an inventory row should open the thing in the explorer: " + await page.evaluate(() => location.hash));
 
-  // the queries, in a drawer over the page: all of them, the Cypher of one, where it is used, the find box, and Escape to close it
-  await page.goto(`${base}/#/acme_exec/queries/zones.wcc`);
-  await page.waitForSelector(".drawer .cypher");
+  // the method page: the rules with their statements, then every query: the Cypher of one, where it is used, the find box
+  await page.goto(`${base}/#/acme_exec/method`);
+  await page.waitForSelector(".method-block .statement .cypher", { timeout: 60000 });
+  out.methodBlocks = await page.locator(".method-block").count();
+  need(out.methodBlocks >= 4, `the method page should open on the rules, got ${out.methodBlocks} blocks`);
+  for (const [section, ready, rows] of [["Flow layer", ".method-table", 7], ["Fixes and verdicts", ".method-table", 5], ["Analytics", ".method-list", 10]]) {
+    await tab(page, new RegExp(`^${section}`)).click();
+    await page.waitForSelector(ready);
+    await page.waitForFunction((n) => document.querySelectorAll(".method-table tbody tr").length === n, rows, { timeout: 10000 }).catch(() => {});
+    need((await page.locator(".method-block").count()) >= 2, `the ${section} section should hold its blocks`);
+    need((await page.locator(".method-table tbody tr").count()) === rows, `the ${section} section's table should have ${rows} rows`);
+  }
+  await shot(page, "views-method");
+  await page.goto(`${base}/#/acme_exec/method/queries/zones.wcc`);
+  await page.waitForSelector(".catalog .cypher");
   out.queries = await page.locator(".catalog-group a").count();
   out.cypher = (await text(page, ".cypher")).slice(0, 60);
   const published = (await (await page.request.get(`${base}/api/queries`)).json()).queries.length;
@@ -199,12 +211,11 @@ const stepTo = (page, name) => page.locator(".workflow-step", { has: page.locato
   await page.locator(".catalog-group a", { hasText: "fix.gate_call" }).click();
   await page.waitForFunction(() => document.querySelector(".query-head h1")?.textContent === "fix.gate_call");
   need(/Guarded/.test(await text(page, ".catalog .rail")), "a fix query should say it is guarded");
-  need((await place(page, "Queries").getAttribute("class")).includes("on"), "the Queries row should light while the drawer is open");
+  need((await place(page, "Method").getAttribute("class")).includes("on"), "the Method row should light on the queries");
+  need(/method\/queries\/fix\.gate_call$/.test(await page.evaluate(() => location.hash)), "a query should have its own address: " + await page.evaluate(() => location.hash));
   await shot(page, "views-queries");
-  await page.keyboard.press("Escape");
-  await page.waitForSelector(".figures dd", { timeout: 60000 });                 // a deep link's drawer lies over the posture
-  await page.waitForSelector(".drawer", { state: "detached" });
-  need((await page.locator(".drawer").count()) === 0 && /#\/acme_exec$/.test(await page.evaluate(() => location.hash)), "Escape should close the drawer onto the page under it: " + await page.evaluate(() => location.hash));
+  await page.goto(`${base}/#/acme_exec/queries/zones.wcc`);                      // the old address lands on the method page
+  await page.waitForFunction(() => location.hash === "#/acme_exec/method/queries/zones.wcc", null, { timeout: 60000 });
 
   // the scenario switch with its way to an import, and a deep link straight to a finding's step
   await page.locator(".switch-button").click();
@@ -228,7 +239,9 @@ const stepTo = (page, name) => page.locator(".workflow-step", { has: page.locato
   await page.goto(`${base}/#/acme_support/whatif`);
   await page.waitForFunction(() => location.hash === "#/acme_support/graph", null, { timeout: 60000 });
   await page.goto(`${base}/#/acme_support/servers`);
-  await page.waitForFunction(() => location.hash === "#/acme_support/inventory/servers", null, { timeout: 60000 });
+  await page.waitForFunction(() => location.hash === "#/acme_support/graph/tables/servers", null, { timeout: 60000 });
+  await page.goto(`${base}/#/acme_support/inventory/tools`);
+  await page.waitForFunction(() => location.hash === "#/acme_support/graph/tables/tools", null, { timeout: 60000 });
 
   // a plan a person rejects: nothing changes, the finding is open again and the options remember
   await page.goto(`${base}/#/acme_support/inbox`);
@@ -365,9 +378,12 @@ const stepTo = (page, name) => page.locator(".workflow-step", { has: page.locato
       };
       problems.push("the question's run did not open by itself: " + JSON.stringify(out.askDebug));
       await page.locator(".activity-row.kind-run .link-plain").first().click();
-      await answered();
+      await answered().catch(async () => {
+        out.askDebugAfterClick = { rows: (await page.locator(".activity-row").allInnerTexts()).slice(0, 3).map((t) => t.replace(/\s+/g, " ").slice(0, 160)), reports: await page.locator(".activity-trace .report").allInnerTexts() };
+        problems.push("the question's run did not answer after opening it by hand: " + JSON.stringify(out.askDebugAfterClick));
+      });
     });
-    out.askAnswer = await text(page, ".report .report-text");
+    out.askAnswer = (await page.locator(".report .report-text").count()) ? await text(page, ".report .report-text") : "";
     need(/thing\(s\) can reach /.test(out.askAnswer) && /Worked out by reach\.into \(algo\.bfs\), not by a model/.test(out.askAnswer),
       "a canned question should be answered from the graph, citing the query: " + out.askAnswer);
     need((await page.locator(".trace-row", { hasText: "reach.into" }).count()) === 1, "the trace should show the query the answer came from");
@@ -390,10 +406,10 @@ const stepTo = (page, name) => page.locator(".workflow-step", { has: page.locato
   await context.close();
 }
 
-// the drawer stays beside the sidebar between the widths where it used to slide under it
+// the catalogue stays beside the sidebar at the width where the old drawer used to slide under it
 {
   const { context, page } = await open(1180, 800);
-  await page.goto(`${base}/#/acme_exec/queries`);
+  await page.goto(`${base}/#/acme_exec/method/queries`);
   await page.waitForSelector(".cypher");
   const list = await page.locator(".catalog-list").boundingBox();
   const side = await page.locator(".side").boundingBox();
@@ -405,7 +421,7 @@ const stepTo = (page, name) => page.locator(".workflow-step", { has: page.locato
 // narrower screens: the rail drops under the brief, then the sidebar becomes a strip; nothing scrolls sideways
 for (const width of [1100, 420]) {
   const { context, page } = await open(width);
-  for (const [name, hash, ready] of [["posture", "#/acme_exec", ".figures dd"], ["inbox", "#/acme_exec/inbox", ".case"], ["finding", "#/acme_exec/finding/fnd%3A97fb560344", ".path-words"], ["path", "#/acme_exec/finding/fnd%3A97fb560344/path", ".chart .fcard"], ["explorer", "#/acme_exec/graph", ".chart .fcard"], ["inventory", "#/acme_exec/inventory", ".inventory"], ["activity", "#/acme_exec/audit", ".activity-row"], ["queries", "#/acme_exec/queries", ".cypher"], ["import", "#/acme_exec/import", ".import textarea"]]) {
+  for (const [name, hash, ready] of [["posture", "#/acme_exec", ".figures dd"], ["inbox", "#/acme_exec/inbox", ".case"], ["finding", "#/acme_exec/finding/fnd%3A97fb560344", ".path-words"], ["path", "#/acme_exec/finding/fnd%3A97fb560344/path", ".chart .fcard"], ["explorer", "#/acme_exec/graph", ".chart .fcard"], ["tables", "#/acme_exec/graph/tables", ".inventory"], ["activity", "#/acme_exec/audit", ".activity-row"], ["method", "#/acme_exec/method", ".method-block"], ["queries", "#/acme_exec/method/queries", ".cypher"], ["import", "#/acme_exec/import", ".import textarea"]]) {
     await page.goto(`${base}/${hash}`);
     await page.waitForSelector(ready, { timeout: 60000 });
     const o = await page.evaluate(() => ({ scrollW: document.documentElement.scrollWidth, clientW: document.documentElement.clientWidth }));
