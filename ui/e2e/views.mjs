@@ -38,21 +38,20 @@ const stepTo = (page, name) => page.locator(".workflow-step", { has: page.locato
 {
   const { context, page } = await open(1440);
 
-  // the posture: the one sentence, the open paths as sankey ribbons between the three columns, the figures, the cut as rules
+  // the posture: the one sentence, the open paths as a live flow between cards, the figures, the cut as rules
   await page.goto(`${base}/#/acme_support`);
-  await page.waitForSelector(".sankey svg .ov-ribbon", { state: "attached", timeout: 240000 });
+  await page.waitForSelector(".riskflow .river", { state: "attached", timeout: 240000 });
   out.postureTitle = await text(page, ".page-head h1");
-  out.ribbons = await page.locator(".sankey .ov-ribbon").count();
+  out.ribbons = await page.locator(".riskflow .river").count();
   out.figures = await page.locator(".figures div").allInnerTexts().then((all) => all.map((t) => t.replace(/\s+/g, " ").trim()));
   need(/^One untrusted source reaches one high-impact resource through one agent, in 4 hops\./.test(out.postureTitle), "the posture should open on its sentence: " + out.postureTitle);
-  need(out.ribbons === 2, `the support posture should draw one finding as two ribbon segments, got ${out.ribbons}`);
+  need(out.ribbons === 2, `the support posture should draw one finding as two hops, got ${out.ribbons}`);
+  out.cards = await page.locator(".riskflow .rcard").allInnerTexts().then((all) => all.map((t) => t.replace(/\s+/g, " ").trim()));
+  need(out.cards.length === 3 && out.cards.some((c) => /UNTRUSTED SOURCE Customer tickets/.test(c)) && out.cards.some((c) => /HIGH-IMPACT ACTION Payments API/.test(c)), "the flow should draw the source, the agent and the action as cards: " + out.cards);
   need(out.figures.some((c) => /^1 open finding$/i.test(c)) && out.figures.some((c) => /^1 cheapest cut, cost$/i.test(c)), "the figures should give the open findings and the cheapest cut: " + out.figures);
-  {
-    const hit = await page.locator(".sankey .ov-ribbon .hit").first().boundingBox();
-    await page.mouse.move(hit.x + hit.width * 0.3, hit.y + hit.height / 2, { steps: 3 });
-    await page.waitForTimeout(250);
-  }
-  out.overRibbon = await text(page, ".sankey .chart-over");
+  await page.locator(".riskflow .river .react-flow__edge-interaction").first().dispatchEvent("mouseover");
+  await page.waitForTimeout(250);
+  out.overRibbon = await text(page, ".riskflow .chart-over");
   need(/Customer tickets reaches Payments API through Support bot in four hops/.test(out.overRibbon) && /click to open/.test(out.overRibbon), "hovering a ribbon did not read the finding: " + out.overRibbon);
   await page.waitForSelector(".cut-block .cut-list li");
   out.cut = await text(page, ".cut-block");
@@ -281,8 +280,8 @@ const stepTo = (page, name) => page.locator(".workflow-step", { has: page.locato
   await page.goto(`${base}/#/devries_self/inbox`);
   await page.waitForFunction(() => document.querySelector(".page-head h1")?.textContent === "Nothing open.");
   await page.goto(`${base}/#/devries_self`);
-  await page.waitForSelector(".sankey", { state: "attached", timeout: 60000 });
-  need(/Nothing is drawn because nothing is open/.test(await text(page, ".sankey .chart-over")), "with nothing open the posture's picture should say so");
+  await page.waitForSelector(".riskflow", { state: "attached", timeout: 60000 });
+  need(/Nothing is drawn because nothing is open/.test(await text(page, ".riskflow .chart-over")), "with nothing open the posture's picture should say so");
   need(/Nothing untrusted reaches/.test(await text(page, ".page-head h1")), "with nothing open the posture should say so in its sentence");
   await page.goto(`${base}/#/devries_self/graph`);
   await tab(page, "DeVries").click();
@@ -298,10 +297,10 @@ const stepTo = (page, name) => page.locator(".workflow-step", { has: page.locato
   await page.waitForSelector(".case .phase.t-amber", { timeout: 240000 });
   out.devOpen = await page.locator(".case.status-open").count();
   await page.goto(`${base}/#/acme_dev`);
-  await page.waitForSelector(".sankey svg .ov-ribbon", { state: "attached", timeout: 60000 });
-  out.devRibbons = new Set(await page.locator(".sankey .ov-ribbon").evaluateAll((gs) => gs.map((g) => g.getAttribute("data-finding")))).size;
-  out.devWorst = await page.locator(".sankey .ov-node.agent.worst").count();
-  need(out.devRibbons === out.devOpen, `the dev posture should draw one ribbon per open finding: ${out.devRibbons} of ${out.devOpen}`);
+  await page.waitForSelector(".riskflow .river", { state: "attached", timeout: 60000 });
+  out.devRibbons = new Set(await page.locator(".riskflow .river").evaluateAll((gs) => gs.map((g) => g.getAttribute("data-finding")))).size;
+  out.devWorst = await page.locator(".riskflow .rcard.worst").count();
+  need(out.devRibbons === out.devOpen, `the dev posture should draw every open finding as a path: ${out.devRibbons} of ${out.devOpen}`);
   need(out.devWorst >= 1, "an agent that holds all three properties and runs unattended should be marked");
   need((await page.locator(".scans .scan").count()) >= 1, "the posture should show at least the scan at start");
   await shot(page, "views-dev-posture");

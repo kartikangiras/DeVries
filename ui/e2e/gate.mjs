@@ -43,7 +43,7 @@ for (const [scenario, fix, cut] of [["acme_support", "gate one call", "set gate 
   await page.goto(`${base}/#/${scenario}`);
   await page.waitForSelector(".figures dd", { timeout: 240000 });
   await page.waitForSelector(".tally-card");
-  await page.waitForSelector(".sankey .ov-ribbon", { state: "attached", timeout: 60000 });   // the picture arrives with the scenario, the figures with the posture
+  await page.waitForSelector(".riskflow .river", { state: "attached", timeout: 60000 });   // the picture arrives with the scenario, the figures with the posture
   r.posture = await first(".page-head h1");
   r.postureFigures = await texts(".figures dd");
   r.scansBefore = await page.locator(".scans .scan").count();
@@ -51,7 +51,8 @@ for (const [scenario, fix, cut] of [["acme_support", "gate one call", "set gate 
   need((await page.locator(".bars li").count()) >= 2, `${scenario}: the posture should draw the blast radius and the exposure as bars`);
   need((await page.locator(".chokes li").count()) >= 1, `${scenario}: the posture should rank the choke points`);
   need((await page.locator(".owasp-code").count()) === 10, `${scenario}: the posture should list the ten OWASP classes`);
-  need((await page.locator(".sankey .ov-ribbon").count()) >= 1, `${scenario}: the posture should draw the open paths as ribbons`);
+  need((await page.locator(".riskflow .river").count()) >= 1 && (await page.locator(".riskflow .rcard").count()) >= 3, `${scenario}: the posture should draw the open paths between cards`);
+  need((await page.locator(".riskflow .river .token").count()) >= 1, `${scenario}: the open paths should carry tokens`);
   await shot(`${scenario}-0-posture`);
 
   await place("Open").click();
