@@ -92,10 +92,20 @@ export function useDeVries(scenario: string | null) {
       .then(() => loadShell())
       .then(() => {
         setReady(true);
-        close = openEvents(onEvent, setConnected);
+        // the stream carries every change; when it comes back after a gap, what was missed is read again
+        let wasConnected = true;
+        close = openEvents(onEvent, (ok) => {
+          setConnected(ok);
+          if (ok && !wasConnected) refreshSoon();
+          wasConnected = ok;
+        });
         api.queries().then(setCatalog).catch(() => {});
       })
       .catch(fail);
+    // and a slow heartbeat, so a lost event never leaves a page stale for long
+    const heartbeat = window.setInterval(() => {
+      if (document.visibilityState === "visible" && live.current.scenario) refreshSoon();
+    }, 20000);
 
     function onEvent(event: StreamEvent) {
       if (event.type === "hello") {
@@ -142,7 +152,10 @@ export function useDeVries(scenario: string | null) {
           break;
       }
     }
-    return () => close();
+    return () => {
+      close();
+      window.clearInterval(heartbeat);
+    };
   }, [fail, loadShell, refreshSoon]);
 
   // A different scenario: drop what belonged to the old one, then load.
