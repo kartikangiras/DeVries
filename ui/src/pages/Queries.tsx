@@ -19,6 +19,21 @@ const GROUPS: { label: string; prefixes: string[] }[] = [
   { label: "Loading a scenario", prefixes: ["ingest", "schema", "canary"] },
 ];
 const DEFAULT = "reach.untrusted_to_high";
+/** Where on screen a query's answer shows, by its prefix: the places, so a reader can find the figure it feeds. */
+const USED_ON: [string, string][] = [
+  ["reach.untrusted_to_high", "a finding's Rule step · Posture's exposure"], ["find.trifecta", "a finding's Rule step · Posture's tally"],
+  ["reach.agents_from_sources", "Posture's Rule of Two tally · the Explorer's reader"], ["reach.from", "Posture's blast radius · the Inventory"],
+  ["reach.into", "Posture's exposure per target · the Inventory"], ["reach.untrusted_nodes", "every chart's filled cards · the Inventory"],
+  ["evidence.", "a finding's Path step · Posture's choke points"], ["wf.", "every sandbox verdict"], ["choke.maxflow", "Posture's cheapest cut · the Explorer's cut lens"],
+  ["choke.betweenness", "Posture's choke points · the Explorer's central lens"], ["choke.pagerank", "the Inventory · the Explorer's reader"],
+  ["zones.", "the Explorer's communities lens"], ["fix.", "a plan applied, or tested in a sandbox"], ["whatif.", "the Explorer's reader · the Inventory's servers"],
+  ["finding.", "Open and Closed · Activity"], ["mitigation.", "a finding's Fix and Options steps · Activity"], ["scan.", "Posture's history · Activity"],
+  ["draft.", "the change under the approval bar · Activity"], ["ui.", "the Explorer · the Inventory"], ["overview.", "Posture"], ["server.", "the Inventory's servers"],
+  ["projection.", "every scan"], ["flow.", "the Explorer · the cut"], ["ingest.", "loading a scenario"], ["schema.", "loading a scenario"], ["canary.", "the self-check at start"],
+  ["config.", "the config hash a plan is tested against"], ["graph.", "every scan"], ["node.", "every page's names"], ["scenario.", "the scenario switch"], ["agent.", "Posture's tally"],
+  ["drift.", "a manifest drift finding"],
+];
+const usedOn = (name: string) => USED_ON.find(([prefix]) => name === prefix || name.startsWith(prefix))?.[1] ?? "the API";
 
 const TOKEN = /(\/\/[^\n]*)|('(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*")|(\$\w+)|\b(algo\.\w+|[a-zA-Z_]+\.[a-zA-Z_.]+(?=\())|\b(OPTIONAL MATCH|ORDER BY|DETACH DELETE|ON CREATE SET|ON MATCH SET|MATCH|WHERE|RETURN|WITH|UNWIND|CALL|YIELD|MERGE|CREATE|SET|DELETE|REMOVE|LIMIT|SKIP|AS|AND|OR|XOR|NOT|IN|IS|NULL|DISTINCT|CASE|WHEN|THEN|ELSE|END|EXISTS|FOR|ON|INDEX|ASC|DESC|TRUE|FALSE|true|false|null)\b|(:[A-Z][A-Za-z_]*)/g;
 const KIND = ["comment", "string", "param", "fn", "kw", "label"];
@@ -54,12 +69,16 @@ export function QueryDrawer({ c, scenario, name, back }: { c: DeVries; scenario:
     const rest = c.catalog.filter((q) => !placed.has(q.name));
     return rest.length ? [...groups, { label: "Other", list: rest }] : groups;
   }, [c.catalog]);
-  const close = () => go(back.scenario ?? scenario, back.page === "queries" ? "inbox" : back.page, back.id);
+  const close = () => go(back.scenario ?? scenario, back.page === "queries" ? "posture" : back.page, back.id, back.sub);
   useEffect(() => {
     const key = (e: KeyboardEvent) => e.key === "Escape" && close();
     window.addEventListener("keydown", key);
     return () => window.removeEventListener("keydown", key);
   });
+  // the selected query is in view when the drawer opens, however far down the catalogue it sits
+  useEffect(() => {
+    document.querySelector(".catalog-list a.on")?.scrollIntoView({ block: "nearest" });
+  }, [selected?.name]);
 
   const params = selected ? [...new Set(selected.cypher.match(/\$\w+/g) ?? [])] : [];
   const algos = selected ? [...new Set(selected.cypher.match(/algo\.\w+/g) ?? [])] : [];
@@ -138,6 +157,10 @@ export function QueryDrawer({ c, scenario, name, back }: { c: DeVries; scenario:
                           ? "It writes, and only to a sandbox copy: it never runs on a working graph."
                           : "It writes to the graph it is run on."}
                   </p>
+                </section>
+                <section>
+                  <Eyebrow>Used on</Eyebrow>
+                  <p className="rail-note">{usedOn(selected.name)}.</p>
                 </section>
                 <section>
                   <div className="block-head">

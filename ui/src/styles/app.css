@@ -510,5 +510,5 @@ a.id:hover { color: var(--ink-strong); text-decoration-color: var(--accent); }
   .trace-meta { justify-content: flex-start; }
   .catalog { display: block; overflow-y: auto; }
   .catalog > .scroll { height: auto; overflow: visible; }
-  .catalog-list { max-height: 260px; border-right: 0; border-bottom: 1px solid var(--rule-soft); }
+  .catalog > .catalog-list { max-height: 260px; overflow-y: auto; border-right: 0; border-bottom: 1px solid var(--rule-soft); }
 }
