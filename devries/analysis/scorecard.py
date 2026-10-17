@@ -72,3 +72,13 @@ def card_view(card: AgentCard) -> dict:
         "external": card.external, "high_impact": card.high_impact,
         "workflows": card.workflows, "autonomous": card.autonomous, "verdict": card.verdict,
     }
+
+
+def tally_view(cards: list[AgentCard]) -> dict:
+    """The cards with a tally: how many agents hold none, one, two or all three properties, and how many of the
+    three-property agents run unattended."""
+    tally = {str(n): 0 for n in range(4)}
+    for card in cards:
+        tally[str(card.count)] += 1
+    return {"tally": tally, "unattended_three": sum(card.count == 3 and card.autonomous for card in cards),
+            "agents": [card_view(card) for card in cards]}

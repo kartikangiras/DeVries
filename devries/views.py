@@ -72,10 +72,26 @@ TAXONOMY: dict[str, list[tuple[str, str]]] = {
 
 def taxonomy_view(kind: str) -> list[dict[str, str]]:
     return [{"code": code, "name": name} for code, name in TAXONOMY.get(kind, [])]
+# The whole list, so a page can say which classes DeVries looks for and which it does not.
+OWASP_TOP_10: list[tuple[str, str]] = [
+    ("ASI01", "Agent goal hijack"), ("ASI02", "Tool misuse and exploitation"), ("ASI03", "Identity and privilege abuse"),
+    ("ASI04", "Agentic supply chain"), ("ASI05", "Unexpected code execution"), ("ASI06", "Memory and context poisoning"),
+    ("ASI07", "Insecure inter-agent communication"), ("ASI08", "Cascading failures"),
+    ("ASI09", "Human-agent trust exploitation"), ("ASI10", "Rogue agents"),
+]
+
+
 
 
 def finding_view(finding: Finding, max_paths: int | None = None) -> dict[str, Any]:
     base: dict[str, Any] = {"id": finding.id, "kind": finding.kind, "severity": finding.severity, "status": finding.status,
+def owasp_coverage(findings: list[Finding]) -> list[dict[str, Any]]:
+    """The ten classes: how many open findings fall in each, and whether any finding kind maps to it at all."""
+    checked = {code for pairs in TAXONOMY.values() for code, _ in pairs}
+    open_codes = Counter(code for f in findings if f.status == "open" for code, _ in TAXONOMY.get(f.kind, []))
+    return [{"code": code, "name": name, "open": open_codes[code], "checked": code in checked} for code, name in OWASP_TOP_10]
+
+
                             "taxonomy": taxonomy_view(finding.kind)}
     if finding.kind == "drift":
         base |= {"server_id": finding.server_id, "drift": finding.drift or {}, "accepted_by": finding.accepted_by, "paths": []}

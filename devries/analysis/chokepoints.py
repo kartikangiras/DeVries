@@ -52,6 +52,21 @@ def from_paths(findings: list[Finding], top: int | None = None) -> ChokepointRep
     return ChokepointReport(method="paths", edges=edges[:top] if top else edges, split_candidates=splits, split_tools=tools)
 
 
+def through(findings: list[Finding]) -> dict[str, dict[str, int]]:
+    """Per node id: `routes`, how many distinct evidence paths pass through it (not at either end), and `findings`,
+    how many findings have it anywhere on a path. The subject of a trifecta is on its own legs' ends, so it counts
+    as a finding there and as a route only where another finding's path runs through it."""
+    routes: dict[str, set[tuple[str, ...]]] = defaultdict(set)
+    hits: dict[str, set[str]] = defaultdict(set)
+    for finding in findings:
+        for path in finding.evidence:
+            for node_id in path.node_ids:
+                hits[node_id].add(finding.id)
+            for node_id in path.node_ids[1:-1]:
+                routes[node_id].add(tuple(path.node_ids))
+    return {node_id: {"routes": len(routes[node_id]), "findings": len(ids)} for node_id, ids in hits.items()}
+
+
 def _split_candidates(findings: list[Finding]) -> tuple[list[tuple[str, int]], dict[str, list[str]]]:
     """Agents that read and then act: one that takes a rule-2 hop in and sends a rule-3 hop out. An injection
     path is looked at on its own; the legs of a trifecta are looked at together, since they meet at the agent.

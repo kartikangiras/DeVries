@@ -141,6 +141,23 @@ def test_chokepoints_map_hops_back_to_config_edges():
     assert report.edges[0].score == 2.0                           # most-crossed edges first
 
 
+def test_the_nodes_the_open_routes_pass_through_are_counted_without_their_ends():
+    injection = Finding(id="fnd:x", fingerprint="x", kind="injection", severity="critical", evidence=[
+        PathEvidence(node_ids=["src:s", "tool:t.get", "agent:a", "tool:t.pay", "res:p"], rules=[1, 2, 3, 5]),
+        PathEvidence(node_ids=["src:s", "tool:t.get", "agent:r", "agent:a", "tool:t.pay", "res:p"], rules=[1, 2, 6, 3, 5]),
+    ])
+    trifecta = Finding(id="fnd:y", fingerprint="y", kind="trifecta", severity="high", agent_id="agent:a", evidence=[
+        PathEvidence(node_ids=["src:s", "tool:t.get", "agent:a"], rules=[1, 2], leg="untrusted"),
+        PathEvidence(node_ids=["src:crm", "tool:t.search", "agent:a"], rules=[1, 2], leg="private"),
+        PathEvidence(node_ids=["agent:a", "tool:t.send", "res:out"], rules=[3, 5], leg="exit"),
+    ])
+    through = chokepoints.through([injection, trifecta])
+    assert through["agent:a"] == {"routes": 2, "findings": 2}          # the trifecta's legs end at it: a finding, not a route
+    assert through["tool:t.get"] == {"routes": 3, "findings": 2} and through["agent:r"] == {"routes": 1, "findings": 1}
+    assert through["src:s"] == {"routes": 0, "findings": 2} and through["res:p"]["routes"] == 0   # ends are never routes
+    assert chokepoints.through([]) == {}
+
+
 async def test_betweenness_and_zones_run_on_the_flow_layer(client, graph):
     await build(client, graph, sources=["tickets", src("lonely", "internal")], resources=["payments"],
                 tools=["get", "refund", "idle"], agents=["a"],
@@ -212,6 +229,7 @@ async def test_a_scan_leaves_one_last_record_and_keeps_one_row_per_scan(client, 
     await build(client, graph, sources=["tickets"], resources=["payments"], tools=["get", "refund"], agents=["bot"],
                 reads=[("get", "tickets")], writes=[("refund", "payments")], calls=[("bot", "get"), ("bot", "refund")])
     assert await findings.last_scan(client, graph) is None           # loaded, never scanned
+    assert await findings.history(client, graph) == []
     first = await findings.scan(client, graph)
     record = await findings.last_scan(client, graph)
     assert (record["scan_id"], record["at"], record["injection"], record["trifecta"]) == (first.scan_id, first.started_at, 1, 0)
@@ -232,7 +250,6 @@ async def test_mincut_is_the_cheapest_cut_and_knows_when_there_is_none(client, g
                 calls=[("a", "get"), ("a", "refund"), ("b", "get"), ("b", "refund")])
     await findings.scan(client, graph)
     report = await chokepoints.mincut(client, graph)
-    assert await findings.history(client, graph) == []
     assert report.method == "mincut" and report.cut_cost == 2
     assert sorted((e.edge.rel, e.edge.from_id, e.edge.to_id, e.edge.rule, e.fixes) for e in report.edges) == [
         ("CAN_CALL", "agent:a", "tool:t.get", 2, ["revoke_call"]), ("CAN_CALL", "agent:b", "tool:t.get", 2, ["revoke_call"])]
