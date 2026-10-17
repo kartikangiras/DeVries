@@ -60,7 +60,7 @@ function StepRow({ step, lit, names, mitigations, scenario }: Shared & { step: S
             </summary>
             {step.queries.length > 0 && (
               <p className="trace-queries">
-                {step.queries.map((q) => <a key={q} href={href(scenario, "queries", q)}>{q}</a>)}
+                {step.queries.map((q) => <a key={q} href={href(scenario, "method", "queries", q)}>{q}</a>)}
               </p>
             )}
             {step.arguments && <pre>{JSON.stringify(step.arguments, null, 1)}</pre>}

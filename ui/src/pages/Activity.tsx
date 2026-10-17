@@ -10,7 +10,7 @@ import { go, href } from "../route";
 import type { DeVries } from "../state";
 import { WithNames, capital, clock, day, plural } from "../text";
 import { RunTrace } from "../Trace";
-import { Button, Empty, Fold, Loading, PageBody, PageHeader, Status, Tabs } from "../ui";
+import { Button, Empty, Loading, PageBody, PageHeader, Status, Tabs } from "../ui";
 
 type Filter = "all" | "runs" | "plans" | "decisions" | "scans" | "writes";
 const FILTER: Record<Exclude<Filter, "all">, ActivityItem["kind"][]> = {
@@ -166,13 +166,6 @@ export function ActivityPage({ c, scenario, runId }: { c: DeVries; scenario: str
             </section>
           ))}
           {!shown.length && <Empty>Nothing of this kind has happened here.</Empty>}
-          <Fold className="source" summary="Source and method" sub={`${plural(feed.data?.queries.length ?? 0, "FalkorDB query", "FalkorDB queries")} · the run registry`}>
-            <p className="chart-note">
-              Scans, plans, decisions and writes are records in the scenario's graph in FalkorDB, read by{" "}
-              {(feed.data?.queries ?? []).map((q, i) => <span key={q}>{i > 0 && ", "}<a href={href(scenario, "queries", q)}>{q}</a></span>)}.
-              Runs are kept by the app for as long as it runs; each step of a run says who decided it: model, loop, scripted or person.
-            </p>
-          </Fold>
         </>
       ) : (
         <Empty>

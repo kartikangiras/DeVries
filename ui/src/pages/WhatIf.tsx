@@ -95,7 +95,7 @@ export function CutBlock({ c, scenario, compact = false, head = true }: { c: DeV
     return () => { wanted = false; };
   }, [scenario, c.flow]);
   if (!cut || cut.scenario !== scenario) return <Loading label="Asking max flow for the cheapest cut" />;
-  const by = <>Worked out by <a href={href(scenario, "queries", "choke.maxflow")}>choke.maxflow</a>, which runs FalkorDB's <code>algo.maxFlow</code> over the flow layer with each hop's capacity set to the cost of the cheapest fix that cuts it.</>;
+  const by = <>Worked out by <a href={href(scenario, "method", "queries", "choke.maxflow")}>choke.maxflow</a>, which runs FalkorDB's <code>algo.maxFlow</code> over the flow layer with each hop's capacity set to the cost of the cheapest fix that cuts it.</>;
   const rules = policy && policy.scenario === scenario && (policy.docker_mcp_gateway.length > 0 || Object.keys(policy.claude_code.permissions).length > 0) ? policy : null;
   const how = (
     <Fold summary="How it was worked out" sub="choke.maxflow · algo.maxFlow">

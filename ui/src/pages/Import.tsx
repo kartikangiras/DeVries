@@ -114,8 +114,7 @@ export function ImportPage({ c, scenario }: { c: DeVries; scenario: string }) {
       <section className="about">
         <div>
           <Eyebrow>What happens next</Eyebrow>
-          <p>The import drafts one agent, the client, holding every tool, and one data source and one resource per server. Label them on the Inbox. The scan runs on the answer, and the audit tests the candidate fixes in sandbox copies and stops at the cheapest that passes, for your approval.</p>
-          {!isPublic && <p>Approving a plan can also write it back to the file it came from: an <code>ask</code> rule in a Claude Code settings file, a server removed from a desktop config, a line in a scenario file. You read the diff first, and nothing is written on a public site.</p>}
+          <p>The import drafts one agent holding every tool, and one data source and one resource per server. Label them under <a href={href(scenario, "inbox")}>Open</a>; the scan runs on the answer.</p>
         </div>
       </section>
       {!c.scenarios.length && <Empty>No scenario is loaded yet. <a href={href(scenario)}>Back</a>.</Empty>}
