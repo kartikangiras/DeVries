@@ -614,6 +614,23 @@ async def test_candidates_offer_a_drop_for_each_read_and_a_split_for_an_agent_th
     assert result.sandbox_runs == 5
 
 
+def test_the_cut_becomes_the_cheapest_fix_per_hop_with_one_fix_per_grant():
+    from devries.analysis.models import ChokepointReport, EdgeRef, EdgeScore
+    from devries.mitigation.candidates import cut_fixes
+
+    report = ChokepointReport(method="mincut", cut_cost=4, edges=[
+        EdgeScore(edge=EdgeRef(rel="CAN_CALL", from_id="agent:a", to_id="tool:t.pay", rule=3), score=1, fixes=["revoke_call", "gate_call"]),
+        EdgeScore(edge=EdgeRef(rel="CAN_CALL", from_id="agent:a", to_id="tool:t.pay", rule=2), score=1, fixes=["revoke_call"]),
+        EdgeScore(edge=EdgeRef(rel="DELEGATES_TO", from_id="agent:a", to_id="agent:r", rule=6), score=2, fixes=["quarantine_delegation"]),
+        EdgeScore(edge=EdgeRef(rel="WRITES", from_id="tool:t.pay", to_id="res:p", rule=5), score=1000, fixes=[]),
+    ])
+    fixes = cut_fixes(report)
+    assert [f.kind for f in fixes] == ["revoke_call", "quarantine_delegation"]      # the grant once, the write never
+    assert (fixes[0].agent_id, fixes[0].tool_id) == ("agent:a", "tool:t.pay")
+    assert (fixes[1].from_agent_id, fixes[1].to_agent_id) == ("agent:a", "agent:r")
+    assert cut_fixes(ChokepointReport(method="mincut", cut_cost=0)) == []
+
+
 def test_the_legs_of_a_trifecta_are_read_together_when_looking_for_an_agent_to_split():
     from devries.analysis.models import Finding, PathEvidence
 

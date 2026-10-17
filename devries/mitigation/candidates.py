@@ -1,7 +1,7 @@
 """From a chokepoint report to candidate plans: one fix per plan, in the order the report ranked the edges."""
 
 from devries.analysis.models import ChokepointReport, EdgeRef
-from devries.mitigation.dsl import COST, DropRead, FixPlan, GateCall, QuarantineDelegation, RevokeCall, SplitAgent
+from devries.mitigation.dsl import COST, DropRead, Fix, FixPlan, GateCall, QuarantineDelegation, RevokeCall, SplitAgent
 
 
 def fix_for(kind: str, edge: EdgeRef):
@@ -40,3 +40,16 @@ def candidates(report: ChokepointReport, capability: dict[str, str | None] | Non
                 seen.add(plan.canonical())
                 plans.append(plan)
     return sorted(plans, key=lambda p: p.cost)            # stable: keeps the report's order within a cost
+
+
+def cut_fixes(report: ChokepointReport) -> list[Fix]:
+    """The cut as fixes: the cheapest kind that can cut each hop, one per config edge. A hop no fix can cut is left
+    out, and the sandbox then says the plan falls short."""
+    fixes, seen = [], set()
+    for scored in report.edges:
+        kinds = [kind for kind in scored.fixes if kind in COST]
+        fix = fix_for(min(kinds, key=COST.__getitem__), scored.edge) if kinds else None
+        if fix is not None and FixPlan(fixes=[fix]).canonical() not in seen:
+            seen.add(FixPlan(fixes=[fix]).canonical())
+            fixes.append(fix)
+    return fixes
