@@ -25,21 +25,24 @@ from devries.agent.loop import Auditor
 from devries.agent.runs import Run, runs
 from devries.analysis import chokepoints, scorecard
 from devries.analysis import findings as findings_mod
+from devries.analysis import posture as posture_mod
 from devries.analysis import zones
+from devries.analysis.models import ChokepointReport, Finding
 from devries.analysis.models import finding_id as finding_id_of
+from devries.analysis.scorecard import AgentCard
 from devries.api.sessions import RateLimiter, Sessions, client_ip
 from devries.config import get_settings
-from devries.errors import DeVriesError, ForbiddenWrite, InvalidScenario, NotFound, UnknownScenario
+from devries.errors import DeVriesError, FixFailed, ForbiddenWrite, InvalidFix, InvalidScenario, NotFound, UnknownScenario
 from devries.events import BOOT, bus
 from devries.graph import keys
 from devries.graph.catalog import CATALOG
 from devries.graph.client import GraphClient, get_client
 from devries.ingest.importer import guess, import_install, import_pasted
 from devries.ingest.scenario_loader import load_scenario, read_scenario
-from devries.mitigation import sandbox, store
+from devries.mitigation import candidates, sandbox, store
 from devries.mitigation import write as write_mod
 from devries.mitigation.compile import policy_from_cut
-from devries.mitigation.dsl import Change
+from devries.mitigation.dsl import Change, FixPlan, describe
 
 log = logging.getLogger("devries.api")
 
@@ -161,7 +164,7 @@ async def graph_view(client: GraphClient, key: str, layer: str) -> dict[str, Any
     return {"layer": layer, "nodes": nodes, "links": links, "workflows": await client.run("ui.workflows", key)}
 
 
-def _sentence(open_findings: list, sources: list, agents: list, actions: list, counts: dict) -> str:
+def _sentence(open_findings: list, agents: list, counts: dict) -> str:
     """The overview's title: one sentence a stranger can read, made from the counts."""
     injections = [f for f in open_findings if f.kind == "injection"]
     trifectas = [f for f in open_findings if f.kind == "trifecta"]
@@ -185,6 +188,54 @@ def _sentence(open_findings: list, sources: list, agents: list, actions: list, c
         parts.append(f"{n(len(trifectas), 'agent holds', 'agents hold')} untrusted input, private data and a way out")
     text = "; ".join(parts) + "."
     return text[0].upper() + text[1:]
+
+
+class Picture:
+    """What the overview and the posture page both start from: the counts, the findings that hold, the Rule of Two
+    cards, the chart's nodes and the cheapest cut, with the open injection and trifecta findings picked out."""
+
+    def __init__(self, counts: dict[str, Any], current: list[Finding], partial: bool, cards: dict[str, AgentCard],
+                 rows: list[dict[str, Any]], cut: ChokepointReport):
+        self.counts, self.current, self.partial, self.cards, self.rows, self.cut = counts, current, partial, cards, rows, cut
+        self.node = {r["id"]: r for r in rows}
+        self.open = [f for f in current if f.status == "open" and f.kind in ("injection", "trifecta")]
+        on_path = {i for f in self.open for p in f.evidence for i in p.node_ids}
+        self.agents_on = sorted(i for i in on_path if self.label(i) == "Agent")
+        self.sources_on = sorted({f.source_id for f in self.open if f.source_id} | {i for f in self.open for i in f.untrusted_ids})
+        self.actions_on = sorted({f.target_id for f in self.open if f.target_id} | {i for f in self.open for i in f.exit_ids})
+
+    def label(self, node_id: str) -> str | None:
+        return self.node.get(node_id, {}).get("label")
+
+    def name(self, node_id: str) -> str:
+        return self.node.get(node_id, {}).get("name") or node_id
+
+    @property
+    def sentence(self) -> str:
+        return _sentence(self.open, self.agents_on, self.counts)
+
+    @property
+    def summary_counts(self) -> dict[str, Any]:
+        return self.counts | {"open_findings": len(self.open), "cut_cost": self.cut.cut_cost}
+
+
+async def picture(client: GraphClient, key: str) -> Picture:
+    """Read the picture of one graph: five calls, every one a catalog query or built on them."""
+    return Picture((await client.run("overview.counts", key))[0], *await findings_mod.current(client, key),
+                   {c.agent_id: c for c in await scorecard.rule_of_two(client, key)},
+                   await client.run("ui.nodes", key), await chokepoints.mincut(client, key))
+
+
+def cut_view(report: ChokepointReport) -> dict[str, Any]:
+    """The cheapest cut as the page takes it: its cost, whether every hop can be cut, and the hops."""
+    return {"cost": report.cut_cost, "cuttable": all(e.score < chokepoints.UNCUTTABLE for e in report.edges),
+            "hops": [views.cut_hop(e) for e in report.edges]}
+
+
+def servers_view(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Each server's row with its lists sorted and the empty entries an OPTIONAL MATCH leaves dropped."""
+    return [{**row, "tools": sorted(t for t in row["tools"] if t), "agents": sorted(a for a in row["agents"] if a),
+             "findings": sorted(f for f in row["findings"] if f)} for row in rows]
 
 
 def build_router(sessions: Sessions, llm: LLM | None, scenario_info: Callable[[], dict[str, dict[str, Any]]],
@@ -356,23 +407,14 @@ def build_router(sessions: Sessions, llm: LLM | None, scenario_info: Callable[[]
         the open paths drawn as ribbons, and a sentence that says it. Everything else folds into counts."""
         client, key = await read_key(request, scenario)
         with client.recording() as ran:
-            counts = (await client.run("overview.counts", key))[0]
-            current, partial = await findings_mod.current(client, key)
-            cards = {c.agent_id: c for c in await scorecard.rule_of_two(client, key)}
-            rows = await client.run("ui.nodes", key)
-            cut = await chokepoints.mincut(client, key)
-        node = {r["id"]: r for r in rows}
-        open_ = [f for f in current if f.status == "open" and f.kind in ("injection", "trifecta")]
-        on_path: set[str] = {i for f in open_ for p in f.evidence for i in p.node_ids}
-        agents_on = sorted(i for i in on_path if node.get(i, {}).get("label") == "Agent")
-        sources_on = sorted({f.source_id for f in open_ if f.source_id} | {i for f in open_ for i in f.untrusted_ids})
-        actions_on = sorted({f.target_id for f in open_ if f.target_id} | {i for f in open_ for i in f.exit_ids})
+            pic = await picture(client, key)
+        node = pic.node
         ribbons = []
-        for f in open_:
+        for f in pic.open:
             if f.kind == "injection":
                 path = f.evidence[0] if f.evidence else None
                 ribbons.append({"id": f.id, "kind": "injection", "source_id": f.source_id, "target_id": f.target_id,
-                                "agent_ids": [i for i in (path.node_ids if path else []) if node.get(i, {}).get("label") == "Agent"],
+                                "agent_ids": [i for i in (path.node_ids if path else []) if pic.label(i) == "Agent"],
                                 "hops": len(path.rules) if path else 0, "routes": f.routes if f.routes is not None else len(f.evidence),
                                 "severity": f.severity})
             else:
@@ -381,26 +423,77 @@ def build_router(sessions: Sessions, llm: LLM | None, scenario_info: Callable[[]
                                 "exit_ids": f.exit_ids, "hops": sum(len(p.rules) for p in f.evidence), "routes": 1, "severity": f.severity})
 
         def card(agent_id: str) -> dict[str, Any]:
-            c = cards.get(agent_id)
-            return {"id": agent_id, "name": node.get(agent_id, {}).get("name") or agent_id,
+            c = pic.cards.get(agent_id)
+            return {"id": agent_id, "name": pic.name(agent_id),
                     "properties": c.properties if c else [], "autonomous": bool(c and c.autonomous), "verdict": c.verdict if c else ""}
 
         columns = {
-            "sources": [{"id": i, "name": node.get(i, {}).get("name") or i, "trust": node.get(i, {}).get("trust")} for i in sources_on],
-            "agents": [card(i) for i in agents_on],
-            "actions": [{"id": i, "name": node.get(i, {}).get("name") or i, "impact": node.get(i, {}).get("impact"),
-                         "external": bool(node.get(i, {}).get("external"))} for i in actions_on],
+            "sources": [{"id": i, "name": pic.name(i), "trust": node.get(i, {}).get("trust")} for i in pic.sources_on],
+            "agents": [card(i) for i in pic.agents_on],
+            "actions": [{"id": i, "name": pic.name(i), "impact": node.get(i, {}).get("impact"),
+                         "external": bool(node.get(i, {}).get("external"))} for i in pic.actions_on],
         }
         folded = {
-            "sources": [r["id"] for r in rows if r["label"] == "DataSource" and r["id"] not in sources_on],
-            "agents": [r["id"] for r in rows if r["label"] == "Agent" and r["id"] not in agents_on],
-            "actions": [r["id"] for r in rows if r["label"] == "Resource" and r["id"] not in actions_on],
-            "tools": [r["id"] for r in rows if r["label"] == "Tool"],
+            "sources": [r["id"] for r in pic.rows if r["label"] == "DataSource" and r["id"] not in pic.sources_on],
+            "agents": [r["id"] for r in pic.rows if r["label"] == "Agent" and r["id"] not in pic.agents_on],
+            "actions": [r["id"] for r in pic.rows if r["label"] == "Resource" and r["id"] not in pic.actions_on],
+            "tools": [r["id"] for r in pic.rows if r["label"] == "Tool"],
         }
-        return {"scenario": scenario, "own_copy": key.startswith("ses:"), "partial": partial,
-                "sentence": _sentence(open_, columns["sources"], columns["agents"], columns["actions"], counts),
-                "counts": counts | {"open_findings": len(open_), "cut_cost": cut.cut_cost},
-                "columns": columns, "folded": folded, "ribbons": ribbons, "queries": ran}
+        return {"scenario": scenario, "own_copy": key.startswith("ses:"), "partial": pic.partial, "sentence": pic.sentence,
+                "counts": pic.summary_counts, "columns": columns, "folded": folded, "ribbons": ribbons, "queries": ran}
+
+    @router.get("/scenarios/{scenario}/posture")
+    async def posture(request: Request, scenario: str) -> dict[str, Any]:
+        """The posture page in one call: the overview's sentence and counts, what untrusted text reaches, the Rule of
+        Two tally, the blast radius of each untrusted source, who reaches each target, where the open routes meet,
+        the cheapest cut, the scans over time and the OWASP classes covered. Every figure is a FalkorDB answer."""
+        client, key = await read_key(request, scenario)
+        with client.recording() as ran:
+            pic = await picture(client, key)
+            depth = await posture_mod.depth_of(client, key)
+            scanned = await findings_mod.last_scan(client, key)
+            facts = {"nodes": len(pic.rows), "flows": len(await client.run("flow.edges", key)),
+                     "workflows": len(await client.run("ui.workflows", key)),
+                     "last_scan": {"at": scanned["at"], "duration_ms": scanned["duration_ms"]} if scanned else None}
+            exposure = await posture_mod.exposure(client, key, depth, pic.node)
+            blast = await posture_mod.blast_radius(client, key, depth, pic.node)
+            targets = await posture_mod.target_exposure(client, key, depth, pic.node)
+            central = await chokepoints.betweenness(client, key)
+            scans = await findings_mod.history(client, key)
+        return {"scenario": scenario, "own_copy": key.startswith("ses:"), "partial": pic.partial, "sentence": pic.sentence,
+                "counts": pic.summary_counts, "facts": facts, "exposure": exposure,
+                "rule_of_two": scorecard.tally_view(list(pic.cards.values())), "blast": blast, "targets": targets,
+                "chokes": posture_mod.chokes(pic.open, pic.node, central), "cut": cut_view(pic.cut), "scans": scans,
+                "owasp": views.owasp_coverage(pic.current), "queries": ran}
+
+    @router.get("/scenarios/{scenario}/scans")
+    async def scans(request: Request, scenario: str) -> dict[str, Any]:
+        """The scans kept on this graph, oldest first: how the count of open findings moved."""
+        client, key = await read_key(request, scenario)
+        with client.recording() as ran:
+            history = await findings_mod.history(client, key)
+        return {"scenario": scenario, "scans": history, "queries": ran}
+
+    def short_path(path: str | None) -> str | None:
+        """A scenario file named from the directory the scenarios live in, when it is under it."""
+        try:
+            return str(Path(path).relative_to(settings.scenarios_dir.parent)) if path else None
+        except ValueError:
+            return path
+
+    @router.get("/scenarios/{scenario}/activity")
+    async def activity(request: Request, scenario: str) -> dict[str, Any]:
+        """One list, newest first, of what happened here: scans, audit runs, plans tested, decisions, what was applied
+        and what was written to a file. Runs come from this process; everything else from the graph."""
+        client, key = await read_key(request, scenario)
+        with client.recording() as ran:
+            items = [views.activity_of_scan(row) for row in await findings_mod.history(client, key)]
+            items += [views.activity_of_run(run) for run in runs.for_graphs(key, keys.scenario_key(scenario))]
+            for m in await store.list_all(client, key):
+                drafts = await client.run("draft.for_mitigation", key, mitigation_id=m.id)
+                items += views.activity_of_mitigation(m, [(d, short_path(d["path"])) for d in drafts if d.get("written_at")])
+        items.sort(key=lambda item: -(item["at"] or 0))
+        return {"scenario": scenario, "items": items, "queries": ran}
 
     @router.get("/scenarios/{scenario}/cut")
     async def cut(request: Request, scenario: str) -> dict[str, Any]:
@@ -409,9 +502,31 @@ def build_router(sessions: Sessions, llm: LLM | None, scenario_info: Callable[[]
         client, key = await read_key(request, scenario)
         with client.recording() as ran:
             report = await chokepoints.mincut(client, key)
-        return {"scenario": scenario, "cost": report.cut_cost,
-                "cuttable": all(e.score < chokepoints.UNCUTTABLE for e in report.edges),
-                "hops": [views.cut_hop(e) for e in report.edges], "queries": ran}
+        return {"scenario": scenario} | cut_view(report) | {"queries": ran}
+
+    @router.post("/scenarios/{scenario}/cut/propose")
+    async def propose_cut(request: Request, scenario: str) -> Any:
+        """The cheapest cut as one plan: the cheapest fix for each hop, verified in a sandbox against every open injection
+        finding and stored as a proposal when it passes. A failing verdict is the answer, not an error: the cut is a
+        guide, and only the sandbox says whether the plan can be made."""
+        client, key = await write_key(request, scenario)
+        with client.recording() as ran:
+            report = await chokepoints.mincut(client, key)
+            current, _ = await findings_mod.current(client, key)
+            injections = [f.id for f in current if f.kind == "injection" and f.status == "open"]
+            fixes = candidates.cut_fixes(report)
+            refused = ("no open injection finding to cut" if not injections else "no hop of the cut can be cut by a fix" if not fixes
+                       else f"the cut takes {len(fixes)} fixes and a plan holds at most three" if len(fixes) > 3 else None)
+            if refused:                                   # the cut as it stands, not a bad request: 409, with the cut's own code
+                return JSONResponse(InvalidFix(refused).to_dict(), status_code=409)
+            plan = FixPlan(fixes=fixes)
+            try:
+                proposed = await ops.propose(client, key, plan, injections, rationale="the cheapest cut, by max flow", source="cut")
+                verdict = None
+            except FixFailed as e:
+                proposed, verdict = None, e.details["verdict"]
+        return {"scenario": scenario, "proposed": views.mitigation_view(proposed) if proposed else None, "verdict": verdict,
+                "summary": [describe(f) for f in plan.fixes], "queries": ran}
 
     @router.get("/scenarios/{scenario}/cut/policy")
     async def cut_policy(request: Request, scenario: str) -> dict[str, Any]:
@@ -492,9 +607,18 @@ def build_router(sessions: Sessions, llm: LLM | None, scenario_info: Callable[[]
         client, key = await read_key(request, scenario)
         with client.recording() as ran:
             rows = await client.run("server.summary", key)
-        return {"scenario": scenario, "servers": [
-            {**row, "tools": sorted(t for t in row["tools"] if t), "agents": sorted(a for a in row["agents"] if a),
-             "findings": sorted(f for f in row["findings"] if f)} for row in rows], "queries": ran}
+        return {"scenario": scenario, "servers": servers_view(rows), "queries": ran}
+
+    @router.get("/scenarios/{scenario}/inventory")
+    async def inventory(request: Request, scenario: str) -> dict[str, Any]:
+        """Every agent, tool, source and resource with what the config gives it and what the graph says about it, and
+        the servers. One page, four lists; most findings first in each."""
+        client, key = await read_key(request, scenario)
+        with client.recording() as ran:
+            pic = await picture(client, key)
+            lists = await posture_mod.inventory(client, key, await client.run("inventory.rows", key), pic.open, pic.cards)
+            rows = await client.run("server.summary", key)
+        return {"scenario": scenario} | lists | {"servers": servers_view(rows), "queries": ran}
 
     @router.get("/scenarios/{scenario}/scorecard")
     async def rule_of_two(request: Request, scenario: str) -> dict[str, Any]:
