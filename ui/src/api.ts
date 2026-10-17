@@ -150,6 +150,39 @@ export type Scorecard = {
 };
 /** The most central agents and tools on the flow layer, by betweenness: context, never a verdict. */
 export type Central = { scenario: string; nodes: { id: string; name: string | null; label: string; score: number }[]; queries: string[] };
+/** One scan of the graph, kept so a posture can be read over time. */
+export type ScanRow = { scan_id: string; at: number; duration_ms: number; injection: number; trifecta: number; open: number; partial: boolean };
+/** The system's standing, all of it read from FalkorDB: where untrusted text can go, what stands in its way, how it has moved. */
+export type Posture = {
+  scenario: string; own_copy: boolean; partial: boolean; sentence: string;
+  counts: Overview["counts"];
+  facts: { nodes: number; flows: number; workflows: number; last_scan: { at: number; duration_ms: number } | null };
+  exposure: { high_reached: number; high_total: number; external_reached: number; external_total: number; agents_reached: number; agents_total: number };
+  rule_of_two: { tally: Record<string, number>; unattended_three: number; agents: Scorecard["agents"] };
+  blast: { id: string; name: string; reached: number; agents: number; tools: number; resources: number; high: number; external: number; ids: string[] }[];
+  targets: { id: string; name: string; impact: string | null; external: boolean; reaching: number; sources: string[] }[];
+  chokes: { id: string; name: string | null; label: string; routes: number; findings: number; betweenness: number | null }[];
+  cut: { cost: number | null; cuttable: boolean; hops: Cut["hops"] };
+  scans: ScanRow[];
+  owasp: { code: string; name: string; open: number; checked: boolean }[];
+  queries: string[];
+};
+/** One line of what happened on a scenario: a scan, a run, a plan tested or proposed, a decision, an application, a write. */
+export type ActivityItem = {
+  at: number; kind: "scan" | "run" | "tested" | "proposal" | "decision" | "applied" | "written" | "labelled" | "import";
+  sentence: string; who: string | null; status: string | null; reason?: string | null;
+  refs: { run_id?: string; mitigation_id?: string; finding_ids?: string[]; scan_id?: string; draft_id?: string; path?: string };
+};
+export type Activity = { scenario: string; items: ActivityItem[]; queries: string[] };
+/** Every thing in the system with what it holds and reaches, one table a kind. */
+export type Inventory = {
+  scenario: string; queries: string[];
+  agents: { id: string; name: string | null; owner: string | null; properties: string[]; count: number; autonomous: boolean; workflows: number; grants: number; gated: number; delegates_to: number; reached: boolean; findings: number; pagerank_rank: number | null }[];
+  tools: { id: string; name: string | null; server_id: string | null; capability: string | null; held_by: number; gated: number; reads: number; acts_on: number; reached: boolean; findings: number; pagerank_rank: number | null }[];
+  sources: { id: string; name: string | null; trust: string | null; read_by: number; reaches_agents: number; findings: number }[];
+  resources: { id: string; name: string | null; impact: string | null; external: boolean; acted_on_by: number; reached_by_untrusted: boolean; reaching_sources: number; findings: number }[];
+  servers: Servers["servers"];
+};
 export type Layer = "flow" | "config";
 export type CatalogQuery = { name: string; mode: "ro" | "rw"; doc: string; cypher: string; targets: string[]; timeout_ms: number };
 
@@ -230,6 +263,12 @@ export const api = {
   ask: (scenario: string, question: string) => call<{ run: Run }>("POST", "/api/agent/ask", { scenario, question }).then((r) => r.run),
   run: (id: string) => call<{ run: RunWithSteps }>("GET", `/api/agent/runs/${encodeURIComponent(id)}`).then((r) => r.run),
   runs: (scenario: string) => call<{ runs: Run[] }>("GET", `${at(scenario)}/runs`).then((r) => r.runs),
+  scans: (scenario: string) => call<{ scenario: string; scans: ScanRow[] }>("GET", `${at(scenario)}/scans`).then((r) => r.scans),
+  posture: (scenario: string) => call<Posture>("GET", `${at(scenario)}/posture`),
+  activity: (scenario: string) => call<Activity>("GET", `${at(scenario)}/activity`),
+  inventory: (scenario: string) => call<Inventory>("GET", `${at(scenario)}/inventory`),
+  /** The cheapest cut as one plan, verified in a sandbox like any other; the answer is the plan or the verdict that refused it. */
+  proposeCut: (scenario: string) => call<{ scenario: string; proposed: Mitigation | null; verdict: Record<string, unknown> | null; summary: string[] }>("POST", `${at(scenario)}/cut/propose`),
 };
 
 /** The event stream. The browser reconnects by itself and sends Last-Event-ID, so nothing recent is missed. */

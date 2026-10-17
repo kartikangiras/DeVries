@@ -10,15 +10,18 @@ import { Icon, Mark, type IconName } from "./ui";
 
 type Row = { page: Page; label: string; icon: IconName };
 const GROUPS: { label: string; rows: Row[] }[] = [
+  { label: "Posture", rows: [{ page: "posture", label: "Posture", icon: "posture" }] },
   { label: "Findings", rows: [{ page: "inbox", label: "Open", icon: "inbox" }, { page: "done", label: "Closed", icon: "done" }] },
-  { label: "Fixes", rows: [{ page: "fixes", label: "Ledger", icon: "fixes" }, { page: "whatif", label: "What if", icon: "whatif" }] },
-  { label: "System", rows: [{ page: "graph", label: "Graph", icon: "graph" }, { page: "servers", label: "Servers", icon: "servers" }, { page: "queries", label: "Queries", icon: "queries" }] },
-  { label: "Audit", rows: [{ page: "audit", label: "Runs", icon: "audit" }, { page: "import", label: "Import", icon: "import" }] },
+  { label: "System", rows: [{ page: "graph", label: "Explorer", icon: "graph" }, { page: "inventory", label: "Inventory", icon: "inventory" }, { page: "queries", label: "Queries", icon: "queries" }] },
+  { label: "Record", rows: [{ page: "audit", label: "Activity", icon: "audit" }, { page: "import", label: "Import", icon: "import" }] },
 ];
 
 /** The nav row a route belongs to: a finding belongs to the list it is in. */
 export function placeOf(route: Route, closed: boolean): Page {
   if (route.page === "finding") return closed ? "done" : "inbox";
+  if (route.page === "fixes") return "audit";          // older addresses, kept so links survive
+  if (route.page === "whatif") return "graph";
+  if (route.page === "servers") return "inventory";
   return route.page;
 }
 
@@ -95,7 +98,6 @@ export function Shell({ c, route, closed = false, queriesOpen = false, children 
   const counts: Partial<Record<Page, number | undefined>> = {
     inbox: c.findings ? open.length : undefined,
     done: c.findings ? c.findings.past.length : undefined,
-    fixes: c.plans.length || undefined,
     audit: c.runList.length || undefined,
   };
   const at = queriesOpen ? "queries" : placeOf(route, closed);

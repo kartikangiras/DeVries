@@ -87,6 +87,20 @@ export function Fold({ summary, sub, open: initially = false, className = "", ch
   );
 }
 
+/** A verdict or a posture in figures: what a person reads before the words. A long word reads smaller. */
+export function Figures({ items }: { items: { n: ReactNode; label: string; tone?: "good" | "bad" }[] }) {
+  return (
+    <dl className="figures">
+      {items.map((it) => (
+        <div key={it.label} className={it.tone ?? ""}>
+          <dd className={typeof it.n === "string" && it.n.length > 7 ? "word" : ""}>{it.n}</dd>
+          <dt>{it.label}</dt>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
 /** A label and its value on one line, the value to the right. */
 export function KV({ k, children, title }: { k: string; children: ReactNode; title?: string }) {
   return (
@@ -127,6 +141,8 @@ const ICONS = {
   servers: <><rect x="4" y="4.5" width="16" height="6" rx="1.5" /><rect x="4" y="13.5" width="16" height="6" rx="1.5" /><path d="M7.5 7.5h.01M7.5 16.5h.01" /></>,
   whatif: <><path d="M6 18V9a3 3 0 0 1 3-3h9" /><path d="m14 2.5 4 3.5-4 3.5" /><path d="M6 18h7" /><circle cx="6" cy="18" r="0.6" /></>,
   import: <><path d="M12 4v10" /><path d="m8 10.5 4 4 4-4" /><path d="M4 15.5V18a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-2.5" /></>,
+  posture: <><path d="M4 17.5a8 8 0 0 1 16 0" /><path d="M12 17.5 15.5 11" /><circle cx="12" cy="17.5" r="1.2" /></>,
+  inventory: <><path d="M4.5 6.5h15M4.5 12h15M4.5 17.5h15" /><circle cx="4.5" cy="6.5" r="0.7" /><circle cx="4.5" cy="12" r="0.7" /><circle cx="4.5" cy="17.5" r="0.7" /></>,
 } as const;
 export type IconName = keyof typeof ICONS;
 

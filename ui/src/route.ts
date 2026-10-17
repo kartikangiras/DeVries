@@ -1,35 +1,35 @@
 // Where the visitor is. Routes live in the hash, so the app is one static page behind any server.
 //
-//   #/acme_support                      the open findings
+//   #/acme_support                      the posture of the scenario: the analytics, where the risk is
+//   #/acme_support/inbox                the open findings
 //   #/acme_support/done                 the closed ones
-//   #/acme_support/finding/fnd:…        one finding: the problem, the fix, the options, the trace
-//   #/acme_support/fixes[/mit:…]        every plan that was tested
-//   #/acme_support/whatif               a change tested in a sandbox, and the cheapest cut as rules
-//   #/acme_support/graph                the whole system, on either renderer
-//   #/acme_support/servers              the MCP servers behind the tools
-//   #/acme_support/audit[/run:…]        what the auditor did
+//   #/acme_support/finding/fnd:…[/step] one finding: summary, rule, path, fix, options; the step is the fourth part
+//   #/acme_support/graph[/id]           the explorer: the whole system on either renderer, a node or a finding's path lit
+//   #/acme_support/inventory[/kind]     every agent, tool, source, resource and server, with what it reaches
+//   #/acme_support/audit[/run:…]        activity: scans, runs, proposals, decisions and writes, in order
 //   #/acme_support/queries[/name]       the Cypher behind all of it, as a drawer over the page
 //   #/acme_support/import               paste a config or a tools/list and audit your own
 //
-// The nav groups them: Findings (Open, Closed), Fixes (Ledger, What if), System (Graph, Servers, Queries),
-// Audit (Runs, Import). The addresses keep their old words (inbox, done), so links in the README and the tests survive.
+// Older addresses keep working: fixes/mit:… lands on the plan's finding, whatif on the explorer, servers on the
+// inventory's servers tab. The nav groups the places: Posture · Findings (Open, Closed) · System (Explorer,
+// Inventory, Queries) · Record (Activity, Import).
 
-export const PAGES = ["inbox", "done", "finding", "fixes", "whatif", "graph", "servers", "audit", "queries", "import"] as const;
+export const PAGES = ["posture", "inbox", "done", "finding", "fixes", "whatif", "graph", "inventory", "servers", "audit", "queries", "import"] as const;
 export type Page = (typeof PAGES)[number];
-export type Route = { scenario: string | null; page: Page; id: string | null };
+export type Route = { scenario: string | null; page: Page; id: string | null; sub: string | null };
 
 export function readRoute(): Route {
-  const [scenario, page, id] = window.location.hash.replace(/^#\/?/, "").split("/").map(decodeURIComponent);
-  const known = (PAGES as readonly string[]).includes(page) ? (page as Page) : "inbox";
-  return { scenario: scenario || null, page: known, id: id || null };
+  const [scenario, page, id, sub] = window.location.hash.replace(/^#\/?/, "").split("/").map(decodeURIComponent);
+  const known = (PAGES as readonly string[]).includes(page) ? (page as Page) : "posture";
+  return { scenario: scenario || null, page: known, id: id || null, sub: sub || null };
 }
 
-export function href(scenario: string | null, page: Page = "inbox", id?: string | null): string {
-  const parts = [scenario, page === "inbox" ? null : page, page === "inbox" ? null : id].filter((p): p is string => !!p);
+export function href(scenario: string | null, page: Page = "posture", id?: string | null, sub?: string | null): string {
+  const parts = [scenario, page === "posture" ? null : page, page === "posture" ? null : id, page === "posture" ? null : sub].filter((p): p is string => !!p);
   return "#/" + parts.map(encodeURIComponent).join("/");
 }
 
-export function go(scenario: string | null, page: Page = "inbox", id?: string | null) {
-  const hash = href(scenario, page, id);
+export function go(scenario: string | null, page: Page = "posture", id?: string | null, sub?: string | null) {
+  const hash = href(scenario, page, id, sub);
   if (window.location.hash !== hash) window.location.hash = hash;
 }
