@@ -110,9 +110,7 @@ export function ActivityPage({ c, scenario, runId }: { c: DeVries; scenario: str
         title={feed.loading && !feed.data ? "Reading the record." : items.length
           ? `${capital(plural(runs, "run", "runs"))}, ${plural(decisions, "decision", "decisions")}, ${plural(items.length, "line", "lines")} in all.`
           : "Nothing has happened here yet."}
-        meta={model?.configured
-          ? <>Every scan, run, plan, decision and write on this scenario, newest first. Runs are driven by {model.name}, which picks the tools; each step of a run says who decided it.</>
-          : <>Every scan, run, plan, decision and write on this scenario, newest first. No model is configured, so a run is scripted: it scans, then tries the candidate fixes in sandbox graphs, cheapest first.</>}
+        meta={<>Every scan, run, plan, decision and write on this scenario, newest first. {model?.configured ? `Runs are driven by ${model.name}.` : "Runs are scripted: no model is configured."}</>}
         actions={canAudit && <Button variant="primary" size="lg" onClick={c.startAudit} disabled={c.busy}>Run audit</Button>}
       />
       <AskBox c={c} />

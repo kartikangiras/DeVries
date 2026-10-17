@@ -11,20 +11,6 @@ import type { DeVries } from "../state";
 import { KIND_WORDS, capital, countWord, plural, short } from "../text";
 import { Button, Empty, Eyebrow, Loading, PageBody, PageHeader } from "../ui";
 
-/** The row's one italic line: why this finding matters, or why it no longer does. */
-function gist(finding: Finding, desk: Desk, names: Record<string, string>): string {
-  if (finding.status === "mitigated") return desk.applied ? `${capital(desk.applied.summary.join(", and "))}.` : "A fix closed it.";
-  if (finding.kind === "drift" && finding.status === "accepted") return `${finding.accepted_by ?? "A person"} accepted the new definitions.`;
-  if (finding.kind === "poisoned_description" && finding.status === "accepted") return `${finding.accepted_by ?? "A person"} read the description and accepted it.`;
-  if (finding.status !== "open") return "It no longer holds in the graph.";
-  if (finding.kind === "drift") return "Tool definitions are not the ones loaded before. Read what changed, then accept them or not.";
-  if (finding.kind === "poisoned_description") return "Text in the tool's description reads as an instruction to the model. Read it before any agent does.";
-  if (finding.kind === "injection") {
-    return `Text an outsider writes there can end in an action on ${names[finding.target_id ?? ""] ?? "a high-impact resource"}, with no person in between.`;
-  }
-  return "One context holds untrusted text, private data and a way to send it out.";
-}
-
 /** An imported install carries no labels: say what is untrusted and what matters, and the scan runs on the answer. */
 function LabelForm({ c }: { c: DeVries }) {
   const sources = (c.flow?.nodes ?? []).filter((n) => n.label === "DataSource");
@@ -98,8 +84,6 @@ function LabelForm({ c }: { c: DeVries }) {
 function Row({ finding, desk, names, scenario }: { finding: Finding; desk: Desk; names: Record<string, string>; scenario: string }) {
   const head = headline(finding, names);
   const plan = desk.proposal ?? desk.applied;
-  // ids in a plan's words are shown as names here too
-  const named = (text: string) => text.replace(/\b(?:agent|tool|src|res|wf):[A-Za-z0-9_.-]*[A-Za-z0-9]/g, (id) => names[id] ?? id);
   return (
     <a className={`case status-${finding.status}`} href={href(scenario, "finding", finding.id)}>
       <article>
@@ -109,13 +93,7 @@ function Row({ finding, desk, names, scenario }: { finding: Finding; desk: Desk;
           <span className="case-kind">{KIND_WORDS[finding.kind]}</span>
           <i>·</i>
           <span className="case-fact"><span>severity</span> {finding.severity}</span>
-          {finding.taxonomy && finding.taxonomy.length > 0 && (
-            <span className="owasp" title={`OWASP Top 10 for Agentic Applications: ${finding.taxonomy.map((t) => `${t.code} ${t.name}`).join("; ")}`}>
-              {finding.taxonomy.map((t) => t.code).join(" · ")}
-            </span>
-          )}
           <span className="case-status">
-            {desk.tested.length > 0 && <span className="case-meta">{plural(desk.tested.length, "plan", "plans")} tested</span>}
             <span className={`phase t-${desk.tone}${desk.pulse ? " pulse" : ""}`}>{desk.word}</span>
           </span>
         </header>
@@ -130,7 +108,6 @@ function Row({ finding, desk, names, scenario }: { finding: Finding; desk: Desk;
           </div>
         </div>
         <footer className="case-foot">
-          <p>{named(gist(finding, desk, names))}</p>
           <span className="case-next">
             <span>{desk.nextLabel}</span>
             <b>{desk.next}</b>

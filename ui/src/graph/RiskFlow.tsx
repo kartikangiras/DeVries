@@ -266,7 +266,7 @@ function Inner({ view, posture, names, scenario }: RiskFlowProps) {
             : <><strong>{name(ribbon.agent_ids[0])}</strong> holds untrusted input, private data and a way out · {ribbon.id} · click to open</>
         ) : overCard ? (
           <><strong>{overCard.name}</strong> <code>{overCard.id}</code>{overCard.eyebrow} · {overCard.sub}{overCard.figure && overCard.figure.value ? ` · ${overCard.figure.label} ${overCard.figure.value} ${overCard.figure.unit}` : overCard.figure ? ` · ${overCard.figure.unit}` : ""} · click to open it in the Explorer</>
-        ) : model.cards.length ? "Each path is one open finding: the tokens are the text an outsider plants, running it endlessly. Hover a path to read it, click it to open it; click a card to open it in the Explorer."
+        ) : model.cards.length ? "Each path is one open finding. Hover it to read it, click it to open it; click a card to open it in the Explorer."
           : "Nothing is drawn because nothing is open: no untrusted source reaches a high-impact action here."}
       </p>
     </div>

@@ -42,15 +42,19 @@ for (const [scenario, fix, cut] of [["acme_support", "gate one call", "set gate 
   // the posture is the home: the sentence, the figures, every block filled
   await page.goto(`${base}/#/${scenario}`);
   await page.waitForSelector(".figures dd", { timeout: 240000 });
-  await page.waitForSelector(".tally-card");
   await page.waitForSelector(".riskflow .river", { state: "attached", timeout: 60000 });   // the picture arrives with the scenario, the figures with the posture
   r.posture = await first(".page-head h1");
   r.postureFigures = await texts(".figures dd");
   r.scansBefore = await page.locator(".scans .scan").count();
-  need(r.postureFigures.length === 7, `${scenario}: the posture should open on seven figures, got ${r.postureFigures}`);
+  need(r.postureFigures.length === 5, `${scenario}: the posture should open on five figures, got ${r.postureFigures}`);
   need((await page.locator(".bars li").count()) >= 2, `${scenario}: the posture should draw the blast radius and the exposure as bars`);
   need((await page.locator(".chokes li").count()) >= 1, `${scenario}: the posture should rank the choke points`);
-  need((await page.locator(".owasp-code").count()) === 10, `${scenario}: the posture should list the ten OWASP classes`);
+  await page.locator(".posture-tally summary").click();
+  await page.waitForSelector(".tally-card");
+  await page.locator(".posture-owasp summary").click();
+  await page.waitForSelector(".owasp-code");
+  need((await page.locator(".owasp-code").count()) === 10, `${scenario}: the posture should list the ten OWASP classes under its fold`);
+  need((await page.locator(".cut-line").count()) === 1, `${scenario}: the posture should say the cheapest cut in one line`);
   need((await page.locator(".riskflow .river").count()) >= 1 && (await page.locator(".riskflow .rcard").count()) >= 3, `${scenario}: the posture should draw the open paths between cards`);
   need((await page.locator(".riskflow .river .token").count()) >= 1, `${scenario}: the open paths should carry tokens`);
   await shot(`${scenario}-0-posture`);
@@ -72,7 +76,6 @@ for (const [scenario, fix, cut] of [["acme_support", "gate one call", "set gate 
   need(/approve the fix/.test(r.next), `${scenario}: the row should say the next step is a person's approval: ${r.next}`);
   need((await page.getByRole("button", { name: "Run audit" }).count()) === 0, `${scenario}: a second audit should not be on offer while one waits`);
   need((await place("Open").locator(".nav-count.alert").count()) === 1, `${scenario}: the inbox count should say something waits for a person`);
-  need((await page.locator(".case .owasp").count()) === r.openBefore, `${scenario}: each open row should carry its OWASP class`);
   await shot(`${scenario}-1-inbox`);
 
   // step 1, the summary: the brief, the path in words, the figures; no chart, nothing about a fix yet

@@ -190,26 +190,15 @@ function Analysis({ finding, cards, c }: { finding: Finding; cards: Card[]; c: D
   const agentIds = cards.map((a) => a.agent_id);
   const workflows = (c.flow?.workflows ?? []).filter((w) => agentIds.includes(w.run_by));
   return (
-    <Block className="analysis" eyebrow="What it means for a fix" aside="read off the flow layer">
+    <Block className="analysis" eyebrow="What it means for a fix" aside="the workflows a fix must not break, and the class in OWASP's list">
       <ul className="analysis-rows">
-        {cards.map((a) => (
-          <li key={a.agent_id}>
-            <strong>{c.names[a.agent_id] ?? a.agent_id}</strong>: {capital(a.verdict)}.
-            {a.autonomous ? " It runs unattended: nobody is there to catch a call." : ""}
-          </li>
-        ))}
         {workflows.map((w) => (
           <li key={w.id}>
             <strong>{w.name}</strong> is {w.mode === "autonomous" ? "an unattended" : "a supervised"} workflow that needs <WithNames text={w.needs.join(", ") || "no tool"} names={c.names} />
             {w.mode === "autonomous" ? ", so a gate on one of those breaks it: a fix has to go around it" : ", so a gate on one of those is a fix a person can live with"}.
           </li>
         ))}
-        {finding.kind === "injection" && (
-          <li>
-            Text an outsider writes into <strong>{c.names[finding.source_id ?? ""] ?? finding.source_id}</strong> can end in an action on <strong>{c.names[finding.target_id ?? ""] ?? finding.target_id}</strong> with no person in between:
-            {finding.paths_found ? ` ${finding.paths_capped ? `${finding.paths_found} or more routes` : plural(finding.paths_found, "route", "routes")}` : " one route"}.
-          </li>
-        )}
+        {!workflows.length && <li>No declared workflow runs through these agents, so nothing constrains the fix.</li>}
         {finding.taxonomy && finding.taxonomy.length > 0 && (
           <li>In the OWASP Top 10 for Agentic Applications it is {finding.taxonomy.map((t, i) => <span key={t.code}>{i > 0 && " and "}<strong>{t.code}</strong> {t.name}</span>)}.</li>
         )}

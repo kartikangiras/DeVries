@@ -177,7 +177,7 @@ export function ExplorerPage({ c, scenario, id }: { c: DeVries; scenario: string
         eyebrow="Explorer"
         title={graph ? `${capital(plural(graph.nodes.length, "node", "nodes"))}, ${plural(graph.links.length, flow ? "flow" : "config edge", flow ? "flows" : "config edges")}${flow && openCount ? `, ${plural(openCount, "open path", "open paths")} lit` : ""}.` : "The whole system."}
         meta={flow
-          ? "Where text and data can travel. Every arc is derived from the config by one of seven rules, and a path means it can flow, not that it did. Lenses light what stands out; the reader says what a card is."
+          ? "Where text and data can travel: every arc comes from the config by one of seven rules, and a path means it can flow, not that it did."
           : "What is configured: which agent can call which tool, who delegates to whom, and what each tool reads and acts on."}
       />
       <div className="chart-controls">

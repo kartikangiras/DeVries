@@ -50,24 +50,26 @@ const stepTo = (page, name) => page.locator(".workflow-step", { has: page.locato
   need(out.cards.length === 3 && out.cards.some((c) => /UNTRUSTED SOURCE Customer tickets/.test(c)) && out.cards.some((c) => /HIGH-IMPACT ACTION Payments API/.test(c)), "the flow should draw the source, the agent and the action as cards: " + out.cards);
   need(out.figures.some((c) => /^1 open finding$/i.test(c)) && out.figures.some((c) => /^1 cheapest cut, cost$/i.test(c)), "the figures should give the open findings and the cheapest cut: " + out.figures);
   await page.locator(".riskflow .river .react-flow__edge-interaction").first().dispatchEvent("mouseover");
-  await page.waitForTimeout(250);
+  await page.waitForFunction(() => /click to open/.test(document.querySelector(".riskflow .chart-over")?.textContent ?? ""), null, { timeout: 5000 }).catch(() => {});
   out.overRibbon = await text(page, ".riskflow .chart-over");
   need(/Customer tickets reaches Payments API through Support bot in four hops/.test(out.overRibbon) && /click to open/.test(out.overRibbon), "hovering a ribbon did not read the finding: " + out.overRibbon);
-  await page.waitForSelector(".cut-block .cut-list li");
-  out.cut = await text(page, ".cut-block");
+  await page.waitForSelector(".cut-line");
+  out.cut = await text(page, ".cut-line");
   need(/Cheapest cut: cost 1\./.test(out.cut) && /Support bot calls get_ticket/.test(out.cut), "the cheapest cut should be named on the posture: " + out.cut);
   await page.locator(".policy summary").click();
   out.policy = await page.locator(".policy pre").first().innerText();
   need(/"deny":\s*\[\s*"mcp__helpdesk__get_ticket"/.test(out.policy), "the cut as a Claude Code rule should deny the one tool: " + out.policy);
+  await page.locator(".posture-tally summary").click();
+  await page.waitForSelector(".tally-card");
   out.tally = await page.locator(".tally-card").allInnerTexts().then((all) => all.map((t) => t.replace(/\s+/g, " ").trim()));
   need(out.tally.length === 1 && /Support bot/.test(out.tally[0]) && /two of three/.test(out.tally[0]), "the tally should give the support bot two of three: " + out.tally);
   out.blast = await text(page, ".posture-blast .bars li");
   need(/Customer tickets/.test(out.blast) && /one high-impact/.test(out.blast), "the blast radius should name the one untrusted source and what it reaches: " + out.blast);
   await shot(page, "views-posture");
   // the cut as one plan: the sandbox refuses it here, because the refund workflow needs the grant it would revoke
-  await page.getByRole("button", { name: "Propose the cut as one plan" }).click();
-  await page.waitForSelector(".propose-cut .whatif-error, .propose-cut a", { timeout: 60000 });
-  out.proposeCut = await text(page, ".propose-cut");
+  await page.getByRole("button", { name: "Propose it as one plan" }).click();
+  await page.waitForSelector(".cut-line .whatif-error, .cut-line a", { timeout: 60000 });
+  out.proposeCut = await text(page, ".cut-line");
   need(/refused it/.test(out.proposeCut) && /refund-request|Refund request/.test(out.proposeCut), "proposing the cut should be refused by the sandbox with the workflow named: " + out.proposeCut);
 
   // the explorer: every node, as cards in lanes, the open paths lit; what is under the pointer is named, a clicked card is read out beside the chart
@@ -85,7 +87,7 @@ const stepTo = (page, name) => page.locator(".workflow-step", { has: page.locato
   need(/Support bot agent:support-bot/.test(out.overNode) && /untrusted text reaches it/.test(out.overNode), "hovering a card did not name it under the chart: " + out.overNode);
   // an arc is a thin curve under a wide invisible stroke; the pointer event is sent to it rather than aimed at it
   await page.locator('.wire[data-hop="agent:support-bot>tool:payments.issue_refund"] .react-flow__edge-interaction').dispatchEvent("mouseover");
-  await page.waitForTimeout(250);
+  await page.waitForFunction(() => /^rule 3/.test(document.querySelector(".chart-over")?.textContent ?? ""), null, { timeout: 5000 }).catch(() => {});
   out.overEdge = await text(page, ".chart-over");
   need(/^rule 3: Support bot can call issue_refund/.test(out.overEdge), "hovering an arc did not say what it stands for: " + out.overEdge);
   await page.locator('.fcard[data-id="agent:support-bot"]').click();

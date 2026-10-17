@@ -163,7 +163,7 @@ a.id:hover { color: var(--ink-strong); text-decoration-color: var(--accent); }
 .transform-to { font: 500 19px/1 var(--sans); letter-spacing: -0.016em; color: var(--accent); white-space: nowrap; }
 .transform-none { font: 400 13px var(--mono); color: var(--ink-faint); }
 
-.case-foot { display: flex; align-items: center; justify-content: space-between; gap: 32px; min-height: 44px; padding: 9px 28px; border-top: 1px solid var(--rule-soft); }
+.case-foot { display: flex; align-items: center; justify-content: flex-end; gap: 32px; min-height: 40px; padding: 7px 28px; border-top: 1px solid var(--rule-soft); }
 .case-foot p { min-width: 0; font: 400 14px/1.45 var(--sans); color: var(--ink-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .case-next { flex: none; display: inline-flex; align-items: baseline; gap: 10px; }
 .case-next span { font-size: 10.5px; font-weight: 500; letter-spacing: 0.2em; text-transform: uppercase; color: var(--ink-faint); }
