@@ -196,12 +196,10 @@ export function ExplorerPage({ c, scenario, id, sub }: { c: DeVries; scenario: s
       <PageHeader
         eyebrow="Explorer"
         title={graph ? `${capital(plural(graph.nodes.length, "node", "nodes"))}, ${plural(graph.links.length, flow ? "flow" : "config edge", flow ? "flows" : "config edges")}${flow && openCount ? `, ${plural(openCount, "open path", "open paths")} lit` : ""}.` : "The whole system."}
-        meta={flow
-          ? "Where text and data can travel: every arc comes from the config by one of seven rules, and a path means it can flow, not that it did."
-          : "What is configured: which agent can call which tool, who delegates to whom, and what each tool reads and acts on."}
-        {view}
+        meta={flow ? "Where text and data can travel." : "What a person set up."}
       />
       <div className="chart-controls">
+        {view}
         <span className="control">Lens</span>
         <div className="pills" role="tablist" aria-label="Lens">
           <button role="tab" aria-selected={lens === "paths"} className={lens === "paths" ? "on" : ""} onClick={() => { setLens("paths"); setLayer("flow"); if (litFinding) pick(null); }} title="The open findings' paths lit over the whole system">Open paths{openCount ? ` · ${openCount}` : ""}</button>
@@ -228,51 +226,30 @@ export function ExplorerPage({ c, scenario, id, sub }: { c: DeVries; scenario: s
               cuts={cutting ? cutHops ?? undefined : undefined} cutsMean="on the cheapest cut" rings={rings} badges={badges} picked={picked} onPick={pick} idle={idle} heightRange={[360, chartHeight]} fitZoom={2.1} />
           ) : <Loading label={c.ready ? "Reading the graph" : "Connecting"} />}
           {cutting && (
-            <p className="chart-note">
-              <strong>Cheapest cut.</strong> The marked hops are the least that separates every untrusted source from every high-impact resource, by max flow.
-              The hops, their cost and the rules they would become are on <a href={href(scenario)}>Posture</a>.
-            </p>
+            <p className="chart-note"><strong>Cheapest cut.</strong> The marked hops; their cost and the rules they would become are on <a href={href(scenario)}>Posture</a>.</p>
           )}
           {centring && central?.scenario === scenario && (
             <div className="chart-note cut-note central-note">
-              <p><strong>Most central.</strong> The agents and tools the most flow passes through, by betweenness centrality on the flow layer: where a change would touch the most paths. Context for a person; no verdict rests on it.</p>
+              <p><strong>Most central.</strong> The agents and tools the most flow passes through.</p>
               <ol className="cut-list">
                 {central.nodes.map((n) => <li key={n.id}><button className="link-plain" onClick={() => pick(n.id)}><WithNames text={n.id} names={c.names} /></button><span> · {n.label.toLowerCase()} · {n.score}</span></li>)}
               </ol>
-              <p>Worked out by <a href={href(scenario, "queries", "choke.betweenness")}>choke.betweenness</a>, which runs FalkorDB's <code>algo.betweenness</code> with a fixed sampling seed.</p>
             </div>
           )}
           {lens === "zones" && graph && (
             <p className="chart-note">
-              {capital(plural(communityCount, "community", "communities"))} by label propagation over the config edges, coloured on the cards' edges: what hangs together, and which of it holds untrusted input.
-              Worked out by <a href={href(scenario, "queries", "zones.communities")}>zones.communities</a> (FalkorDB's <code>algo.labelPropagation</code>).{" "}
+              {capital(plural(communityCount, "community", "communities"))}, coloured on the cards' edges.{" "}
               {zoneCount === 1 && inZone === total
                 ? "Connected at all, the graph is one zone, and a blast zone: it holds both an untrusted source and a high-impact resource."
                 : inZone === 0
                   ? `Connected at all, it is ${plural(zoneCount, "zone", "zones")}, none a blast zone: no connected part holds both an untrusted source and a high-impact resource.`
-                  : `Connected at all, it is ${plural(zoneCount, "zone", "zones")}; ${plural(inZone, "node", "nodes")} sit in a blast zone, one that holds both an untrusted source and a high-impact resource.`}{" "}
-              Neither looks at direction, so either can prove a source cannot reach a resource, never that it can.
+                  : `Connected at all, it is ${plural(zoneCount, "zone", "zones")}; ${plural(inZone, "node", "nodes")} sit in a blast zone, one that holds both an untrusted source and a high-impact resource.`}
             </p>
           )}
           {litFinding && (
             <p className="chart-note">
               Lit: the path of <a href={href(scenario, "finding", litFinding.id, "path")}>{findingTitle(litFinding, c.names)}</a>. <button className="link" onClick={() => pick(null)}>Show every open path</button>.
             </p>
-          )}
-          {graph && (
-            <figcaption>
-              <Fold className="source" summary="Source and method" sub={`the ${layer} layer · ${plural(graph.queries.length, "FalkorDB query", "FalkorDB queries")} · ${renderer === "falkordb" ? "FalkorDB canvas" : "ELK and React Flow"}`}>
-                <p className="chart-note">
-                  Source: the {layer} layer of {scenario}{c.current?.own_copy ? " (your sandbox copy)" : ""} in FalkorDB, read by{" "}
-                  {graph.queries.map((q, i) => <span key={q}>{i > 0 && ", "}<a href={href(scenario, "queries", q)}>{q}</a></span>)}.{" "}
-                  {renderer === "falkordb"
-                    ? "Drawn by FalkorDB's canvas component on the database's own node ids; the colours are DeVries's facts."
-                    : "Laid out by ELK in lanes, drawn with React Flow; a card is filled when untrusted text reaches it, which FalkorDB works out (reach.untrusted_nodes)."}
-                  {flow ? " A path means text can flow, not that it did." : " Config edges are what a person set up; the flow layer is derived from them."}
-                  {c.health?.canary && <> Self-check: {c.health.canary.ok ? "passed" : "FAILED"} ({c.health.canary.detail}).</>}
-                </p>
-              </Fold>
-            </figcaption>
           )}
           {graph && (
             <details className="as-table">
