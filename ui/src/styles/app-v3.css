@@ -56,16 +56,6 @@
 .more .block { gap: 12px; }
 .takeaway a { color: var(--ink); }
 
-/* ---- the queries drawer */
-.drawer-scrim { position: fixed; inset: 0; z-index: 40; background: rgb(0 0 0 / 0.45); animation: fade-up 180ms var(--ease-out-quart) both; }
-.drawer { position: absolute; top: 0; right: 0; bottom: 0; width: min(1180px, 96vw); display: flex; flex-direction: column; background: var(--bg); border-left: 1px solid var(--rule); box-shadow: -24px 0 60px rgb(0 0 0 / 0.45); animation: drawer-in 260ms var(--ease-out-quart) both; }
-@keyframes drawer-in { from { transform: translateX(24px); opacity: 0; } to { transform: none; opacity: 1; } }
-.drawer-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; padding: 22px 28px 14px; border-bottom: 1px solid var(--rule-soft); }
-.drawer-head h2 { margin-top: 6px; font: 500 18px/1.2 var(--mono); letter-spacing: -0.01em; color: var(--ink-strong); }
-.drawer-close { display: inline-flex; padding: 8px; border-radius: var(--radius-sm); color: var(--ink-faint); }
-.drawer-close:hover { background: var(--surface); color: var(--ink-strong); }
-.drawer .catalog { flex: 1; min-height: 0; }
-
 /* ---- the change to your config, under the approval line */
 .approval { flex-direction: column; align-items: stretch; gap: 0; }
 .approval-top { display: flex; align-items: center; justify-content: space-between; gap: 28px; }
@@ -100,7 +90,6 @@
 .switch-import button .switch-name { color: var(--accent); }
 
 @media (max-width: 860px) {
-  .drawer { width: 100vw; }
   .approval-top { flex-direction: column; align-items: stretch; gap: 12px; }
   .ov-counts { grid-template-columns: repeat(3, 1fr); }
 }
@@ -338,9 +327,6 @@
 .read .whatif-line { margin-top: 4px; }
 .read .whatif-line select { max-width: 100%; }
 .read .whatif-answer { margin-top: 10px; }
-/* the queries drawer stays beside the sidebar at every width */
-.drawer { width: min(1180px, calc(100vw - 224px)); }
-.drawer-head h2 { overflow-wrap: anywhere; }
 @media (max-width: 1180px) {
   .posture-pair { grid-template-columns: 1fr; }
 }
@@ -350,7 +336,6 @@
   .catalog > .catalog-list { max-height: 220px; overflow-y: auto; border-right: 0; border-bottom: 1px solid var(--rule-soft); }
 }
 @media (max-width: 860px) {
-  .drawer { width: 100vw; }
   .bars li { grid-template-columns: minmax(0, 1fr) 36px; }
   .bars .bar-track { grid-column: 1 / -1; }
   .chokes li { grid-template-columns: 22px minmax(0, 1fr); }

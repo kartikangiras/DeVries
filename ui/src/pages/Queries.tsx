@@ -1,10 +1,10 @@
-// The Cypher behind everything, one named query at a time, in a drawer over whatever page the visitor
-// was on. Nothing in the app runs a query that is not in this list. The three parts (the list, the
-// statement, what it is used by) follow Manthan's policy page (see ui/THIRD_PARTY_NOTICES.md).
+// The Cypher behind everything, one named query at a time: the catalogue down the side, the statement in the
+// middle, where it is used on the right. Nothing in the app runs a query that is not in this list. It sits on
+// the Method page; the three parts follow Manthan's policy page (see ui/THIRD_PARTY_NOTICES.md).
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import type { CatalogQuery } from "../api";
-import { go, href, type Route } from "../route";
+import { go, href } from "../route";
 import type { DeVries } from "../state";
 import { plural } from "../text";
 import { Eyebrow, Icon, KV, Loading } from "../ui";
@@ -13,22 +13,22 @@ const GROUPS: { label: string; prefixes: string[] }[] = [
   { label: "Verdicts and evidence", prefixes: ["reach", "find", "evidence", "wf", "graph"] },
   { label: "Graph algorithms", prefixes: ["zones", "choke"] },
   { label: "Fixes and what-ifs", prefixes: ["fix", "whatif"] },
-  { label: "Findings, plans and drafts", prefixes: ["finding", "mitigation", "draft", "config"] },
+  { label: "Findings, plans and drafts", prefixes: ["finding", "mitigation", "draft", "config", "scan"] },
   { label: "The flow layer", prefixes: ["projection", "flow"] },
-  { label: "Reading for the page", prefixes: ["ui", "node", "scenario", "overview"] },
+  { label: "Reading for the page", prefixes: ["ui", "node", "scenario", "overview", "inventory", "server", "agent"] },
   { label: "Loading a scenario", prefixes: ["ingest", "schema", "canary"] },
 ];
 const DEFAULT = "reach.untrusted_to_high";
 /** Where on screen a query's answer shows, by its prefix: the places, so a reader can find the figure it feeds. */
 const USED_ON: [string, string][] = [
   ["reach.untrusted_to_high", "a finding's Rule step · Posture's exposure"], ["find.trifecta", "a finding's Rule step · Posture's tally"],
-  ["reach.agents_from_sources", "Posture's Rule of Two tally · the Explorer's reader"], ["reach.from", "Posture's blast radius · the Inventory"],
-  ["reach.into", "Posture's exposure per target · the Inventory"], ["reach.untrusted_nodes", "every chart's filled cards · the Inventory"],
+  ["reach.agents_from_sources", "Posture's Rule of Two tally · the Explorer's reader"], ["reach.from", "Posture's blast radius · the Explorer's tables"],
+  ["reach.into", "Posture's exposure · the Explorer's tables"], ["reach.untrusted_nodes", "every chart's filled cards · the Explorer's tables"],
   ["evidence.", "a finding's Path step · Posture's choke points"], ["wf.", "every sandbox verdict"], ["choke.maxflow", "Posture's cheapest cut · the Explorer's cut lens"],
-  ["choke.betweenness", "Posture's choke points · the Explorer's central lens"], ["choke.pagerank", "the Inventory · the Explorer's reader"],
-  ["zones.", "the Explorer's communities lens"], ["fix.", "a plan applied, or tested in a sandbox"], ["whatif.", "the Explorer's reader · the Inventory's servers"],
+  ["choke.betweenness", "Posture's choke points · the Explorer's central lens"], ["choke.pagerank", "the Explorer's tables and reader"],
+  ["zones.", "the Explorer's communities lens"], ["fix.", "a plan applied, or tested in a sandbox"], ["whatif.", "the Explorer's reader and tables"],
   ["finding.", "Open and Closed · Activity"], ["mitigation.", "a finding's Fix and Options steps · Activity"], ["scan.", "Posture's history · Activity"],
-  ["draft.", "the change under the approval bar · Activity"], ["ui.", "the Explorer · the Inventory"], ["overview.", "Posture"], ["server.", "the Inventory's servers"],
+  ["draft.", "the change under the approval bar · Activity"], ["ui.", "the Explorer"], ["overview.", "Posture"], ["server.", "the Explorer's tables"], ["inventory.", "the Explorer's tables"],
   ["projection.", "every scan"], ["flow.", "the Explorer · the cut"], ["ingest.", "loading a scenario"], ["schema.", "loading a scenario"], ["canary.", "the self-check at start"],
   ["config.", "the config hash a plan is tested against"], ["graph.", "every scan"], ["node.", "every page's names"], ["scenario.", "the scenario switch"], ["agent.", "Posture's tally"],
   ["drift.", "a manifest drift finding"],
@@ -53,8 +53,20 @@ export function Cypher({ text }: { text: string }) {
   return <pre className="cypher"><code>{out}</code></pre>;
 }
 
-/** The drawer: the catalogue down the side, the statement in the middle, what it is for and who used it on the right. */
-export function QueryDrawer({ c, scenario, name, back }: { c: DeVries; scenario: string; name: string | null; back: Route }) {
+/** One query's statement, read from the catalogue by name, for the Method page to quote. */
+export function Statement({ c, scenario, name }: { c: DeVries; scenario: string; name: string }) {
+  const q = c.catalog.find((x) => x.name === name);
+  if (!q) return <Loading label={`Reading ${name}`} />;
+  return (
+    <figure className="statement">
+      <figcaption><a href={href(scenario, "method", "queries", name)}>{q.name}</a> <span>{q.doc}</span></figcaption>
+      <Cypher text={q.cypher} />
+    </figure>
+  );
+}
+
+/** The catalogue: the list down the side, the statement in the middle, what it is for and who used it on the right. */
+export function QueryCatalogue({ c, scenario, name }: { c: DeVries; scenario: string; name: string | null }) {
   const [find, setFind] = useState("");
   const byName = useMemo(() => new Map(c.catalog.map((q) => [q.name, q])), [c.catalog]);
   const selected = byName.get(name ?? DEFAULT) ?? c.catalog[0] ?? null;
@@ -69,124 +81,104 @@ export function QueryDrawer({ c, scenario, name, back }: { c: DeVries; scenario:
     const rest = c.catalog.filter((q) => !placed.has(q.name));
     return rest.length ? [...groups, { label: "Other", list: rest }] : groups;
   }, [c.catalog]);
-  const close = () => go(back.scenario ?? scenario, back.page === "queries" ? "posture" : back.page, back.id, back.sub);
-  useEffect(() => {
-    const key = (e: KeyboardEvent) => e.key === "Escape" && close();
-    window.addEventListener("keydown", key);
-    return () => window.removeEventListener("keydown", key);
-  });
-  // the selected query is in view when the drawer opens, however far down the catalogue it sits
+  // the selected query is in view, however far down the catalogue it sits
   useEffect(() => {
     document.querySelector(".catalog-list a.on")?.scrollIntoView({ block: "nearest" });
   }, [selected?.name]);
 
+  if (!c.catalog.length) return <Loading label="Reading the query catalogue" />;
   const params = selected ? [...new Set(selected.cypher.match(/\$\w+/g) ?? [])] : [];
   const algos = selected ? [...new Set(selected.cypher.match(/algo\.\w+/g) ?? [])] : [];
   const users = selected && c.run ? c.run.steps.filter((s) => s.queries.includes(selected.name)) : [];
 
   return (
-    <div className="drawer-scrim" onClick={close} role="presentation">
-      <aside className="drawer" role="dialog" aria-label="The queries" onClick={(e) => e.stopPropagation()}>
-        <header className="drawer-head">
-          <div>
-            <Eyebrow>Queries</Eyebrow>
-            <h2>{selected ? selected.name : "The catalogue"}</h2>
-          </div>
-          <button className="drawer-close" onClick={close} aria-label="Close">
-            <Icon name="cross" size={16} />
-          </button>
-        </header>
-        {!c.catalog.length ? <Loading label="Reading the query catalogue" /> : (
-          <div className="catalog">
-            <nav className="catalog-list scroll" aria-label="Queries">
-              <label className="search">
-                <Icon name="search" size={15} />
-                <input type="search" value={find} onChange={(e) => setFind(e.target.value)} placeholder="Find a query…" aria-label="Find a query" />
-              </label>
-              {grouped.map((g) => {
-                const list = g.list.filter(match);
-                if (!list.length) return null;
-                return (
-                  <div className="catalog-group" key={g.label}>
-                    <Eyebrow>{g.label}</Eyebrow>
-                    {list.map((q) => (
-                      <a key={q.name} href={href(scenario, "queries", q.name)} className={q.name === selected?.name ? "on" : ""} aria-current={q.name === selected?.name ? "true" : undefined}>
-                        {q.name}
-                      </a>
-                    ))}
-                  </div>
-                );
-              })}
-              <p className="catalog-count">{plural(c.catalog.length, "query", "queries")} · all named · no other Cypher runs</p>
-            </nav>
+    <div className="catalog">
+      <nav className="catalog-list scroll" aria-label="Queries">
+        <label className="search">
+          <Icon name="search" size={15} />
+          <input type="search" value={find} onChange={(e) => setFind(e.target.value)} placeholder="Find a query…" aria-label="Find a query" />
+        </label>
+        {grouped.map((g) => {
+          const list = g.list.filter(match);
+          if (!list.length) return null;
+          return (
+            <div className="catalog-group" key={g.label}>
+              <Eyebrow>{g.label}</Eyebrow>
+              {list.map((q) => (
+                <a key={q.name} href={href(scenario, "method", "queries", q.name)} className={q.name === selected?.name ? "on" : ""} aria-current={q.name === selected?.name ? "true" : undefined}>
+                  {q.name}
+                </a>
+              ))}
+            </div>
+          );
+        })}
+        <p className="catalog-count">{plural(c.catalog.length, "query", "queries")} · all named · no other Cypher runs</p>
+      </nav>
 
-            {selected && (
-              <div className="scroll">
-                <article className="query">
-                  <header className="query-head">
-                    <div>
-                      <Eyebrow>Query</Eyebrow>
-                      <h1>{selected.name}</h1>
-                      <p className="query-doc">{selected.doc}</p>
-                    </div>
-                    <span className={`phase ${selected.mode === "ro" ? "t-muted" : "t-info"}`}>{selected.mode === "ro" ? "Read only" : "Writes"}</span>
-                  </header>
-                  <Eyebrow>Cypher</Eyebrow>
-                  <Cypher text={selected.cypher} />
-                </article>
+      {selected && (
+        <div className="scroll">
+          <article className="query">
+            <header className="query-head">
+              <div>
+                <Eyebrow>Query</Eyebrow>
+                <h1>{selected.name}</h1>
+                <p className="query-doc">{selected.doc}</p>
               </div>
-            )}
+              <span className={`phase ${selected.mode === "ro" ? "t-muted" : "t-info"}`}>{selected.mode === "ro" ? "Read only" : "Writes"}</span>
+            </header>
+            <Eyebrow>Cypher</Eyebrow>
+            <Cypher text={selected.cypher} />
+          </article>
+        </div>
+      )}
 
-            {selected && (
-              <aside className="rail" aria-label="About this query">
-                <section>
-                  <Eyebrow>At a glance</Eyebrow>
-                  <dl>
-                    <KV k="Mode">{selected.mode === "ro" ? "read only" : "writes"}</KV>
-                    <KV k="Runs on">{selected.targets.map((t) => (t === "working" ? "working graphs" : "sandboxes")).join(", ")}</KV>
-                    <KV k="Parameters">{params.length ? params.join(" ") : "none"}</KV>
-                    <KV k="Algorithms">{algos.length ? algos.join(" ") : "none"}</KV>
-                    <KV k="Time limit">{selected.timeout_ms} ms</KV>
-                  </dl>
-                  <p className="rail-note">
-                    {selected.mode === "ro"
-                      ? "It is sent with GRAPH.RO_QUERY, so it cannot change a graph."
-                      : selected.name.startsWith("fix.")
-                        ? "Guarded: on a working graph it runs only for a plan a person approved. On a sandbox copy it runs freely, which is how a plan is tested."
-                        : !selected.targets.includes("working")
-                          ? "It writes, and only to a sandbox copy: it never runs on a working graph."
-                          : "It writes to the graph it is run on."}
-                  </p>
-                </section>
-                <section>
-                  <Eyebrow>Used on</Eyebrow>
-                  <p className="rail-note">{usedOn(selected.name)}.</p>
-                </section>
-                <section>
-                  <div className="block-head">
-                    <Eyebrow>Used by</Eyebrow>
-                    {c.run && <span>{c.run.id}</span>}
-                  </div>
-                  {users.length ? (
-                    <ul className="used">
-                      {users.map((s) => (
-                        <li key={s.n}>
-                          <button onClick={() => go(scenario, "audit", c.run!.id)}>
-                            <code>{s.tool}</code>
-                            <span>step {s.n} · {s.phase}{s.ms != null ? ` · ${s.ms} ms` : ""}</span>
-                          </button>
-                        </li>
-                      ))}
-                    </ul>
-                  ) : (
-                    <p className="rail-note">{c.run ? "No step of the last audit run used it." : "Run an audit to see which of its steps use this query."}</p>
-                  )}
-                </section>
-              </aside>
+      {selected && (
+        <aside className="rail" aria-label="About this query">
+          <section>
+            <Eyebrow>At a glance</Eyebrow>
+            <dl>
+              <KV k="Mode">{selected.mode === "ro" ? "read only" : "writes"}</KV>
+              <KV k="Runs on">{selected.targets.map((t) => (t === "working" ? "working graphs" : "sandboxes")).join(", ")}</KV>
+              <KV k="Parameters">{params.length ? params.join(" ") : "none"}</KV>
+              <KV k="Algorithms">{algos.length ? algos.join(" ") : "none"}</KV>
+              <KV k="Time limit">{selected.timeout_ms} ms</KV>
+            </dl>
+            <p className="rail-note">
+              {selected.mode === "ro"
+                ? "It is sent with GRAPH.RO_QUERY, so it cannot change a graph."
+                : selected.name.startsWith("fix.")
+                  ? "Guarded: on a working graph it runs only for a plan a person approved. On a sandbox copy it runs freely, which is how a plan is tested."
+                  : !selected.targets.includes("working")
+                    ? "It writes, and only to a sandbox copy: it never runs on a working graph."
+                    : "It writes to the graph it is run on."}
+            </p>
+          </section>
+          <section>
+            <Eyebrow>Used on</Eyebrow>
+            <p className="rail-note">{usedOn(selected.name)}.</p>
+          </section>
+          <section>
+            <div className="block-head">
+              <Eyebrow>Used by</Eyebrow>
+              {c.run && <span>{c.run.id}</span>}
+            </div>
+            {users.length ? (
+              <ul className="used">
+                {users.map((s) => (
+                  <li key={s.n}>
+                    <button onClick={() => go(scenario, "audit", c.run!.id)}>
+                      <code>{s.tool}</code>
+                      <span>step {s.n} · {s.phase}{s.ms != null ? ` · ${s.ms} ms` : ""}</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="rail-note">{c.run ? "No step of the last run used it." : "Run an audit to see which of its steps use this query."}</p>
             )}
-          </div>
-        )}
-      </aside>
+          </section>
+        </aside>
+      )}
     </div>
   );
 }
