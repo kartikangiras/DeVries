@@ -1,6 +1,6 @@
-# Third-party notices for the Cistern UI
+# Third-party notices for the DeVries UI
 
-The UI in this directory is Cistern's own code. Its look and its structure are not original:
+The UI in this directory is DeVries's own code. Its look and its structure are not original:
 they follow two other projects, on purpose. This file says what was taken from each, under what
 terms, and what was changed.
 
@@ -11,7 +11,7 @@ terms, and what was changed.
 - Licence: Apache License, Version 2.0. A copy is in [`licenses/Apache-2.0.txt`](licenses/Apache-2.0.txt).
   The Manthan repository has no NOTICE file.
 
-Cistern's interface is adapted from Manthan's `manthan-ui`: its "Operations Memo" design system, the
+DeVries's interface is adapted from Manthan's `manthan-ui`: its "Operations Memo" design system, the
 structure of its app, and its landing page. Read for this were `manthan-ui/.impeccable.md`,
 `src/globals.css`, `src/components/app/AppShell.tsx`, `src/components/ui/{Page,Button,Badge}.tsx`,
 `src/components/app/workspace/atoms.tsx`, `src/pages/Inbox.tsx`, `src/pages/drafts/WorkspaceMemo.tsx`,
@@ -46,34 +46,34 @@ What was taken:
 What was changed:
 
 - No Manthan source file is included. Everything is rewritten as plain CSS and React components for
-  Cistern's own data; Tailwind, `motion`, `lucide` and the router are not used.
+  DeVries's own data; Tailwind, `motion`, `lucide` and the router are not used.
 - Token names are shortened (`--color-bg` is `--bg`). The light theme is left out. `--info` is lighter.
 - The accent is a desaturated iris, `oklch(0.64 0.15 285)`, where Manthan's is a desaturated emerald,
   `oklch(0.62 0.15 150)`; the chroma and the role of the colour are the same.
 - The landing page is plain React and CSS: no Tailwind, `motion`, GSAP, `lucide` or router. Its
   reveals are an IntersectionObserver, its scenes are CSS transitions, and its videos (Manthan's are
   on its own CDN and not part of the repository) are replaced by a drawn background: a canvas of slow
-  colour and ripples. The pricing section is a "run it" section, since Cistern has no price. All copy,
-  all content of the demo and the cards, and all product logic are Cistern's.
+  colour and ripples. The pricing section is a "run it" section, since DeVries has no price. All copy,
+  all content of the demo and the cards, and all product logic are DeVries's.
 - The display serif is Instrument Serif everywhere (Manthan's app styles name Spectral).
 - Fonts are served by the app from `@fontsource` packages, not fetched from Google Fonts.
 - A "case" is a finding, "drafted actions" are the changes of a plan, "policy" is the workflows a fix
   must not break, and the view toggle shows the audit trace.
-- Icons, the mark, all copy and all product logic are Cistern's. Manthan's name, logo, images and
+- Icons, the mark, all copy and all product logic are DeVries's. Manthan's name, logo, images and
   text are not used.
 
 ## simple-icons (the marks on the landing page)
 
 - Project: simple-icons, <https://github.com/simple-icons/simple-icons>, licence CC0-1.0.
 - Used: the SVG paths and brand colours of thirty marks, in `src/landing/servers.ts`, for the marquee
-  of MCP servers on the landing page. Each mark is its owner's trademark; it names a server Cistern
+  of MCP servers on the landing page. Each mark is its owner's trademark; it names a server DeVries
   can load and implies no endorsement.
 
 ## Agent Ethology (charts only)
 
 - Site: <https://agent-ethology.vercel.app/> (pages read: `backstage.html`, `ideas.html`, `contagion.html`)
 
-How Cistern draws a graph follows the charts on that site: a rounded panel; dots on lanes, each with
+How DeVries draws a graph follows the charts on that site: a rounded panel; dots on lanes, each with
 a dark ring; thin arcs between them; the region of concern shaded faintly; notes written on the chart
 as sentences in a mono face; names next to their dots; pill controls above and a source note below;
 a panel that reads whatever dot is clicked. The five chart colours in `src/styles/chart.css` are
@@ -103,15 +103,13 @@ the chart's text alternative: the edges of a chart, as a table, under the chart.
 The charts are drawn with these libraries, used unmodified as dependencies; none of their code is copied
 into this repository.
 
-- **React Flow** (`@xyflow/react` 12), <https://reactflow.dev/>, MIT. Draws Cistern's own chart: the
-  cards, the arcs, zoom and pan. The node and edge components, the lanes and the key are Cistern's.
+- **React Flow** (`@xyflow/react` 12), <https://reactflow.dev/>, MIT. Draws DeVries's own chart: the
+  cards, the arcs, zoom and pan. The node and edge components, the lanes and the key are DeVries's.
 - **ELK** (`elkjs` 0.12, the Eclipse Layout Kernel compiled to JavaScript), <https://github.com/kieler/elkjs>,
   EPL-2.0 (or GPL-3.0-or-later; the EPL is used here). Lays the cards out in lanes, left to right.
-- **d3-sankey** (0.12), <https://github.com/d3/d3-sankey>, BSD-3-Clause. Lays out the overview: the
-  columns, the order that keeps the ribbons from crossing, and the ribbon paths.
 - **FalkorDB canvas** (`@falkordb/canvas` 0.3), <https://github.com/FalkorDB/falkordb-canvas>, MIT.
-  FalkorDB's own graph component, the second renderer on every chart. Cistern's node drawing on it
-  (`src/graph/GraphCanvas.tsx`) is Cistern's; the layouts, the hit testing and the camera are the component's.
+  FalkorDB's own graph component, the second renderer on every chart. DeVries's node drawing on it
+  (`src/graph/GraphCanvas.tsx`) is DeVries's; the layouts, the hit testing and the camera are the component's.
 
 The lane chart that these replace was drawn by hand in SVG after Agent Ethology's charts; what survives of
 that is the vocabulary of the key (hot, private, plain, gated, cut, central) and the lanes.
