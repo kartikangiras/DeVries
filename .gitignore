@@ -18,15 +18,17 @@ ui/dist/
 ui/e2e/shots/
 *.log
 .imports/
-*.cistern.bak
-*.cistern.tmp
+*.devries.bak
+*.devries.tmp
 
 # local snapshots and OS files
 .snapshots/
 .DS_Store
 
-# plans and generated documents stay local; the README is the one document that ships
+# plans stay local; the README, the generated query list and the third-party notices ship
 *.md
 !README.md
+!docs/QUERIES.md
+!ui/THIRD_PARTY_NOTICES.md
 # brand sources
 logos/

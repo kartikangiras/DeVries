@@ -1,6 +1,6 @@
 """DeVries's MCP server. It holds no logic of its own: each tool wraps the engines.
 
-Ten tools. Six read: list_scenarios, scan, trust_zones, find_injection_paths,
+Eleven tools. Seven read: list_scenarios, scan, trust_zones, rule_of_two, find_injection_paths,
 find_trifecta_agents, rank_chokepoints. Two test changes in a sandbox:
 simulate_mitigation, what_if. Two act: propose_fix, apply_fix. There is
 deliberately no approval tool: only a person can approve a fix, through the API.
