@@ -56,6 +56,7 @@ Without FalkorDB, DeVries cannot compute a path, rank a chokepoint or verify a f
 | Trust zones and communities | `algo.WCC` over the flow layer; `algo.labelPropagation` over the config edges |
 | Influence | `algo.pageRank` over the flow layer, on every node's read panel |
 | The Rule of Two | Three BFS passes per scenario: which agents untrusted input reaches, which private data reaches, which can act |
+| The posture | `algo.bfs` from each untrusted source (its blast radius) and from every node into each high-impact action (its exposure); the open routes through each node beside `algo.betweenness` for the choke points; one `Scan` node per scan for the history |
 | Central agents and tools | `algo.betweenness` |
 | The cheapest cut | `algo.maxFlow`, with each hop's capacity set to the cost of the cheapest fix that cuts it |
 | Sandboxes | `GRAPH.COPY`: a fix is tested on a copy, which is then deleted; there is no other way a sandbox is made |
@@ -73,7 +74,7 @@ cp .env.example .env        # then set FALKORDB_PASSWORD
 make app                    # FalkorDB 6.0.2 and the app, in containers
 ```
 
-Open <http://localhost:8000>: a landing page, with the app behind "Open the app" (or at `#/acme_support`) and your own config behind "Paste your config" (`#/acme_support/import`). The app loads the nine scenarios on first start, scans each, and audits each to its first proposal, scripted, so the first screen already holds tested plans waiting for a nod. `PRERUN_AUDITS=false` skips that pass.
+Open <http://localhost:8000>: a landing page, with the app behind "Open the app" (or at `#/acme_support`) and your own config behind "Paste your config" (`#/acme_support/import`). The app loads the nine scenarios on first start, scans each, and audits each to its first proposal, scripted, so the first screen already holds tested plans waiting for approval. `PRERUN_AUDITS=false` skips that pass.
 
 From source, for development:
 
@@ -106,27 +107,25 @@ To let a model drive the auditor, put `ANTHROPIC_API_KEY` in `.env`. `.env.examp
 
 ## A tour in five minutes
 
-The sidebar is in four groups: **Findings** (Open, Closed), **Fixes** (Ledger, What if), **System** (Graph, Servers, Queries) and **Audit** (Runs, Import). The switch at its top changes scenario. A finding is worked through in five steps, each about one thing: **Summary**, **Path** (hop by hop), **Why** (each agent on the path against Meta's Rule of Two), **Fix** (the plan that passed, where it cuts, the path as it would leave it, and the approval, which lives only here) and **Options** (every plan tested, as one chart), with the run's **Trace** beside them. Every chart has two renderers: DeVries's own, laid out by ELK and drawn with React Flow, and FalkorDB's canvas component on the same nodes; the switch over each chart remembers your choice. Anything you change is changed in your own copy of the scenario; the arrow at the foot of the sidebar gives you the original back.
+The sidebar is in four groups: **Posture**; **Findings** (Open, Closed); **System** (Explorer, Inventory, Queries); **Record** (Activity, Import). The switch at its top changes scenario. Each place answers one question no other place answers, and the same thing is never drawn two ways: a finding's path is a chart once, on its Path step; a plan is a verdict row; an agent is a Rule of Two row; a run is a line on Activity; the system is figures on Posture and a map in the Explorer. A finding is worked through in five steps, each about one thing: **Summary**, **Rule**, **Path**, **Fix** (the approval lives only here) and **Options**. Every chart has two renderers: DeVries's own, laid out by ELK and drawn with React Flow, and FalkorDB's canvas component on the same nodes; the switch over each chart remembers your choice. Anything you change is changed in your own copy of the scenario; the arrow at the foot of the sidebar gives you the original back.
 
-1. **Acme support desk → Open.** One finding: customer tickets can reach the payments API. The audit the app ran at start has already tested fixes for it in sandbox graphs: both revokes fail (the refund workflow needs those tools), stopping the tool reading tickets fails for the same reason, the gate passes and so does a split. The row reads "Awaiting approval" and carries its OWASP class. Open it.
-2. **Step 1, the summary.** The brief says how in one paragraph with numbered evidence, and the chart draws the four hops as cards in lanes, sized to fill the box; "FalkorDB canvas" draws the same nodes on FalkorDB's own component. Nothing about a fix yet: each step is about one thing.
-3. **Step 2, the path.** The same chart with "Whole system" a click away, then the hops in order, each with the rule that derived it and the config edge behind it; the source note and the two queries fold out under the chart.
-4. **Step 3, why.** Each agent on the path in a grid against Meta's Rule of Two, with what gives it each property; under it, the workflows that constrain a fix and the OWASP class.
-5. **Step 4, the fix.** The verdict in figures, the plan that passed change by change, the path as it stands with the hop the plan cuts marked, and the path as the plan would leave it, read from a sandbox. The approval bar lives on this step only. In it, "see the change to the scenario file" shows the plan as a diff of `scenarios/acme_support.yaml`: `gate: human_approval` on one line, comments kept. The text can be edited. **Approve · Apply** changes the graph; tick "Also write it" and it writes the file too, with a backup beside it, reloads the scenario from the file, and the finding closes on the reload or stays open with the receipt saying so. On an imported Claude Code project the same panel shows an `ask` rule for `.claude/settings.json`.
-6. **Step 5, the options.** Every plan a sandbox was asked about for this finding as one chart, cheapest first: its cost as a bar, a cell per finding it closed or left open, what it would open and break, and the reason under each; a passing one can be previewed. Folded under them: the what-if line, the cheapest cut as rules, the servers on the path and what a sandbox says removing one would do, and, with a model, a rehearsal of what an attacker would plant.
-7. **Reject the gate** with a reason, such as "refunds must stay automatic". The bar offers the other plan that passed: split the support bot, so a reader does the reading and returns only structured fields. **Approve · Apply.** The finding closes, and the chart shows the reader and the quarantined hop.
-8. **Fixes → Ledger** is every plan a sandbox was asked about, across findings, with its verdict and the literal change; select a plan to see the finding's path as that plan would leave it. **Fixes → What if** tests a change that widens the config: on *Acme dev team*, "Release bot could call request" opens one new finding; under it, the cheapest cut as a Claude Code `permissions` block and Docker MCP Gateway commands.
-9. **Acme executive office.** Here the gate fails, because the daily digest runs unattended and nobody is there to approve; the audit proposes quarantining the inbox reader instead, and that closes two findings at once.
-10. **Acme dev team.** Seven findings, closed by two fixes in two rounds. One finding is the eleven-hop path: an issue is read by the triage agent, handed to the planner and the coder, pushed to the main branch, read back from the repository by the release bot, and deployed.
-11. **System → Graph.** The overview: untrusted sources on the left, the agents they reach in the middle, the high-impact actions on the right, and only the open paths drawn between them, as sankey ribbons whose width grows with the number of routes. The title is a sentence read from the graph, each agent carries its Rule of Two letters, and the counts strip gives the cheapest cut's cost by `algo.maxFlow`. "All nodes" draws everything as cards in lanes, on DeVries's chart or on FalkorDB's canvas (force or tree); "More" holds the layers, Communities, Most central, the Cheapest cut and the edges as a table.
-12. **Graph → More → Cheapest cut.** `algo.maxFlow` marks the cheapest set of hops that separates every untrusted source from every high-impact resource, and shows the cut as a Claude Code `permissions` block and as Docker MCP Gateway commands. On the support desk the cut is one revoke, which the sandbox refuses: the cut says where to look, the sandbox says what is safe.
-13. **DeVries itself.** DeVries's own MCP tools, loaded as a scenario. Nothing is open, and only because `apply_fix` needs a person: take that gate away and two injection paths open.
-14. **Graph → More → Communities** colours the cards' edges by `algo.labelPropagation` over the config edges; **Most central** rings the five agents and tools the most flow passes through, by `algo.betweenness`; clicking an agent shows its PageRank and its Rule of Two badges.
-15. **Open → This scenario → Rule of Two.** Folded under the findings, a scorecard: for each agent, whether untrusted input reaches it, whether private data does, and whether it can act. On the executive office the assistant holds all three and runs unattended, which Meta's rule says it must not.
-16. **System → Servers.** Each MCP server with its tools, who holds them and the findings that run through them, and "test removing it": a sandbox says what taking the server out would close and break. On the dev team, removing the HTTP server closes five findings and breaks nothing.
-17. **Audit → Runs, the ask box.** Without a model the graph answers four kinds of question by itself: try "What can reach Payments API?" The answer names the query it came from, and the trace shows it as a step.
-18. **System → Queries.** Every chart note and every finding links to the query behind it, and the nav row opens the whole catalogue; either opens a drawer with the Cypher over the page you are on (`#/<scenario>/queries/<name>`), and Escape closes it. Nothing in the app runs a query that is not in that list.
-19. **Audit → Import.** The switch's last entry, or "Paste your config" on the landing page: paste a client config or a saved `tools/list`, say what is untrusted and what matters, and the audit runs by itself to its first proposal. See [Import your own install](#import-your-own-install).
+1. **Acme support desk → Posture.** The home of a scenario: "One untrusted source reaches one high-impact resource through one agent, in 4 hops." Seven figures (open findings; high-impact actions reached; ways out reached; agents untrusted text reaches; agents holding all three of Meta's properties, and how many of them run unattended; the cheapest cut's cost); the open paths as sankey ribbons; the Rule of Two tally; the blast radius of each untrusted source and the exposure of each high-impact action, as bars; the choke points ranked by the open routes through them, with the cheapest cut by `algo.maxFlow` and a button that proposes it as one plan for the sandbox to verify; the scans over time; the ten OWASP classes, with the four DeVries checks. Every block folds its source and method under one line that names the FalkorDB query.
+2. **Open.** One finding: customer tickets can reach the payments API. The audit the app ran at start has already tested fixes for it in sandbox graphs: both revokes fail (the refund workflow needs those tools), stopping the tool reading tickets fails for the same reason, the gate passes and so does a split. The row reads "Awaiting approval" and carries its OWASP class. Open it.
+3. **Step 1, the summary.** The headline, the path in words (`Customer tickets → get_ticket → Support bot → issue_refund → Payments API`), the figures (severity, routes, hops, agents on the path, plans passed of tested, status), and the brief with numbered footnotes; a footnote opens the path with that card lit. Nothing is drawn here and nothing is decided.
+4. **Step 2, the rule.** Which rule fired (rule 1, an injection path; rule 2, a trifecta) and what in this graph satisfies each of its needs, with names: a source outsiders write, a route over the flow layer, a high-impact action, no person in between. For a trifecta, each agent on the path in a grid against Meta's Rule of Two. Under it, what that means for a fix: the workflows that constrain it and the OWASP class.
+5. **Step 3, the path.** The one chart, hop by hop, each hop with the rule that derived it and the config edge behind it; "FalkorDB canvas" draws the same nodes on FalkorDB's own component; "Open in the Explorer" lights the path over the whole system.
+6. **Step 4, the fix.** The verdict in figures, the plan change by change with the literal edit, and the path after: each hop as the finding found it beside what a sandbox copy with the plan applied says about it ("gated: a person approves each call", "untrusted text no longer reaches Payments API"). The approval bar lives on this step only. In it, "see the change to the scenario file" shows the plan as a diff of `scenarios/acme_support.yaml`: `gate: human_approval` on one line, comments kept. The text can be edited. **Approve · Apply** changes the graph; tick "Also write it" and it writes the file too, with a backup beside it, reloads the scenario from the file, and the finding closes on the reload or stays open with the receipt saying so. On an imported Claude Code project the same panel shows an `ask` rule for `.claude/settings.json`.
+7. **Step 5, the options.** Every plan a sandbox was asked about for this finding as one chart, cheapest first: its cost as a bar, a cell per finding it closed or left open, what it would open and break, and the reason under each; any of them can be read on the fix step. With a model, a rehearsal of what an attacker would plant.
+8. **Reject the gate** with a reason, such as "refunds must stay automatic". The bar offers the other plan that passed: split the support bot, so a reader does the reading and returns only structured fields. **Approve · Apply.** The finding closes, and the path shows the reader and the quarantined hop.
+9. **Posture again.** The scan the apply ran is one more bar under "Over time", down to none open, and the exposure figures read 0 of 1.
+10. **Activity.** Every scan, run, plan tested or proposed, decision, application and write on the scenario, newest first, each a line that says who did it; a run opens to its trace, and its report cites the steps its ids came from. The ask box at the top: without a model the graph answers four kinds of question by itself (try "What can reach Payments API?"), naming the query the answer came from.
+11. **Acme executive office.** Here the gate fails, because the daily digest runs unattended and nobody is there to approve; the audit proposes quarantining the inbox reader instead, and that closes two findings at once. Its Posture tallies two agents holding all three, one of them unattended.
+12. **Acme dev team.** Seven findings, closed by two fixes in two rounds, each approved from its finding. One finding is the eleven-hop path: an issue is read by the triage agent, handed to the planner and the coder, pushed to the main branch, read back from the repository by the release bot, and deployed. Its Posture ranks the coder as the first choke point, with ten open routes through it.
+13. **Explorer.** The whole system as cards in lanes, on DeVries's chart or on FalkorDB's canvas (force or tree), the only place it is drawn. Lenses: the open paths lit over everything, Communities by `algo.labelPropagation`, the Cheapest cut marked on its hop, the Most central agents and tools by `algo.betweenness`; the Flow or the Config layer; the edges as a table. Click a card to read what reaches it, what it reaches and the findings through it, and, for an agent, to test one more grant in a sandbox: on the dev team, "Release bot could call request" opens one new finding.
+14. **Inventory.** Every agent, tool, source, resource and server, one table a kind, with what reaches each, what it reaches, its Rule of Two letters, its PageRank and the open findings through it. The Servers tab keeps "test removing it": on the dev team, removing the HTTP server closes five findings and breaks nothing. A row opens the thing in the Explorer.
+15. **DeVries itself.** DeVries's own MCP tools, loaded as a scenario. Nothing is open, and only because `apply_fix` needs a person: take that gate away and two injection paths open.
+16. **Queries.** Every figure and every chart note links to the query behind it, and the nav row opens the whole catalogue; either opens a drawer with the Cypher over the page you are on (`#/<scenario>/queries/<name>`), says where on screen the answer shows, and Escape closes it. Nothing in the app runs a query that is not in that list.
+17. **Import.** The switch's last entry, or "Paste your config" on the landing page: paste a client config or a saved `tools/list`, say what is untrusted and what matters, and the audit runs by itself to its first proposal. See [Import your own install](#import-your-own-install).
 
 ## The graph data model
 
@@ -163,7 +162,7 @@ graph LR
 | `Workflow` | `id`, `name`, `description`, `mode` (`supervised`, `autonomous`) | Work the agents must keep being able to do |
 | `Finding` | `fingerprint`, `id`, `kind`, `severity`, `status`, `source_id`, `target_id`, `agent_id`, `path_ids`, `evidence_json`, timestamps | An injection path or a trifecta agent, kept across scans |
 | `Mitigation` | `id`, `status`, `fix_json`, `cost`, `passed`, `reason`, `verdict_json`, `config_hash`, `target_fingerprints`, `source`, `rationale`, who decided and when | A plan and the sandbox verdict on it |
-| `Scan` | `scan_id`, `at`, `duration_ms`, counts | The last scan of the graph |
+| `Scan` | `scan_id`, `at`, `duration_ms`, counts, `open` | One record per scan, for the history on Posture, and a `last` pointer |
 | `ToolAct` | `id`, `of`, `name` | Derived, never loaded or drawn: the acting side of a tool that writes (see below) |
 
 Ids carry their kind: `agent:support-bot`, `tool:payments.issue_refund`, `src:customer-tickets`, `res:payments-api`, `wf:refund-request`, `srv:payments`, `fnd:dce0910d42`, `mit:b68c44c5ab`. A finding's id is the first ten hex digits of a hash of what it is (source and sink, or the agent), so the same finding has the same id on every scan and in every copy.
@@ -268,7 +267,7 @@ A plan is one to three fixes; each fix after the first adds a point. The baselin
 
 ## The queries and algorithms
 
-Every Cypher statement the product runs is a named entry in [`devries/graph/catalog.py`](devries/graph/catalog.py), sent with parameters and never built from strings. There are 63. **[docs/QUERIES.md](docs/QUERIES.md) is the full list with the Cypher of each**, generated from the catalog (a test fails if it is out of date). The app serves the same list at `/api/queries`.
+Every Cypher statement the product runs is a named entry in [`devries/graph/catalog.py`](devries/graph/catalog.py), sent with parameters and never built from strings. There are 84. **[docs/QUERIES.md](docs/QUERIES.md) is the full list with the Cypher of each**, generated from the catalog (a test fails if it is out of date). The app serves the same list at `/api/queries`.
 
 | Group | Queries | Purpose |
 | --- | --- | --- |
@@ -277,11 +276,12 @@ Every Cypher statement the product runs is a named entry in [`devries/graph/cata
 | Evidence | `evidence.pair_paths`, `node.names`, `graph.node_count` | Paths to show, never to decide |
 | Algorithms | `zones.wcc`, `choke.betweenness`, `choke.maxflow` | Trust zones, central nodes, the cheapest cut |
 | Fixes and what-if | `fix.gate_call`, `fix.revoke_call`, `fix.quarantine_delegation`, `fix.drop_read`, `fix.split_agent`, `whatif.grant_call`, `whatif.add_delegation` | Each one statement that reports how many rows it changed |
-| Records | `finding.*`, `mitigation.*`, `scan.*` | Findings, plans, verdicts, decisions |
+| Records | `finding.*`, `mitigation.*`, `scan.*` | Findings, plans, verdicts, decisions, one record per scan |
+| Posture and inventory | `reach.from`, `reach.into`, `reach.untrusted_nodes`, `choke.pagerank`, `inventory.rows`, `scan.history` | The blast radius, the exposure, what reaches each thing, the history |
 | Loading | `ingest.*`, `schema.index.*`, `config.*` | Scenario files to graph; the config hash; cloning without `GRAPH.COPY` |
 | UI and self-check | `ui.*`, `scenario.summary`, `canary.*` | What the charts read; a known-bad graph scanned at start |
 
-FalkorDB procedures used: `algo.bfs`, `algo.SPpaths`, `algo.WCC`, `algo.betweenness`, `algo.maxFlow`. Commands beyond `GRAPH.QUERY`: `GRAPH.RO_QUERY`, `GRAPH.COPY`, `GRAPH.DELETE`, `GRAPH.LIST`.
+FalkorDB procedures used: `algo.bfs`, `algo.SPpaths`, `algo.WCC`, `algo.labelPropagation`, `algo.pageRank`, `algo.betweenness`, `algo.maxFlow`. Commands beyond `GRAPH.QUERY`: `GRAPH.RO_QUERY`, `GRAPH.COPY`, `GRAPH.DELETE`, `GRAPH.LIST`.
 
 The cheapest cut is read off the max flow in Python: the edges that leave the part of the graph still reachable from the sources once every saturated edge is removed. It is offered as a guide and labelled as one. It knows nothing about workflows, one revoke removes two flow edges, and a trifecta is not a cut.
 
@@ -289,15 +289,15 @@ The cheapest cut is read off the max flow in Python: the edges that leave the pa
 
 ```mermaid
 flowchart LR
-  Browser["Browser<br/>React UI, SVG charts"]
+  Browser["Browser<br/>React UI, charts on two renderers"]
   Client["MCP client<br/>e.g. Claude Desktop"]
   subgraph App["app (one process, FastAPI)"]
     API["REST + server-sent events<br/>visitor sessions, approval"]
-    MCP["MCP server, 10 tools<br/>stdio and /mcp"]
+    MCP["MCP server, 11 tools<br/>stdio and /mcp"]
     Auditor["Auditor loop<br/>phases, grounding, budgets"]
     Ops["ops: scan, simulate, what-if,<br/>propose, approve, apply"]
     Engine["analysis + mitigation<br/>sandbox verdicts, search"]
-    Catalog["query catalog<br/>81 named statements"]
+    Catalog["query catalog<br/>84 named statements"]
   end
   Claude["Claude API<br/>(optional)"]
   subgraph FDB["FalkorDB"]
@@ -363,7 +363,7 @@ The MCP server speaks stdio, and the app serves the same tools at `/mcp` (stream
 }
 ```
 
-Both paths are absolute on purpose: a desktop app is not started from a shell, and a bare `uv` is not found on its PATH. A test launches exactly this entry with a bare environment from another directory, lists the ten tools and runs a scan. It has also been tested over HTTP. It has not been tried in Claude Desktop itself, which was not installed on the machine this was built on.
+Both paths are absolute on purpose: a desktop app is not started from a shell, and a bare `uv` is not found on its PATH. A test launches exactly this entry with a bare environment from another directory, lists the eleven tools and runs a scan. It has also been tested over HTTP. It has not been tried in Claude Desktop itself, which was not installed on the machine this was built on.
 
 | Tool | What it does | Writes |
 | --- | --- | --- |
@@ -392,9 +392,9 @@ uv run python -m devries.ingest --import https://host.example/mcp       # a stre
 uv run python -m devries.ingest --import path/to/tools.json             # a saved tools/list
 ```
 
-Each server is launched or called, with your own environment and credentials, and its `tools/list` becomes a manifest. The app container mounts `scenarios/` and `manifests/` from this folder, so an import made here shows up in the running app. The draft scenario has one agent, the client, holding every tool, and one data source and one resource per server, both **unknown**: nothing in an import is a finding until you say what is untrusted and what matters. Open the scenario in the UI and the Open list asks you, with guesses from the servers' names; save, and the scan runs on your answer. `--label src:filesystem=private` does the same from the command line. What the import shows is the thing every MCP scanner shows and no scenario file can: your own setup, as a graph, audited.
+Each server is launched or called, with your own environment and credentials, and its `tools/list` becomes a manifest. The app container mounts `scenarios/` and `manifests/` from this folder, so an import made here shows up in the running app. The draft scenario has one agent, the client, holding every tool, and one data source and one resource per server, both **unknown**: nothing in an import is a finding until you say what is untrusted and what matters. Open the scenario in the UI and the Open list asks you, with guesses from the servers' names; save, and the scan runs on your answer. `--label src:filesystem=private` does the same from the command line. An import shows your own setup as a graph, audited, which no scenario file can.
 
-The same import is in the app: the last entry of the scenario switch, or "Paste your config" on the landing page. On this machine the page takes a pasted client config or `tools/list`, or any source the command line takes, and the import joins the shared scenarios. On a public site (`DEVRIES_PUBLIC=true`) it takes only what is pasted, asks servers with a `url` for their tools over HTTPS with a timeout and a size cap, skips every `command` and says so, keeps the result in a graph that exists for that session alone, and rations imports per address. Either way, once the sources and resources are labelled the audit runs by itself to its first proposal. Launching a command is the exception, not the rule: the scanners warn that scanning a config runs its stdio servers, and a saved or fetched `tools/list` shows the same tools without running anything.
+The same import is in the app: the last entry of the scenario switch, or "Paste your config" on the landing page. On this machine the page takes a pasted client config or `tools/list`, or any source the command line takes, and the import joins the shared scenarios. On a public site (`DEVRIES_PUBLIC=true`) it takes only what is pasted, asks servers with a `url` for their tools over HTTPS with a timeout and a size cap, skips every `command` and says so, keeps the result in a graph that exists for that session alone, and rations imports per address. Either way, once the sources and resources are labelled the audit runs by itself to its first proposal. Launching a command stays the rare case: the scanners warn that scanning a config runs its stdio servers, and a saved or fetched `tools/list` shows the same tools without running anything.
 
 ### Fix the real configuration
 
@@ -441,18 +441,18 @@ A scenario is a YAML file in `scenarios/` that points at manifests in `manifests
 
 ## Tests
 
-`make test` runs 281 tests against the running FalkorDB, in about two minutes:
+`make test` runs 304 tests against the running FalkorDB, in about two minutes:
 
 | Kind | Count | What it checks |
 | --- | ---: | --- |
 | Probes | 9 | The FalkorDB behaviours the design depends on: what `algo.bfs` and `algo.SPpaths` return, that every algorithm runs read-only, that a rebuild is atomic for concurrent readers, that `GRAPH.COPY` is consistent and carries indexes, that a slow read is cut off |
-| Unit | 152 | One test per taint rule, the invariants of the flow layer, each fix query, sandbox verdicts, the search, approval and apply, the catalog, the import of a config and its permission rules, the change compiler for each target, and a write to a file that closes the finding on the reload |
-| Golden | 18 | Each scenario: its findings, which fix wins, which are rejected and why |
+| Unit | 154 | One test per taint rule, the invariants of the flow layer, each fix query, sandbox verdicts, the search, approval and apply, the catalog, the import of a config and its permission rules, the change compiler for each target, and a write to a file that closes the finding on the reload |
+| Golden | 33 | Each scenario: its findings, which fix wins, which are rejected and why |
 | MCP contract | 28 | Tool list and schemas, answers, structured errors, size limits, both transports, and a launch with no shell behind it |
 | Agent | 41 | The loop with a scripted stand-in for the model: phases, grounding, budgets, fallback, stopping at a proposal, the evaluation harness |
-| API | 33 | Routes, sessions and isolation, the event stream, what-if, previews, the cheapest cut and its policy, the overview, the brief and the figure, drafts and the write from the browser, pasted imports, the public mode, the audits the app runs at start |
+| API | 39 | Routes, sessions and isolation, the event stream, what-if, previews, the cheapest cut and its policy, the overview, the posture, the scan history, the activity, the inventory, the cut as a plan, the brief and the figure, drafts and the write from the browser, pasted imports, the public mode, the audits the app runs at start |
 
-`make e2e` drives the running app in headless Chrome: the plans the start-up audit proposed, the finding's five steps, the review panel's diff, an approval and the finding closing on two scenarios; a rejection followed by approving the split; both fixes of `acme_dev`; the sankey overview and the whole graph on both renderers, the cheapest cut and its policy, the servers page, the what-if page, the queries drawer, the import page, deep links, and three screen widths. It fails on any console error, any 4xx or 5xx, and any request to another origin. Run it against an app started without a model key, so a run costs nothing:
+`make e2e` drives the running app in headless Chrome: the posture with its figures, bars and history, the plans the start-up audit proposed, the finding's five steps (the chart on Path only, the approval on Fix only), the review panel's diff, an approval and the finding closing on two scenarios, the posture's history dropping and Activity recording the decision; a rejection followed by approving the split; both fixes of `acme_dev` from their findings; the explorer on both renderers with its lenses, the cut proposed as a plan, the inventory and its servers, a what-if from the explorer's reader, the queries drawer, the import page, deep links and older addresses, and three screen widths. It fails on any console error, any 4xx or 5xx, and any request to another origin. Run it against an app started without a model key, so a run costs nothing:
 
 ```bash
 ANTHROPIC_API_KEY= uv run uvicorn devries.app:app --port 8010    # in one terminal
@@ -469,14 +469,12 @@ On a public address, each visitor works in their own copy of a scenario (at most
 
 ## What is not built
 
-- **Runs with a real model.** See [The auditor](#the-auditor).
 - **A live deployment.** See above.
-- **A change-data-capture pipeline** (Postgres → Debezium → Kafka → FalkorDB's Kafka sink) was designed and then dropped; none of it was built. It showed plumbing, not an agent deciding from a graph, and the what-if line tells the same story: a risky grant caught before it ships. PLAN.md section 12 says what was found in the sink's source.
+- **A change-data-capture pipeline** (Postgres → Debezium → Kafka → FalkorDB's Kafka sink) was designed and then dropped; none of it was built. It showed plumbing rather than an agent deciding from a graph, and the what-if line already catches a risky grant before it ships. The design document records what was found in the sink's source.
 - **A try in Claude Desktop itself**, and a demo video.
 - **Watching an origin for drift** on a timer. Drift is found on each reload; nothing re-reads a config by itself.
-- **FalkorDB's canvas component.** An earlier version of the UI used `@falkordb/canvas`; the charts are now SVG drawn by this project.
 
-[PLAN.md](PLAN.md) is the design document: the reasoning behind each of these choices, the decisions log, and what is and is not done. [pivot.md](pivot.md) is what comes next: improvements to what exists, then inputs from real installs and analyses taken from the closest projects.
+The design document (PLAN.md) and the pivot plans are working notes kept out of the repository; this README is the one document that ships. [docs/QUERIES.md](docs/QUERIES.md) is generated from the catalog and ships with it.
 
 ## What was written before the event
 
@@ -484,13 +482,13 @@ The event runs from 15 to 18 October 2026, and its rules ask that the main codin
 
 Everything in this repository was written before the event opened, and all of the code on 13 October 2026, two days before: the Python package, the UI (rebuilt twice that day; this is its third form), the first four scenarios, the tests and this README. Five scenarios were added on 16 October, during the event: sales, finance, people, operations and data. They are data files in the shape the other four already had, with their synthetic manifests, and no code changed for them beyond the scenario count in one API test, one browser check and the landing page's footer. The design document and the first probes of FalkorDB are a little older. Nothing was committed during that time; the folder held no git repository.
 
-The rules allow ideas, notes, graph model sketches and diagrams to be prepared beforehand. Of what is here, only PLAN.md is that kind of preparation. The code is not.
+The rules allow ideas, notes, graph model sketches and diagrams to be prepared beforehand. Of what was written then, only the design document is that kind of preparation. The code is not.
 
 ## How AI tools were used
 
 Almost all of this repository was written by an AI coding assistant: [Claude Code](https://claude.com/claude-code), Anthropic's command-line tool, running Claude Opus models in the author's terminal. That covers the design document, the Python and TypeScript, the tests, the scenario files and this README.
 
-The author chose the problem and the track, set the constraints, directed the work turn by turn, and made the decisions recorded in PLAN.md section 18: among them the product's name, withdrawing the first UI redesign and rebuilding it on one reference, and when to build. The assistant wrote the code, ran the tests and the browser checks, and reported what passed and what did not.
+The author chose the problem and the track, set the constraints, directed the work turn by turn, and made the decisions recorded in the design document: among them the product's name, withdrawing the first UI redesign and rebuilding it on one reference, and when to build. The assistant wrote the code, ran the tests and the browser checks, and reported what passed and what did not.
 
 At run time the only model involved is the auditor's own use of Claude, described above, and it is optional.
 
@@ -501,7 +499,7 @@ The look and the structure of the UI are not original, and are not meant to pass
 - The interface is adapted from [Manthan](https://github.com/akash-mondal/manthan) (Copyright 2026 Manthan Engineering, Apache License 2.0): its design tokens, its type, its sidebar shell, the structure of its inbox, case workspace, approval ledger and audit log, and the structure and motion of its landing page. Nothing is copied file for file; it is rewritten for DeVries's data, the accent is iris where Manthan's is emerald, and Manthan's name, logo, videos and text are not used.
 - The marks of MCP servers on the landing page are from [simple-icons](https://github.com/simple-icons/simple-icons) (CC0-1.0); each is its owner's trademark.
 - The charts are drawn with [React Flow](https://reactflow.dev/) (MIT) laid out by [ELK](https://github.com/kieler/elkjs) (EPL-2.0), the overview with [d3-sankey](https://github.com/d3/d3-sankey) (BSD-3-Clause), and every chart can also be drawn by [FalkorDB's canvas](https://github.com/FalkorDB/falkordb-canvas) (MIT). The lanes and the vocabulary of the key come from the hand-drawn SVG chart they replaced, which followed [Agent Ethology](https://agent-ethology.vercel.app/backstage.html).
-- The fonts are Geist, Geist Mono and Instrument Serif, under the SIL Open Font License, served by the app.
+- The fonts are Geist and Geist Mono in the app, and Instrument Serif on the landing page, under the SIL Open Font License, served by the app.
 
 [ui/THIRD_PARTY_NOTICES.md](ui/THIRD_PARTY_NOTICES.md) lists what was taken from each and what was changed, and [ui/licenses/Apache-2.0.txt](ui/licenses/Apache-2.0.txt) is Manthan's licence. What is DeVries's own is everything the UI shows: the graph model, the taint rules, the queries, the sandbox verdicts, the auditor and the MCP tools.
 
