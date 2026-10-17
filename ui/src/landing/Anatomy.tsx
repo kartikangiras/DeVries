@@ -25,7 +25,7 @@ export function Anatomy() {
       <Card
         delay={0.16}
         title="A brief your reviewer will sign"
-        body="Every finding lands as a plain-English memo, not a model dump. The paragraph, the plans that passed and the evidence are on one page, each claim ending in a numbered citation to the rule and the edge behind it. The cheapest plan that passed waits for a nod. No tool can approve, and the trace says so."
+        body="Every finding lands as a plain-English memo, not a model dump. The paragraph, the plans that passed and the evidence are on one page, each claim ending in a numbered citation to the rule and the edge behind it. The cheapest plan that passed waits for your approval. No tool can approve, and the trace says so."
         visual={<BriefVisual />}
       />
       <Card
@@ -43,7 +43,7 @@ export function Anatomy() {
       <Card
         delay={0.4}
         title="An audit trail on every run"
-        body="Every scan, every sandbox, every verdict, every nod is recorded on the graph with who decided it: model, loop, scripted or person. The trace of a run reads like prose, each step naming the query it came from, and the ledger keeps every plan that was tested, passed or not."
+        body="Every scan, every sandbox, every verdict, every approval is recorded on the graph with who decided it: model, loop, scripted or person. The trace of a run reads like prose, each step naming the query it came from, and the ledger keeps every plan that was tested, passed or not."
         visual={<AuditVisual />}
       />
     </div>
@@ -353,7 +353,7 @@ function CompareVisual() {
 type Event = { who: "you" | "auditor"; verb: string; object: string; via: string; minsAgo: number };
 const EVENTS: Event[] = [
   { who: "auditor", verb: "rescanned", object: "acme_support · 0 open", via: "reach.untrusted_to_high", minsAgo: 1 },
-  { who: "auditor", verb: "applied", object: "mit:7d04e1c2aa", via: "apply_fix, after your nod", minsAgo: 1 },
+  { who: "auditor", verb: "applied", object: "mit:7d04e1c2aa", via: "apply_fix, after your approval", minsAgo: 1 },
   { who: "you", verb: "approved", object: "split Support bot", via: "the approval bar", minsAgo: 2 },
   { who: "you", verb: "rejected the gate:", object: "“refunds must stay automatic”", via: "the approval bar", minsAgo: 3 },
   { who: "auditor", verb: "proposed", object: "gate issue_refund · cost 2", via: "the cheapest plan that passed", minsAgo: 5 },

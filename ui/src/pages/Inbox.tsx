@@ -1,4 +1,5 @@
-// The open findings, each a small memo of its own, and the same list for the ones that are closed. The row is Manthan's inbox row (strip, headline with its figure, footer with what happens
+// The open findings, each a small memo of its own, and the same list for the ones that are closed. The scenario's
+// standing is on Posture; this page is the list, and for an import, the labels the scan needs. The row is Manthan's inbox row (strip, headline with its figure, footer with what happens
 // next), holding a finding instead of a case (see ui/THIRD_PARTY_NOTICES.md).
 
 import type { Finding } from "../api";
@@ -7,8 +8,8 @@ import { headline } from "../brief";
 import { deskOf, exposure, recommendation, type Desk } from "../desk";
 import { href } from "../route";
 import type { DeVries } from "../state";
-import { KIND_WORDS, capital, clock, countWord, plural, short } from "../text";
-import { Button, Empty, Eyebrow, Fold, Loading, PageBody, PageHeader } from "../ui";
+import { KIND_WORDS, capital, countWord, plural, short } from "../text";
+import { Button, Empty, Eyebrow, Loading, PageBody, PageHeader } from "../ui";
 
 /** The row's one italic line: why this finding matters, or why it no longer does. */
 function gist(finding: Finding, desk: Desk, names: Record<string, string>): string {
@@ -191,41 +192,9 @@ export function Inbox({ c, scenario, done = false }: { c: DeVries; scenario: str
           {c.current?.own_copy && <> This is your sandbox copy; <button className="link" onClick={c.reset} disabled={c.busy}>reset it</button> to see the shared scenario again.</>}
         </Empty>
       )}
-      {!done && c.current && c.flow && (
+      {!done && c.current?.imported && c.flow && (
         <section className="about">
-          <div>
-            <Eyebrow>This scenario</Eyebrow>
-            <p>{c.current.description}.</p>
-          </div>
-          <p className="about-facts">
-            {c.flow.nodes.length} nodes · {c.flow.links.length} flows · {plural(c.flow.workflows.length, "workflow", "workflows")} a fix must not break
-            <span className="scanned">
-              {found?.last_scan ? `last scanned ${clock(found.last_scan.at)} in ${found.last_scan.duration_ms} ms` : "not scanned yet"}
-              {c.health?.falkordb_version ? ` · FalkorDB ${c.health.falkordb_version}` : ""}
-            </span>
-            <a href={href(scenario, "graph")}>See the graph →</a>
-          </p>
-          {c.current.imported && <LabelForm c={c} />}
-          {c.scorecard && c.scorecard.agents.length > 0 && (
-            <Fold className="scorecard" summary="Rule of Two" sub={`${plural(c.scorecard.agents.length, "agent", "agents")} · which of untrusted input, private data and a way to act each one holds`}>
-              <table className="table">
-                <thead><tr><th>Agent</th><th>A · untrusted in</th><th>B · private in</th><th>C · acts</th><th>Runs</th><th>Verdict</th></tr></thead>
-                <tbody>
-                  {c.scorecard.agents.map((a) => (
-                    <tr key={a.agent_id} className={a.count === 3 && a.autonomous ? "worst" : ""}>
-                      <td>{c.names[a.agent_id] ?? a.agent_id}</td>
-                      <td className="mono">{a.untrusted_in.length ? "yes" : "·"}</td>
-                      <td className="mono">{a.private_in.length ? "yes" : "·"}</td>
-                      <td className="mono">{a.acts_on.length ? (a.external ? "yes, externally" : "yes") : "·"}</td>
-                      <td className="mono">{a.workflows.length ? a.workflows.map((w) => w.mode).join(", ") : "·"}</td>
-                      <td>{a.verdict}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              <p className="about-note">Meta's Agents Rule of Two: an agent holds at most two of the three, and one that needs all three should not run unattended. Read off the flow layer by <a href={href(scenario, "queries", "reach.agents_from_sources")}>three BFS passes</a>; the findings are the verdicts.</p>
-            </Fold>
-          )}
+          <LabelForm c={c} />
         </section>
       )}
     </PageBody>

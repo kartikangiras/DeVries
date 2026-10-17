@@ -279,7 +279,7 @@ const STEPS = [
     num: "03",
     verb: "Fix, within your gates.",
     copy:
-      "Candidate fixes come from the config edges the path crosses. Each is applied to a copy of the graph and judged by the same queries: the finding gone, nothing new, every workflow intact. The cheapest that passes waits for your nod. No tool can approve.",
+      "Candidate fixes come from the config edges the path crosses. Each is applied to a copy of the graph and judged by the same queries: the finding gone, nothing new, every workflow intact. The cheapest that passes waits for your approval. No tool can approve.",
     scene: <FixScene />,
   },
 ];
