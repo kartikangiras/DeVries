@@ -490,6 +490,27 @@ RETURN s.scan_id AS scan_id, s.at AS at, s.duration_ms AS duration_ms,
        s.injection AS injection, s.trifecta AS trifecta, s.partial AS partial
 """,
     ),
+    NamedQuery(
+        name="scan.keep", mode="rw", targets=WORKING, timeout_ms=2_000, idempotent=True,
+        doc="Keep one Scan node per scan, beside the 'last' record: when it ran, how long it took, what it found and how "
+            "many findings were open afterwards. The history a posture page draws over time.",
+        cypher="""
+MERGE (s:Scan {id: $scan_id})
+SET s.scan_id = $scan_id, s.at = $at, s.duration_ms = $duration_ms,
+    s.injection = $injection, s.trifecta = $trifecta, s.open = $open, s.partial = $partial
+RETURN s.at AS at
+""",
+    ),
+    NamedQuery(
+        name="scan.history", mode="ro", targets=WORKING, timeout_ms=2_000,
+        doc="The last 50 scans of a working graph, newest first. A graph loaded before scans were kept has none.",
+        cypher="""
+MATCH (s:Scan) WHERE s.id <> 'last'
+RETURN s.scan_id AS scan_id, s.at AS at, s.duration_ms AS duration_ms,
+       s.injection AS injection, s.trifecta AS trifecta, s.open AS open, s.partial AS partial
+ORDER BY s.at DESC LIMIT 50
+""",
+    ),
 
     # ------------------------------------------------------------------ ingest (scenario loader)
     NamedQuery(

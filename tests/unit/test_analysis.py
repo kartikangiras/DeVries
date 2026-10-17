@@ -208,7 +208,7 @@ async def test_canary_fails_loudly_when_a_verdict_query_returns_nothing(client, 
         await canary.ensure(client, ttl_s=0)
 
 
-async def test_a_scan_leaves_one_record_of_itself(client, graph):
+async def test_a_scan_leaves_one_last_record_and_keeps_one_row_per_scan(client, graph):
     await build(client, graph, sources=["tickets"], resources=["payments"], tools=["get", "refund"], agents=["bot"],
                 reads=[("get", "tickets")], writes=[("refund", "payments")], calls=[("bot", "get"), ("bot", "refund")])
     assert await findings.last_scan(client, graph) is None           # loaded, never scanned
@@ -218,8 +218,11 @@ async def test_a_scan_leaves_one_record_of_itself(client, graph):
     second = await findings.scan(client, graph)
     again = await findings.last_scan(client, graph)
     assert again["scan_id"] == second.scan_id != first.scan_id
-    rows = await client.graph(graph).ro_query("MATCH (s:Scan) RETURN count(s)")
-    assert rows.result_set[0][0] == 1                                # one record, overwritten, however often it scans
+    rows = await client.graph(graph).ro_query("MATCH (s:Scan {id: 'last'}) RETURN count(s)")
+    assert rows.result_set[0][0] == 1                                # one last record, overwritten, however often it scans
+    kept = await findings.history(client, graph)                     # and one row per scan, oldest first
+    assert [(s["scan_id"], s["open"], s["injection"]) for s in kept] == [(first.scan_id, 1, 1), (second.scan_id, 1, 1)]
+    assert (await client.run("scenario.summary", graph))[0]["nodes"] == 6    # the records are not the scenario's nodes (one server, two tools, a source, a resource, an agent)
 
 
 async def test_mincut_is_the_cheapest_cut_and_knows_when_there_is_none(client, graph):
@@ -229,6 +232,7 @@ async def test_mincut_is_the_cheapest_cut_and_knows_when_there_is_none(client, g
                 calls=[("a", "get"), ("a", "refund"), ("b", "get"), ("b", "refund")])
     await findings.scan(client, graph)
     report = await chokepoints.mincut(client, graph)
+    assert await findings.history(client, graph) == []
     assert report.method == "mincut" and report.cut_cost == 2
     assert sorted((e.edge.rel, e.edge.from_id, e.edge.to_id, e.edge.rule, e.fixes) for e in report.edges) == [
         ("CAN_CALL", "agent:a", "tool:t.get", 2, ["revoke_call"]), ("CAN_CALL", "agent:b", "tool:t.get", 2, ["revoke_call"])]

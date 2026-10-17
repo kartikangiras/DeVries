@@ -193,6 +193,11 @@ async def last_scan(client: GraphClient, graph_key: str) -> dict | None:
     return rows[0] if rows else None
 
 
+async def history(client: GraphClient, graph_key: str) -> list[dict]:
+    """The scans kept on this graph, oldest first: when each ran and how many findings it left open."""
+    return list(reversed(await client.run("scan.history", graph_key)))
+
+
 async def scan(client: GraphClient, graph_key: str) -> ScanResult:
     started_at = int(time.time() * 1000)
     t0 = time.monotonic()
@@ -226,9 +231,14 @@ async def scan(client: GraphClient, graph_key: str) -> ScanResult:
     scan_id = f"scan:{token_hex(4)}"
     duration_ms = int((time.monotonic() - t0) * 1000)
     # one record per graph, so a page can say when it was last scanned even when nothing was found
+    injection = sum(f.kind == "injection" for f in findings)
+    trifecta = sum(f.kind == "trifecta" for f in findings)
     await client.run("scan.record", graph_key, scan_id=scan_id, at=started_at, duration_ms=duration_ms,
-                     injection=sum(f.kind == "injection" for f in findings),
-                     trifecta=sum(f.kind == "trifecta" for f in findings), partial=partial)
+                     injection=injection, trifecta=trifecta, partial=partial)
+    # and one node per scan, so a page can show how the count of open findings moved
+    await client.run("scan.keep", graph_key, scan_id=scan_id, at=started_at, duration_ms=duration_ms,
+                     injection=injection, trifecta=trifecta, partial=partial,
+                     open=sum(f.status == "open" for f in findings))
 
     return ScanResult(
         graph=graph_key, scan_id=scan_id, started_at=started_at,
