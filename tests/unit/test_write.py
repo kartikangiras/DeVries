@@ -15,7 +15,7 @@ from devries.config import get_settings
 from devries.errors import ForbiddenWrite
 from devries.ingest.importer import import_install
 from devries.ingest.scenario_loader import load_scenario
-from devries.mitigation import search, store
+from devries.mitigation import apply, search, store
 from devries.mitigation import write as write_mod
 from devries.mitigation.sandbox import StaleTarget
 
@@ -53,6 +53,10 @@ async def test_a_gate_written_to_the_scenario_file_closes_the_finding_on_reload(
         draft = await write_mod.draft_for(client, key, path, gate.id, names)
         assert draft.kind == "scenario" and draft.writable and "gate: human_approval" in draft.diff
 
+        with pytest.raises(store.WrongStatus):                                             # nobody has approved it yet
+            await write_mod.write(client, key, key, path, gate.id, names, "Tester", root=tmp_path)
+        assert "gate: human_approval" not in path.read_text()
+        await apply.approve(client, key, gate.id, "Tester", session="session-one")
         receipt = await write_mod.write(client, key, key, path, gate.id, names, "Tester", root=tmp_path)
         assert receipt.path == str(path) and Path(receipt.backup).is_file() and receipt.reloaded
         assert receipt.closed == [finding.id] and receipt.open_after == []
@@ -63,6 +67,7 @@ async def test_a_gate_written_to_the_scenario_file_closes_the_finding_on_reload(
         # the reloaded graph tells the story: the plan applied, the finding mitigated, the draft written
         plan = await store.get(client, key, gate.id)
         assert plan.status == "applied" and plan.approved_by == "Tester"
+        assert plan.approved_session == store.session_hash("session-one")                   # bound to the session that decided
         rows = {r["id"]: r["status"] for r in await client.run("finding.list", key)}
         assert rows[finding.id] == "mitigated"
         drafts = await client.run("draft.for_mitigation", key, mitigation_id=gate.id)
@@ -89,6 +94,7 @@ async def test_an_edited_draft_is_what_gets_written_and_a_bad_edit_is_refused(cl
         assert kept.edited and "order: 7" in kept.after                                # the edit is kept on the graph
         broken = await write_mod.edit(client, key, path, gate.id, names, "scenario: [not valid")
         assert not broken.writable and "does not load" in broken.note
+        await apply.approve(client, key, gate.id, "Tester")
         with pytest.raises(write_mod.NotWritable):
             await write_mod.write(client, key, key, path, gate.id, names, "Tester", root=tmp_path)
         receipt = await write_mod.write(client, key, key, path, gate.id, names, "Tester", after_text=edited.after, root=tmp_path)
@@ -154,6 +160,7 @@ async def test_a_claude_code_project_gets_an_ask_rule_and_the_finding_closes_on_
         assert draft.kind == "claude-code" and draft.path == str(project / ".claude" / "settings.json") and draft.writable
         assert json.loads(draft.after)["permissions"]["ask"] == ["mcp__notes__send_note"]
 
+        await apply.approve(client, key, mid, "Tester")
         receipt = await write_mod.write(client, key, key, result.scenario_path, mid, names, "Tester", root=tmp_path)
         assert json.loads((project / ".claude" / "settings.json").read_text())["permissions"]["ask"] == ["mcp__notes__send_note"]
         assert receipt.reloaded and receipt.closed == open_ids and receipt.open_after == []
@@ -187,6 +194,11 @@ async def test_a_desktop_config_that_moved_on_since_the_import_is_not_written(cl
         assert draft.kind == "claude-desktop" and draft.writable
         assert "notes" not in json.loads(draft.after)["mcpServers"] and "notes-two" in json.loads(draft.after)["mcpServers"]
         assert "hunter2" not in draft.diff                                                 # the secret stays out of the diff
+        assert draft.secrets and "hunter2" not in draft.view()["after"] and draft.view()["editable"] is False
+        assert "hunter2" in draft.before                                                    # the file it was drafted from holds the secret
+        with pytest.raises(write_mod.NotWritable):                                         # and nobody edits a file with secrets here
+            await write_mod.edit(client, key, result.scenario_path, mid, names, draft.after + "\n")
+        await apply.approve(client, key, mid, "Tester")
         config.write_text(config.read_text() + "\n")                                      # someone edited it meanwhile
         with pytest.raises(StaleTarget):
             await write_mod.write(client, key, key, result.scenario_path, mid, names, "Tester", root=tmp_path)

@@ -2,10 +2,10 @@
 
 import pytest
 import redis.exceptions as rex
+from helpers import agent
 
 from devries.graph import schema
 from devries.graph.catalog import CONSTRAINED_LABELS, INDEXES
-from helpers import agent
 
 
 async def test_bootstrap_creates_everything_and_can_run_twice(client, graph):

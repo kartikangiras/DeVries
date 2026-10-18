@@ -1,11 +1,11 @@
 """Scans, evidence, chokepoints, zones, the workflow check and the canary."""
 
 import pytest
+from helpers import broken, build, res, set_call_gate, src
 
 from devries.analysis import canary, chokepoints, findings, zones
 from devries.analysis.models import Finding, PathEvidence
 from devries.errors import CanaryFailed
-from helpers import broken, build, res, set_call_gate, src
 
 PRIVATE = {"id": "src:crm", "name": "crm", "trust": "private"}
 EXIT = {"id": "res:mail", "name": "mail", "impact": "medium", "external": True}

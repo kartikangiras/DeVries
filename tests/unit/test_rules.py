@@ -1,7 +1,8 @@
 """One test per taint rule, plus the gates. Each builds the smallest config graph that shows the rule."""
 
-from devries.analysis import findings
 from helpers import build, flows, gated, rebuild, set_call_gate, set_delegation_gate
+
+from devries.analysis import findings
 
 
 async def test_rule1_data_enters_a_tool_that_reads_it(client, graph):

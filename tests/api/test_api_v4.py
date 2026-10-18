@@ -4,7 +4,6 @@ import asyncio
 
 from test_api import Stream, base, open_ids, visitor  # noqa: F401  (the fixture and helpers of the first API file)
 
-
 # ---------------------------------------------------------------------- scans over time
 
 async def test_each_scan_is_kept_and_listed_oldest_first(base):
@@ -43,7 +42,7 @@ async def test_the_posture_page_is_one_call(base):
         assert (target["id"], target["reaching"], target["sources"], target["impact"]) == ("res:payments-api", 1, ["src:customer-tickets"], "high")
         assert view["chokes"][0]["id"] == "agent:support-bot" and view["chokes"][0]["routes"] == 1 and view["chokes"][0]["findings"] == 1
         assert all(c["label"] in ("Agent", "Tool") for c in view["chokes"])
-        assert view["cut"]["cost"] == 1 and view["cut"]["cuttable"] is True and view["cut"]["hops"][0]["rule"] == 2
+        assert view["cut"]["cost"] == 2 and view["cut"]["cuttable"] is True and view["cut"]["hops"][0]["rule"] == 3   # the gate, not the revoke the sandbox refuses
         assert view["scans"] and view["scans"][-1]["open"] == 1
         owasp = {o["code"]: o for o in view["owasp"]}
         assert len(owasp) == 10 and owasp["ASI01"]["open"] == 1 and owasp["ASI01"]["checked"] is True
@@ -72,7 +71,7 @@ async def test_the_activity_list_tells_the_story_newest_first(base):
 
         listed = (await http.get("/api/scenarios/acme_support/activity")).json()
         items = listed["items"]
-        assert "scan.history" in listed["queries"] and "draft.for_mitigation" in listed["queries"]
+        assert "scan.history" in listed["queries"] and "draft.list" in listed["queries"]
         assert [i["at"] for i in items] == sorted((i["at"] for i in items), reverse=True)
         assert all(set(i) >= {"at", "kind", "sentence", "who", "status", "refs"} for i in items)
         by_kind = {}
@@ -142,19 +141,21 @@ async def test_the_inventory_lists_every_node_once_with_what_the_graph_says_abou
 
 # ---------------------------------------------------------------------- the cut as one plan
 
-async def test_the_cut_is_proposed_as_one_plan_and_a_failing_verdict_is_the_answer(base):
+async def test_the_cut_is_proposed_as_one_plan_and_the_sandbox_has_the_last_word(base):
+    """The capacities carry the workflows, so the cut names the gate the sandbox passes; it is proposed, not applied."""
     async with visitor(base) as http:
         answer = await http.post("/api/scenarios/acme_support/cut/propose")
         assert answer.status_code == 200, answer.text
         body = answer.json()
-        assert body["proposed"] is None and body["summary"] == ["revoke tool:helpdesk.get_ticket from agent:support-bot"]
-        verdict = body["verdict"]
-        assert verdict["passed"] is False and "wf:refund-request" in verdict["reason"] and verdict["resolved"] == ["fnd:dce0910d42"]
-        assert verdict["plan"]["fixes"][0]["kind"] == "revoke_call" and verdict["targets"] == ["fnd:dce0910d42"]
-        assert {"choke.maxflow", "flow.edges", "wf.broken", "fix.revoke_call"} <= set(body["queries"])
+        assert body["summary"] == ["require human approval before agent:support-bot calls tool:payments.issue_refund"]
+        proposed = body["proposed"]
+        assert proposed is not None and body["verdict"] is None
+        assert proposed["status"] == "proposed" and proposed["source"] == "cut" and proposed["passed"] is True and proposed["cost"] == 2
+        assert proposed["plan"]["fixes"][0]["kind"] == "gate_call" and proposed["targets"] == ["fnd:dce0910d42"]
+        assert {"choke.maxflow", "flow.edges", "wf.broken", "fix.gate_call"} <= set(body["queries"])
         assert (await http.get("/api/session")).json()["copies"] == ["acme_support"]   # a proposal is made on the visitor's copy
         assert await open_ids(http, "acme_support") == ["fnd:dce0910d42"]                # and nothing was applied
-        assert not any(m["source"] == "cut" for m in (await http.get("/api/scenarios/acme_support/mitigations")).json()["mitigations"])
+        assert any(m["source"] == "cut" for m in (await http.get("/api/scenarios/acme_support/mitigations")).json()["mitigations"])
 
         refused = await http.post("/api/scenarios/devries_self/cut/propose")
         assert refused.status_code == 409 and refused.json()["error"]["code"] == "invalid_fix"

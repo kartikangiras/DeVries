@@ -12,6 +12,9 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).parent))
 
+from fake import FakeLLM, call, calls, drive, new_run, say, tools_used  # noqa: E402
+from helpers import build, flows, workflow  # noqa: E402
+
 from devries.agent import phases, prompts  # noqa: E402
 from devries.agent.llm import AssistantTurn, LLMError, LLMRefused, ToolResults, UserText, spend  # noqa: E402
 from devries.analysis import findings  # noqa: E402
@@ -21,8 +24,6 @@ from devries.events import bus  # noqa: E402
 from devries.graph import keys  # noqa: E402
 from devries.mitigation import sandbox, store  # noqa: E402
 from devries.mitigation.dsl import FixPlan, mitigation_id  # noqa: E402
-from fake import FakeLLM, call, calls, drive, new_run, say, tools_used  # noqa: E402
-from helpers import build, flows, workflow  # noqa: E402
 
 FP = injection_fingerprint("src:tickets", "res:payments")
 FND = finding_id(FP)
@@ -43,7 +44,7 @@ async def desk(client, key, mode: str = "supervised") -> str:
 
 def investigate(name: str) -> list:
     return [
-        call("find_injection_paths", scenario=name, because="The scan reported one open finding; I want its path."),
+        call("find_injection_paths", scenario=name, because=f"The scan returned {FND} as open; I want its path."),
         call("rank_chokepoints", scenario=name, finding_ids=[FND], because=f"{FND} runs through agent:a; where can it be cut?"),
         call("choose_targets", finding_ids=[FND], because=f"{FND} is the only open finding and reaches res:payments."),
     ]
@@ -243,7 +244,7 @@ async def test_with_no_model_the_run_is_scripted_and_says_so(client, graph):
     assert (run.status, run.outcome, run.mode, run.model) == ("done", "applied", "scripted", None)
     assert run.scripted_reason == "no model is configured" and run.answer_by == "template"
     assert tools_used(run, "scripted") == ["find_injection_paths", "trust_zones", "rank_chokepoints", "choose_targets", "baseline_search", "propose_fix"]
-    assert "cheapest cut by max flow costs 1" in run.answer and "the plan that passed costs 2" in run.answer
+    assert "cheapest cut by max flow costs 2" in run.answer and "the plan that passed costs the same" in run.answer
     assert tools_used(run, "model") == [] and run.usage.model_steps == 0 and run.usage.simulations == 4
     assert (await store.get(client, graph, run.mitigation_id)).source == "scripted"    # never passed off as an agent's
     assert "scripted" in run.steps[0].text
@@ -458,7 +459,7 @@ def test_the_four_question_kinds_are_recognised_and_nothing_else():
 
 
 async def test_without_a_model_a_graph_question_is_answered_from_the_catalog(client, graph):
-    name = await desk(client, graph)
+    _ = await desk(client, graph)
     run = await drive(client, new_run(graph, kind="ask", question="What can reach payments?"), None)
     assert (run.status, run.outcome, run.mode, run.answer_by) == ("done", "answered", "scripted", "template")
     assert "agent:a" in run.answer and "tool:t.refund" in run.answer and "src:tickets (untrusted)" in run.answer

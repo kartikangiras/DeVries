@@ -8,7 +8,7 @@ import pytest
 
 from devries.analysis import findings
 from devries.errors import InvalidScenario
-from devries.ingest.importer import discover, draft, fetch_tools, guess, import_install, slug
+from devries.ingest.importer import discover, draft, guess, import_install, slug
 from devries.ingest.scenario_loader import load_scenario, read_scenario
 
 ROOT = Path(__file__).resolve().parents[2]

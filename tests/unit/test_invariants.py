@@ -1,8 +1,9 @@
 """The six invariants of the projection (PLAN.md section 5), with rule 7 as the one exception to the fourth."""
 
+from helpers import build, flows, gated, rebuild, set_call_gate
+
 from devries.analysis import findings
 from devries.graph.projection import SIGNATURES
-from helpers import build, flows, gated, rebuild, set_call_gate
 
 BUSY = dict(
     sources=["tickets", {"id": "src:crm", "name": "crm", "trust": "private"}],

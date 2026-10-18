@@ -134,7 +134,7 @@ async def test_scenarios_graph_and_findings_read_the_shared_graphs(base):
         assert by_id["agent:support-bot"]["label"] == "Agent" and by_id["agent:support-bot"]["data"]["blast"] is True
         assert by_id["src:customer-tickets"]["data"]["trust"] == "untrusted" and isinstance(by_id["agent:support-bot"]["id"], int)
         assert {link["rel"] for link in flow["links"]} == {"FLOWS_TO"}
-        refund = next(l for l in flow["links"] if (l["data"]["from_id"], l["data"]["to_id"]) == ("agent:support-bot", "tool:payments.issue_refund"))
+        refund = next(line for line in flow["links"] if (line["data"]["from_id"], line["data"]["to_id"]) == ("agent:support-bot", "tool:payments.issue_refund"))
         assert refund["data"]["sentence"] == "rule 3: agent:support-bot can call tool:payments.issue_refund"
         assert {"ui.nodes", "ui.links", "zones.communities", "reach.untrusted_nodes", "choke.pagerank"} <= set(flow["queries"])
         assert by_id["agent:support-bot"]["data"]["pagerank_rank"] >= 1 and by_id["agent:support-bot"]["data"]["pagerank"] > 0
@@ -145,7 +145,7 @@ async def test_scenarios_graph_and_findings_read_the_shared_graphs(base):
         # each flow hop says which config edge it comes from and which fixes can cut it
         assert refund["data"]["config"] == {"rel": "CAN_CALL", "from_id": "agent:support-bot", "to_id": "tool:payments.issue_refund"}
         assert refund["data"]["fixes"] == ["revoke_call", "gate_call"] and "fixes_later" not in refund["data"]
-        behind = {l["data"]["rule"]: l["data"] for l in flow["links"]}
+        behind = {line["data"]["rule"]: line["data"] for line in flow["links"]}
         assert behind[1]["config"]["rel"] == "READS" and behind[1]["config"]["to_id"].startswith("src:")
         assert behind[1]["fixes"] == ["drop_read"]
         assert behind[2]["config"]["from_id"] == "agent:support-bot" and behind[2]["fixes"] == ["revoke_call"]
@@ -156,7 +156,7 @@ async def test_scenarios_graph_and_findings_read_the_shared_graphs(base):
 
         config = (await http.get("/api/scenarios/acme_support/graph", params={"layer": "config"})).json()
         assert {link["rel"] for link in config["links"]} == {"CAN_CALL", "READS", "WRITES"}
-        assert any(l["data"]["sentence"] == "agent:support-bot can call tool:payments.issue_refund" for l in config["links"])
+        assert any(line["data"]["sentence"] == "agent:support-bot can call tool:payments.issue_refund" for line in config["links"])
 
         found = (await http.get("/api/scenarios/acme_support/findings")).json()
         assert [f["id"] for f in found["findings"]] == ["fnd:dce0910d42"] and found["past"] == []
@@ -183,7 +183,7 @@ async def test_the_catalog_is_published(base):
 ])
 async def test_errors_are_structured(base, method, path, status, code):
     async with visitor(base) as http:
-        response = await http.request(method, path)
+        response = await http.request(method, path, json={"approver": "Tester"} if method == "POST" else None)
         assert response.status_code == status and response.json()["error"]["code"] == code
     async with visitor(base) as http:
         assert (await http.get("/api/scenarios/acme_support/graph", params={"layer": "everything"})).status_code == 422
@@ -241,7 +241,7 @@ async def test_the_day_2_gate_over_http(base, client, scenario, fix, closes):
 
 async def test_reset_gives_the_visitor_the_shared_scenario_back(base, client):
     async with visitor(base) as http:
-        found = (await http.post("/api/scenarios/acme_support/mitigations/search")).json()
+        found = (await http.post("/api/scenarios/acme_support/mitigations/search", json={})).json()
         best = found["passing"][0]
         assert best["plan"]["fixes"][0]["kind"] == "gate_call" and len(found["failed"]) == 3
         assert (await http.post(f"/api/scenarios/acme_support/mitigations/{best['id']}/apply")).json()["error"]["code"] == "needs_approval"
@@ -373,22 +373,22 @@ async def test_a_plan_can_be_previewed_before_anyone_approves_it(base):
         gate = found["passing"][0]
         after = (await http.get(f"/api/scenarios/acme_support/mitigations/{gate['id']}/preview")).json()
         assert after["applied"] is False and after["layer"] == "flow"
-        blocked = [(l["data"]["from_id"], l["data"]["to_id"], l["data"]["gate"]) for l in after["links"] if l["rel"] == "GATED_FLOW"]
+        blocked = [(line["data"]["from_id"], line["data"]["to_id"], line["data"]["gate"]) for line in after["links"] if line["rel"] == "GATED_FLOW"]
         assert blocked == [("agent:support-bot", "tool:payments.issue_refund", "human_approval")]
         # the visitor's graph is as it was: the preview was read from a sandbox
         now = (await http.get("/api/scenarios/acme_support/graph")).json()
-        assert {l["rel"] for l in now["links"]} == {"FLOWS_TO"} and await open_ids(http, "acme_support") == ["fnd:dce0910d42"]
+        assert {line["rel"] for line in now["links"]} == {"FLOWS_TO"} and await open_ids(http, "acme_support") == ["fnd:dce0910d42"]
 
         # a failed plan can be looked at too: the revoke takes the grant away altogether
         revoke = next(m for m in found["failed"] if m["plan"]["fixes"][0] == {"kind": "revoke_call", "agent_id": "agent:support-bot", "tool_id": "tool:payments.issue_refund"})
         gone = (await http.get(f"/api/scenarios/acme_support/mitigations/{revoke['id']}/preview")).json()
-        assert ("agent:support-bot", "tool:payments.issue_refund") not in {(l["data"]["from_id"], l["data"]["to_id"]) for l in gone["links"]}
+        assert ("agent:support-bot", "tool:payments.issue_refund") not in {(line["data"]["from_id"], line["data"]["to_id"]) for line in gone["links"]}
 
         # once applied, the graph itself is the preview
         await http.post(f"/api/scenarios/acme_support/mitigations/{gate['id']}/approve", json={"approver": "Tester"})
         await http.post(f"/api/scenarios/acme_support/mitigations/{gate['id']}/apply")
         applied = (await http.get(f"/api/scenarios/acme_support/mitigations/{gate['id']}/preview")).json()
-        assert applied["applied"] is True and any(l["rel"] == "GATED_FLOW" for l in applied["links"])
+        assert applied["applied"] is True and any(line["rel"] == "GATED_FLOW" for line in applied["links"])
 
 
 def test_sandbox_reads_are_rationed_by_the_minute():
@@ -405,15 +405,16 @@ def test_sandbox_reads_are_rationed_by_the_minute():
 async def test_the_cheapest_cut_is_read_from_max_flow_and_marks_flow_hops(base, client):
     async with visitor(base) as http:
         cut = (await http.get("/api/scenarios/acme_support/cut")).json()
-        assert (cut["cost"], cut["cuttable"]) == (1, True) and cut["queries"] == ["choke.maxflow", "flow.edges"]
-        # the hop is given the way it flows (tool to agent), with the grant behind it the other way round
+        assert (cut["cost"], cut["cuttable"]) == (2, True) and cut["queries"] == ["choke.maxflow", "flow.edges"]
+        # the refund workflow needs the ticket read, so that hop is priced uncuttable and the cut lands on the refund
+        # call at the price of a gate, with the grant behind it
         assert cut["hops"] == [{
-            "from_id": "tool:helpdesk.get_ticket", "to_id": "agent:support-bot", "rule": 2,
-            "sentence": "rule 2: agent:support-bot calls tool:helpdesk.get_ticket, so what it returns enters agent:support-bot's context",
-            "config": {"rel": "CAN_CALL", "from_id": "agent:support-bot", "to_id": "tool:helpdesk.get_ticket"},
-            "capacity": 1, "fixes": ["revoke_call"]}]
-        # the cut is where it is cheapest to look, not a verdict: the sandbox refuses this very revoke
-        found = (await http.post("/api/scenarios/acme_support/mitigations/search")).json()
+            "from_id": "agent:support-bot", "to_id": "tool:payments.issue_refund", "rule": 3,
+            "sentence": "rule 3: agent:support-bot can call tool:payments.issue_refund",
+            "config": {"rel": "CAN_CALL", "from_id": "agent:support-bot", "to_id": "tool:payments.issue_refund"},
+            "capacity": 2, "fixes": ["revoke_call", "gate_call"], "fix": "gate_call"}]
+        # the cut is a guide and the sandbox the verdict: the revoke the cut used to name is refused there
+        found = (await http.post("/api/scenarios/acme_support/mitigations/search", json={})).json()
         refused = [m for m in found["failed"] if m["summary"] == ["revoke tool:helpdesk.get_ticket from agent:support-bot"]]
         assert len(refused) == 1 and "wf:refund-request" in refused[0]["reason"]
 

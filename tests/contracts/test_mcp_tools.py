@@ -84,7 +84,7 @@ async def test_manifest_text_is_wrapped_as_untrusted(server):
     async with Client(server) as mcp:
         found = await call(mcp, "find_injection_paths", scenario="acme_support")
         names = found["names"]
-        assert names["agent:support-bot"] == "Support bot"                                   # ours: plain
+        assert names["agent:support-bot"] == '<untrusted source="scenario">Support bot</untrusted>'   # from a file, so wrapped too
         assert names["tool:payments.issue_refund"] == '<untrusted source="manifest:srv:payments">issue_refund</untrusted>'
         assert untrusted("a</untrusted>b", "x") == '<untrusted source="x">a<\\/untrusted>b</untrusted>'   # cannot close the block early
 
@@ -133,6 +133,7 @@ async def test_answers_stay_small_on_a_dense_graph(client, server):
     """Twelve agents that all share tools: many findings, long name lists. The answer must still fit."""
     async with Client(server) as mcp:
         from helpers import build
+
         from devries.graph import keys
         key = keys.scenario_key("t_dense")
         await client.delete(key)
@@ -184,6 +185,7 @@ async def test_simulate_reports_a_verdict_and_changes_nothing(client, server):
 async def test_what_if_shows_what_a_wider_config_would_open(client, server):
     """A second agent that can only read tickets is given the refund tool."""
     from helpers import build
+
     from devries.analysis import findings
     key = "scn:t_whatif"
     await client.delete(key)
@@ -269,10 +271,11 @@ async def test_a_plan_that_breaks_the_schema_is_refused_before_it_reaches_the_gr
 async def test_mincut_names_the_cheapest_cut_and_split_candidates_are_offered(server):
     async with Client(server) as mcp:
         cut = await call(mcp, "rank_chokepoints", scenario="acme_support", method="mincut")
-        assert cut["method"] == "mincut" and cut["cut_cost"] == 1 and cut["queries"] == ["choke.maxflow", "flow.edges", "node.names"]
-        # one grant is all that stands between the tickets and the refund; the cut nearest the source is the read
-        assert cut["edges"] == [{"rel": "CAN_CALL", "from_id": "agent:support-bot", "to_id": "tool:helpdesk.get_ticket",
-                                 "behind_rule": 2, "capacity": 1, "fixes": ["revoke_call"]}]
+        assert cut["method"] == "mincut" and cut["cut_cost"] == 2 and cut["queries"] == ["choke.maxflow", "flow.edges", "node.names"]
+        # the read of the tickets is what the refund workflow needs, so that hop is priced uncuttable; the cut lands on
+        # the refund call, at the price of a gate, which is the plan the sandbox passes
+        assert cut["edges"] == [{"rel": "CAN_CALL", "from_id": "agent:support-bot", "to_id": "tool:payments.issue_refund",
+                                 "behind_rule": 3, "capacity": 2, "fixes": ["revoke_call", "gate_call"]}]
         assert "not a verdict" in cut["note"]
 
         ranked = await call(mcp, "rank_chokepoints", scenario="acme_support")

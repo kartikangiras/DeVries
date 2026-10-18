@@ -2,22 +2,19 @@
 imports from the browser (private on a public site), audits that start by themselves, and the pass at start."""
 
 import asyncio
-import json
 import secrets
 import shutil
 import socket
 from pathlib import Path
 
 import httpx2 as httpx
-import pytest
-import pytest_asyncio
 import uvicorn
+from test_api import Stream, base, open_ids, visitor  # noqa: F401  (the fixture and helpers of the first API file)
 
 from devries.agent.llm import spend
 from devries.app import create_app
 from devries.config import get_settings
 from devries.ingest.scenario_loader import load_scenario
-from test_api import Stream, base, open_ids, visitor  # noqa: F401  (the fixture and helpers of the first API file)
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -33,12 +30,15 @@ async def test_the_overview_is_one_sentence_and_three_columns(base):
         assert [a["id"] for a in view["columns"]["actions"]] == ["res:payments-api"]
         ribbon = view["ribbons"][0]
         assert (ribbon["id"], ribbon["kind"], ribbon["hops"], ribbon["agent_ids"]) == ("fnd:dce0910d42", "injection", 4, ["agent:support-bot"])
-        assert view["counts"]["untrusted_sources"] == 1 and view["counts"]["open_findings"] == 1 and view["counts"]["cut_cost"] == 1
+        assert view["counts"]["untrusted_sources"] == 1 and view["counts"]["open_findings"] == 1 and view["counts"]["cut_cost"] == 2
         assert "src:payment-records" in view["folded"]["sources"] and "overview.counts" in view["queries"]
         clean = (await http.get("/api/scenarios/devries_self/overview")).json()
         assert clean["ribbons"] == [] and "Nothing untrusted reaches" in clean["sentence"]
         dev = (await http.get("/api/scenarios/acme_dev/overview")).json()
-        assert "agents hold untrusted input, private data and a way out" in dev["sentence"] and len(dev["ribbons"]) == 7
+        # the second line counts what the figure beside it counts (four Rule of Two cards hold all three), then the way out
+        assert dev["sentence_more"] == "Four agents hold all three of Meta's properties, three of them with a way out of the organisation."
+        assert len(dev["ribbons"]) == 7
+        assert len(dev["sentence"].split()) <= 16                                   # the title stays one short sentence
 
 
 async def test_findings_carry_their_owasp_class_and_export_as_a_brief_and_a_figure(base):
@@ -60,16 +60,16 @@ async def test_findings_carry_their_owasp_class_and_export_as_a_brief_and_a_figu
 async def test_the_cut_is_offered_as_rules(base):
     async with visitor(base) as http:
         policy = (await http.get("/api/scenarios/acme_support/cut/policy")).json()
-        assert policy["cost"] == 1 and policy["claude_code"] == {"permissions": {"deny": ["mcp__helpdesk__get_ticket"]}}
-        assert policy["docker_mcp_gateway"] == ["docker mcp profile tools default --disable helpdesk.get_ticket"]
-        assert '"deny"' in policy["claude_code_text"]
+        assert policy["cost"] == 2 and policy["claude_code"] == {"permissions": {"ask": ["mcp__payments__issue_refund"]}}
+        assert policy["docker_mcp_gateway"] == ["docker mcp profile tools default --disable payments.issue_refund"]
+        assert '"ask"' in policy["claude_code_text"]
 
 
 # ---------------------------------------------------------------------- drafts
 
 async def test_a_plan_is_drafted_as_the_change_to_the_scenario_file_and_a_visitor_can_edit_it(base):
     async with visitor(base) as http:
-        found = (await http.post("/api/scenarios/acme_support/mitigations/search")).json()
+        found = (await http.post("/api/scenarios/acme_support/mitigations/search", json={})).json()
         gate = next(m for m in found["passing"] if m["plan"]["fixes"][0]["kind"] == "gate_call")
         drafted = (await http.get(f"/api/scenarios/acme_support/mitigations/{gate['id']}/draft")).json()
         d = drafted["draft"]
@@ -105,9 +105,15 @@ async def test_a_write_from_the_browser_changes_the_file_reloads_the_shared_grap
         await load_scenario(client, path, root=tmp_path)
         async with visitor(base) as http:
             stream = await Stream.open(http)
-            found = (await http.post(f"/api/scenarios/{name}/mitigations/search")).json()
+            found = (await http.post(f"/api/scenarios/{name}/mitigations/search", json={})).json()
             gate = next(m for m in found["passing"] if m["plan"]["fixes"][0]["kind"] == "gate_call")
             assert (await http.get("/api/session")).json()["copies"] == [name]
+            # nothing is written for a plan nobody approved
+            refused = await http.post(f"/api/scenarios/{name}/mitigations/{gate['id']}/draft/write", json={"approver": "Kartik"})
+            assert refused.status_code == 409 and refused.json()["error"]["code"] == "needs_approval"
+            assert "gate: human_approval" not in path.read_text()
+            approved = (await http.post(f"/api/scenarios/{name}/mitigations/{gate['id']}/approve", json={"approver": "Kartik"})).json()
+            assert approved["mitigation"]["approved_session"] and len(approved["mitigation"]["approved_session"]) == 10
             written = await http.post(f"/api/scenarios/{name}/mitigations/{gate['id']}/draft/write", json={"approver": "Kartik"})
             assert written.status_code == 200, written.text
             receipt = written.json()["receipt"]

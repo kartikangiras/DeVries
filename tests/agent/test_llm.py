@@ -11,7 +11,17 @@ import pytest
 
 from devries.agent import grounding, phases
 from devries.agent.llm import (
-    AssistantTurn, ClaudeLLM, LLMError, LLMRefused, Spend, ToolResult, ToolResults, ToolSpec, UserText, configured_llm, cost_usd,
+    AssistantTurn,
+    ClaudeLLM,
+    LLMError,
+    LLMRefused,
+    Spend,
+    ToolResult,
+    ToolResults,
+    ToolSpec,
+    UserText,
+    configured_llm,
+    cost_usd,
 )
 from devries.config import Settings
 
