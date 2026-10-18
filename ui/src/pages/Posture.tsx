@@ -1,15 +1,17 @@
 // The scenario's standing, read from FalkorDB: how exposed it is, where the risk runs, what stands in its way, and
 // whether it is getting better. Five figures, the live flow, two bar charts, the choke points with the cut, the
-// history; the Rule of Two tally and the OWASP coverage are folded under one line each. How each figure is read
-// is on the Method page, not here.
+// Rule of Two agent by agent (open), the history once there is one, and the OWASP coverage folded under one line.
+// How each figure is read is on the Method page, not here.
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { api, type Mitigation, type Posture } from "../api";
 import { useFetch } from "../fetch";
+import { loadElk } from "../graph/Flow";
 import { RiskFlow } from "../graph/RiskFlow";
 import { href } from "../route";
 import type { DeVries } from "../state";
-import { WithNames, clock, countWord, plural } from "../text";
+import { cutBy } from "../desk";
+import { WithNames, capital, clock, countWord, plural } from "../text";
 import { Block, Button, Empty, Figures, Fold, Loading, PageBody, PageHeader } from "../ui";
 
 /** One row a thing, a bar for its figure against the largest, a second thinner bar for the part that matters most. */
@@ -35,9 +37,8 @@ function Bars({ rows, max, label }: { rows: { id: string; name: string; sub: str
   );
 }
 
-/** Open findings after each scan, as one bar a scan; the latest is lit, so a fix shows as a drop. */
+/** Open findings after each scan, as one bar a scan; the latest is lit, so a fix shows as a drop. Drawn once there are two. */
 function Scans({ scans }: { scans: Posture["scans"] }) {
-  if (!scans.length) return <p className="rail-note">No scan has been recorded on this graph yet; the next one starts the history.</p>;
   const max = Math.max(1, ...scans.map((s) => s.open));
   const shown = scans.slice(-24);
   return (
@@ -75,7 +76,7 @@ function CutLine({ c, scenario, cut }: { c: DeVries; scenario: string; cut: Post
       <p>
         <strong>{cut.cuttable ? `Cheapest cut: cost ${cut.cost}.` : "No set of fixes separates them."}</strong>{" "}
         {cut.hops.map((h, i) => (
-          <span key={`${h.from_id}>${h.to_id}`}>{i > 0 && "; "}<WithNames text={h.sentence.replace(/^rule \d+: /, "")} names={c.names} />{h.fixes.length ? ` (${h.fixes.join(" or ")})` : " (cannot be cut)"}</span>
+          <span key={`${h.from_id}>${h.to_id}`}>{i > 0 && "; "}<WithNames text={h.sentence.replace(/^rule \d+: /, "")} names={c.names} />{h.fix ? ` (${cutBy([h.fix])})` : h.fixes.length ? ` (${cutBy(h.fixes)})` : " (cannot be cut)"}</span>
         ))}.
         {cut.cuttable && hasInjection && (
           !state || state.error ? <> <Button size="sm" onClick={propose} disabled={c.busy}>Propose it as one plan</Button>{state?.error && <span className="whatif-error"> {state.error}</span>}</>
@@ -98,6 +99,16 @@ function CutLine({ c, scenario, cut }: { c: DeVries; scenario: string; cut: Post
 export function PosturePage({ c, scenario }: { c: DeVries; scenario: string }) {
   // ask again when the config, a scan or a plan has moved
   const posture = useFetch(() => api.posture(scenario), [scenario, c.configHash, c.scannedAt, c.plans.length, c.findings?.findings.length]);
+  // the Explorer and a finding's Path step lay their chart out with ELK: fetch it now, while this page is idle, so they open faster
+  useEffect(() => {
+    const warm = () => void loadElk().catch(() => {});
+    if (typeof window.requestIdleCallback === "function") {
+      const id = window.requestIdleCallback(warm, { timeout: 4000 });
+      return () => window.cancelIdleCallback(id);
+    }
+    const id = window.setTimeout(warm, 1500);           // Safari has no idle callback
+    return () => window.clearTimeout(id);
+  }, []);
   const p = posture.data?.scenario === scenario ? posture.data : null;
   const overview = c.overview?.scenario === scenario ? c.overview : null;
   const open = c.findings?.findings.filter((f) => f.status === "open") ?? [];
@@ -106,6 +117,8 @@ export function PosturePage({ c, scenario }: { c: DeVries; scenario: string }) {
   const name = (id: string) => c.names[id] ?? id;
   const untrustedTotal = p?.counts.untrusted_sources ?? 0;
   const three = p?.rule_of_two.agents.filter((a) => a.count === 3) ?? [];
+  // the second clause of the sentence, when the server gives one, opens the meta line
+  const more = p?.sentence_more?.trim().replace(/[.;,]\s*$/, "");
 
   return (
     <PageBody width="wide">
@@ -113,6 +126,7 @@ export function PosturePage({ c, scenario }: { c: DeVries; scenario: string }) {
         eyebrow="Posture"
         title={p?.sentence ?? overview?.sentence ?? (c.ready ? "Reading the graph." : "Connecting.")}
         meta={<>
+          {more ? `${capital(more)}. ` : ""}
           {c.current?.description ? `${c.current.description}. ` : ""}
           {p?.facts.last_scan ? `Last scanned ${clock(p.facts.last_scan.at)}.` : "Not scanned yet."}
           {p?.own_copy ? " Your sandbox copy." : ""}
@@ -143,6 +157,7 @@ export function PosturePage({ c, scenario }: { c: DeVries; scenario: string }) {
                   id: b.id, name: b.name, value: b.reached, accent: b.high + b.external, href: href(scenario, "graph", b.id),
                   sub: [plural(b.agents, "agent", "agents"), plural(b.tools, "tool", "tools"), b.high ? `${countWord(b.high)} high-impact` : null, b.external ? `${countWord(b.external)} way${b.external === 1 ? "" : "s"} out` : null].filter(Boolean).join(" · "),
                 }))} />
+              {p.blast.length > 0 && <p className="bars-key"><i aria-hidden />what the source's text reaches · <i className="lit" aria-hidden />lit: high-impact resources and ways out among them</p>}
             </Block>
             <Block className="posture-targets" eyebrow="Exposure" aside="how many untrusted sources reach each action">
               <Bars label="Exposure" max={Math.max(1, untrustedTotal)}
@@ -150,6 +165,7 @@ export function PosturePage({ c, scenario }: { c: DeVries; scenario: string }) {
                   id: t.id, name: t.name, value: t.reaching, href: href(scenario, "graph", t.id),
                   sub: [t.impact ? `${t.impact} impact` : null, t.external ? "leaves the organisation" : null, t.reaching ? `from ${t.sources.map(name).join(", ")}` : "from no untrusted source"].filter(Boolean).join(" · "),
                 }))} />
+              {p.targets.length > 0 && <p className="bars-key"><i aria-hidden />how many of the {plural(untrustedTotal, "untrusted source", "untrusted sources")} reach it</p>}
             </Block>
           </div>
 
@@ -169,11 +185,7 @@ export function PosturePage({ c, scenario }: { c: DeVries; scenario: string }) {
             <CutLine c={c} scenario={scenario} cut={p.cut} />
           </Block>
 
-          <Block className="posture-scans" eyebrow="Over time" aside={`${plural(p.scans.length, "scan", "scans")} · open findings after each`}>
-            <Scans scans={p.scans} />
-          </Block>
-
-          <Fold className="posture-tally" summary="Rule of Two, agent by agent" sub={`${plural(p.rule_of_two.agents.length, "agent", "agents")} · ${three.length ? `${countWord(three.length)} ${three.length === 1 ? "holds" : "hold"} all three` : "none holds all three"}${p.rule_of_two.unattended_three ? `, ${countWord(p.rule_of_two.unattended_three)} unattended` : ""}`}>
+          <Fold className="posture-tally" open summary="Rule of Two, agent by agent" sub={`${plural(p.rule_of_two.agents.length, "agent", "agents")} · ${three.length ? `${countWord(three.length)} ${three.length === 1 ? "holds" : "hold"} all three` : "none holds all three"}${p.rule_of_two.unattended_three ? `, ${countWord(p.rule_of_two.unattended_three)} unattended` : ""}`}>
             {p.rule_of_two.agents.length ? (
               <ul className="tally">
                 {p.rule_of_two.agents.map((a) => (
@@ -189,7 +201,15 @@ export function PosturePage({ c, scenario }: { c: DeVries; scenario: string }) {
             ) : <Empty>No agent in this scenario.</Empty>}
           </Fold>
 
-          <Fold className="posture-owasp" summary="OWASP Top 10 coverage" sub={`${p.owasp.filter((o) => o.checked).length} of 10 classes checked · ${p.owasp.reduce((n, o) => n + o.open, 0)} open`}>
+          {p.scans.length >= 2 ? (
+            <Block className="posture-scans" eyebrow="Over time" aside={`${plural(p.scans.length, "scan", "scans")} · open findings after each`}>
+              <Scans scans={p.scans} />
+            </Block>
+          ) : (
+            <p className="rail-note posture-scans-note">{p.scans.length === 1 ? "One scan so far; the history starts with the next." : "No scan has been recorded on this graph yet; the history starts with the second."}</p>
+          )}
+
+          <Fold className="posture-owasp" summary="OWASP Top 10 coverage" sub={`${p.owasp.filter((o) => o.checked).length} of 10 classes checked · ${plural(p.owasp.filter((o) => o.open > 0).length, "class", "classes")} with open findings`}>
             <ul className="owasp-row">
               {p.owasp.map((o) => (
                 <li key={o.code} className={`owasp-code${o.checked ? "" : " off"}${o.open ? " hot" : ""}`} title={`${o.code} ${o.name}${o.checked ? "" : " · not checked by DeVries"}`}>

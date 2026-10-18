@@ -1,6 +1,6 @@
 // The open findings, each a small memo of its own, and the same list for the ones that are closed. The scenario's
-// standing is on Posture; this page is the list, and for an import, the labels the scan needs. The row is Manthan's inbox row (strip, headline with its figure, footer with what happens
-// next), holding a finding instead of a case (see ui/THIRD_PARTY_NOTICES.md).
+// standing is on Posture; this page is the list, and for an import, the labels the scan needs. A row is a strip,
+// a headline with its figure, and a footer with what happens next.
 
 import type { Finding } from "../api";
 import { useState } from "react";

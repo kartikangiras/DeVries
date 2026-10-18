@@ -26,10 +26,10 @@ const HOP: Record<number, (a: string, b: string) => string> = {
 };
 
 /** Meta's Rule of Two, said once on a trifecta's brief: all three properties in one agent. */
-export const RULE_OF_TWO = "That is all three properties of Meta's Agents Rule of Two in one context, which the rule says must not run unattended.";
+const RULE_OF_TWO = "That is all three properties of Meta's Agents Rule of Two in one context, which the rule says must not run unattended.";
 
 /** The first hop of a finding that a gate blocks now, if any: where a fix cut it. */
-export function blockedHop(finding: Finding, flow: Graph | undefined): GraphLink | null {
+function blockedHop(finding: Finding, flow: Graph | undefined): GraphLink | null {
   const live = linkIndex(flow);
   for (const { path } of pathsOf(finding)) {
     for (let i = 0; i < path.node_ids.length - 1; i++) {
@@ -43,12 +43,6 @@ export function blockedHop(finding: Finding, flow: Graph | undefined): GraphLink
 const gateWords = (gate: string | null | undefined) => (gate === "quarantine" ? "a quarantine" : "an approval gate");
 
 /** The brief's paragraph, with ids in it. */
-/** How many tools a drift finding touches. */
-export function driftCount(finding: Finding): number {
-  const d = finding.drift;
-  return d ? d.added.length + d.removed.length + Object.keys(d.changed).length : 0;
-}
-
 export function tldr(finding: Finding, flow: Graph | undefined): string {
   if (finding.kind === "poisoned_description") {
     const flags = finding.flags ?? [];
@@ -106,7 +100,9 @@ export function verdictSentence(m: Mitigation): string {
   const resolved = m.resolved?.length ?? 0;
   const introduced = m.introduced?.length ?? 0;
   const broken = m.newly_broken?.length ?? 0;
-  return `Tested on a sandbox copy of the graph${m.sandbox_ms != null ? ` in ${m.sandbox_ms} ms` : ""}: it resolves ${plural(resolved, "finding", "findings")}, introduces ${introduced ? plural(introduced, "new one", "new ones") : "none"} and breaks ${broken ? plural(broken, "workflow", "workflows") : "no workflow"}.`;
+  const breaks = m.unconstrained ? "breaks nothing that was checked" : `breaks ${broken ? plural(broken, "workflow", "workflows") : "no workflow"}`;
+  const caveat = m.unconstrained ? " No workflow is declared here, so nothing was checked for breakage." : "";
+  return `Tested on a sandbox copy of the graph${m.sandbox_ms != null ? ` in ${m.sandbox_ms} ms` : ""}: it resolves ${plural(resolved, "finding", "findings")}, introduces ${introduced ? plural(introduced, "new one", "new ones") : "none"} and ${breaks}.${caveat}`;
 }
 
 /** Every path node of a finding gets a footnote number, in the order the chart reads: left to right. */

@@ -31,7 +31,7 @@ const RUN_PHASE: Record<string, string> = {
 
 /** The plan to put in front of a person when several passed: the one the audit run proposed, and
  *  failing that the search's own order: cheapest, then the one that closes most, then the first tested. */
-export function best(passing: Mitigation[], run: Run | null): Mitigation | null {
+function best(passing: Mitigation[], run: Run | null): Mitigation | null {
   const proposed = passing.find((m) => m.id === run?.mitigation_id);
   if (proposed) return proposed;
   return [...passing].sort((a, b) => a.cost - b.cost || (b.resolved?.length ?? 0) - (a.resolved?.length ?? 0) || a.created_at - b.created_at)[0] ?? null;
@@ -63,11 +63,14 @@ export function deskOf(finding: Finding, plans: Mitigation[], run: Run | null, o
   if (run?.kind === "audit" && run.status === "running") {
     return { ...base, word: "Investigating", tone: "info", pulse: true, next: RUN_PHASE[run.phase] ?? run.phase };
   }
-  if (tested.some((m) => m.status === "rejected")) return { ...base, word: "Open", tone: "danger", next: "a fix was rejected; run the audit again" };
+  // while the audit waits on a decision about another finding's fix, the page offers no second audit: that decision comes first
+  const paused = (run?.kind === "audit" && run.status === "awaiting_approval") || plans.some((m) => isLive(m, open));
+  const again = paused ? "decide the fix that is waiting, then run the audit again" : "run the audit again";
+  if (tested.some((m) => m.status === "rejected")) return { ...base, word: "Open", tone: "danger", next: `a fix was rejected; ${again}` };
   // a plan passed, but for a finding that has since closed: its verdict describes a graph that is gone
-  if (tested.some((m) => m.status === "proposed" && m.passed)) return { ...base, word: "Open", tone: "danger", next: "its tested plan is out of date; run the audit again" };
+  if (tested.some((m) => m.status === "proposed" && m.passed)) return { ...base, word: "Open", tone: "danger", next: `its tested plan is out of date; ${again}` };
   if (tested.length) return { ...base, word: "Open", tone: "danger", next: "no plan passed yet" };
-  return { ...base, word: "Open", tone: "danger", next: "run the audit" };
+  return { ...base, word: "Open", tone: "danger", next: paused ? again : "run the audit" };
 }
 
 /** How exposed a finding is, in a figure: "four hops", "three legs". */
@@ -99,9 +102,10 @@ export function recommendation(plan: Mitigation): string {
   return n === 1 ? one : many.replace("%n", countWord(n));
 }
 
-/** What a sandbox said about a plan: "resolves 2 · introduces 0 · breaks 0". */
+/** What a sandbox said about a plan: "resolves 2 · introduces 0 · breaks 0". With no workflow declared, breakage was not checked, and the line says so. */
 export function verdictLine(m: Mitigation): string {
-  return `resolves ${m.resolved?.length ?? 0} · introduces ${m.introduced?.length ?? 0} · breaks ${m.newly_broken?.length ?? 0}`;
+  const line = `resolves ${m.resolved?.length ?? 0} · introduces ${m.introduced?.length ?? 0} · breaks ${m.unconstrained ? "unchecked" : m.newly_broken?.length ?? 0}`;
+  return m.unconstrained ? `${line} · No workflow is declared here, so nothing was checked for breakage.` : line;
 }
 
 /** The literal change to the configuration: which edge of the graph, and what happens to it. */
@@ -116,3 +120,13 @@ export function patchText(patch: any): string {
 export const FIX_VERB: Record<string, string> = {
   gate_call: "Gate", revoke_call: "Revoke", quarantine_delegation: "Quarantine", drop_read: "Drop", split_agent: "Split",
 };
+
+/** A fix as the act that makes it, for saying how a hop is cut: "revoking the grant". */
+const FIX_BY: Record<string, string> = {
+  gate_call: "gating the call", revoke_call: "revoking the grant", quarantine_delegation: "quarantining the delegation", drop_read: "dropping the read", split_agent: "splitting the agent",
+};
+
+/** How a hop can be cut, in words: "cut by revoking the grant or by gating the call". */
+export function cutBy(fixes: string[]): string {
+  return `cut by ${fixes.map((f) => FIX_BY[f] ?? f.replace(/_/g, " ")).join(" or by ")}`;
+}

@@ -1,10 +1,9 @@
 // The frame every page sits in: the sidebar with the scenario switch, the places to go in four groups, and
 // the session; and the page beside it. There is no top bar; each page carries its own header.
-// The structure follows Manthan's AppShell (see ui/THIRD_PARTY_NOTICES.md).
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { deskOf } from "./desk";
-import { go, href, type Page, type Route } from "./route";
+import { go, href, placeOf, type Page, type Route } from "./route";
 import type { DeVries } from "./state";
 import { Icon, Mark, type IconName } from "./ui";
 
@@ -14,16 +13,6 @@ const GROUPS: { label: string; rows: Row[] }[] = [
   { label: "System", rows: [{ page: "graph", label: "Explorer", icon: "graph" }, { page: "method", label: "Method", icon: "method" }] },
   { label: "Record", rows: [{ page: "audit", label: "Activity", icon: "audit" }, { page: "import", label: "Import", icon: "import" }] },
 ];
-
-/** The nav row a route belongs to: a finding belongs to the list it is in. */
-export function placeOf(route: Route, closed: boolean): Page {
-  if (route.page === "finding") return closed ? "done" : "inbox";
-  if (route.page === "fixes") return "audit";          // older addresses, kept so links survive
-  if (route.page === "whatif") return "graph";
-  if (route.page === "servers" || route.page === "inventory") return "graph";
-  if (route.page === "queries") return "method";
-  return route.page;
-}
 
 function ScenarioSwitch({ c, scenario }: { c: DeVries; scenario: string | null }) {
   const [open, setOpen] = useState(false);
@@ -76,12 +65,17 @@ function ScenarioSwitch({ c, scenario }: { c: DeVries; scenario: string | null }
 function Session({ c }: { c: DeVries }) {
   const own = !!c.current?.own_copy;
   const model = c.session?.model;
+  // the badge says what drove the newest run on this scenario; a configured model only speaks for the next one
+  const newest = c.runList[0] ?? c.run ?? null;
+  const badge = newest?.mode === "agent" ? `model · ${newest.model ?? model?.name ?? "a model"}`
+    : model?.configured ? (newest ? "scripted pass · model ready" : `no run yet · ${model.name ?? "model"} ready`)
+      : "scripted · no model";
   return (
     <div className="session">
       <span className={`session-dot${c.connected ? "" : " off"}`} title={c.connected ? "Live: changes arrive as they happen" : "Reconnecting"} aria-hidden />
       <span className="session-text">
         <span className="session-name">{own ? (c.current?.private ? "Your import" : "Your sandbox copy") : "Shared scenario"}</span>
-        <span className="session-sub model-badge">{model?.configured ? `model · ${model.name}` : "scripted · no model"}</span>
+        <span className="session-sub model-badge">{badge}</span>
       </span>
       {own && (
         <button className="session-reset" onClick={c.reset} disabled={c.busy} title="Delete your copies and see the shared scenarios again" aria-label="Reset">
@@ -128,6 +122,7 @@ export function Shell({ c, route, closed = false, children }: { c: DeVries; rout
         <Session c={c} />
       </aside>
       <main className="main">
+        {c.dbDown && <p className="outage" role="status">FalkorDB is not answering. Retrying every few seconds.</p>}
         {c.problem && (
           <p className="problem" role="alert">
             {c.problem} <button className="link" onClick={c.dismiss}>Dismiss</button>
