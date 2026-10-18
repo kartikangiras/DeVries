@@ -1,7 +1,7 @@
 """python -m devries.agent --scenario NAME [--no-model] [--wait]
 
 One audit on a shared scenario graph, driven by the configured model when a key is set and scripted
-otherwise, kept on the graph as it moves so the running app shows it on the scenario's Record page.
+otherwise, kept on the graph as it moves so the running app shows it on the scenario's Activity page.
 It stops once a plan waits for a person: approve or reject that plan in the app. With --wait it stays
 and waits for the decision instead (up to APPROVAL_TIMEOUT_S), which only an approval made in this
 same process could satisfy, so --wait is for a scripted check, not for the app.
@@ -11,13 +11,15 @@ import argparse
 import asyncio
 import sys
 
-from devries.agent.llm import configured_llm
+import redis.exceptions as rex
+
+from devries.agent.llm import configured_llm, spend
 from devries.agent.loop import Auditor
 from devries.agent.runs import Persister, runs
 from devries.analysis import canary
 from devries.config import get_settings
 from devries.graph import keys
-from devries.graph.client import GraphClient
+from devries.graph.client import GraphClient, unreachable
 from devries.mcp_server.server import build_server
 
 
@@ -29,9 +31,18 @@ def _line(step) -> str:
 
 async def main(scenario: str, use_model: bool, wait: bool) -> int:
     settings = get_settings()
-    client = GraphClient()
+    try:
+        client = GraphClient()
+    except (rex.RedisError, OSError) as e:
+        print(unreachable(e))
+        return 2
     try:
         key = keys.scenario_key(scenario)
+        if not await client.ping():
+            print(unreachable(ConnectionError("no answer")))
+            return 2
+        spend.attach(client)
+        await spend.load()                                # today's model spend, shared with the app
         if not await client.exists(key):
             print(f"no scenario graph for {scenario!r}: run `make seed` first")
             return 1
@@ -59,7 +70,7 @@ async def main(scenario: str, use_model: bool, wait: bool) -> int:
               + (f" · ${run.usage.cost_usd:.2f}" if run.usage.cost_usd else ""))
         if run.mitigation_id:
             print(f"plan {run.mitigation_id} waits for a person: open the scenario in the app to approve or reject it")
-        print(f"the run is kept on the graph: the app shows it on {scenario}'s Record page")
+        print(f"the run is kept on the graph: the app shows it on {scenario}'s Activity page")
         return 0 if run.status == "done" else 1
     finally:
         await client.close()

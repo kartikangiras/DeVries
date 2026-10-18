@@ -17,12 +17,15 @@ The command exits 1 if a run with a model did worse than the baseline, and 0 oth
 
 import argparse
 import asyncio
+import json
 import logging
 import sys
 from dataclasses import dataclass
+from datetime import datetime, timezone
+from pathlib import Path
 from secrets import token_hex
 
-from devries import ops
+from devries import about, ops
 from devries.agent.llm import LLM, configured_llm
 from devries.agent.loop import Auditor
 from devries.agent.runs import runs
@@ -128,6 +131,29 @@ async def measure_agent(client: GraphClient, llm: LLM, scenario: str, n: int) ->
         await client.delete(key)
 
 
+def _span(values: list[float], fmt: str = "{:g}") -> str:
+    low, high = min(values), max(values)
+    return fmt.format(low) if low == high else f"{fmt.format(low)}–{fmt.format(high)}"
+
+
+def results(baselines: list[Baseline], agent_runs: list[AgentRun], model: str) -> dict:
+    """The eval as the landing and the README quote it: per scenario, the baseline and the model's runs beside it."""
+    by_scenario = {b.scenario: b for b in baselines}
+    rows = []
+    for b in baselines:
+        mine = [r for r in agent_runs if r.scenario == b.scenario]
+        if not mine:
+            continue
+        rows.append({"scenario": b.scenario, "baseline": b.plan, "baseline_cost": b.cost, "search_to_first_pass": b.to_first_pass,
+                     "search_total": b.sandboxes, "model_sandboxes": _span([r.sandboxes for r in mine]),
+                     "model_steps": _span([r.model_steps for r in mine]), "usd": _span([r.usd for r in mine], "{:.2f}"),
+                     "matched": sum(r.verdict(by_scenario[r.scenario]) in ("matches", "cheaper") for r in mine), "runs": len(mine)})
+    return {"measured_at": datetime.now(timezone.utc).strftime("%Y-%m-%d"), "model": model,
+            "runs_per_scenario": max((r["runs"] for r in rows), default=0), "scenarios": rows,
+            "matched": sum(r["matched"] for r in rows), "runs": sum(r["runs"] for r in rows),
+            "note": "Written by `make agent-eval` when a model is configured; the landing and the README quote it."}
+
+
 def table(baselines: list[Baseline], agent_runs: list[AgentRun], model: str | None) -> str:
     lines = ["| Scenario | Target | Baseline plan | Cost | Sandboxes to first pass | Sandboxes in all |",
              "| --- | --- | --- | ---: | ---: | ---: |"]
@@ -155,7 +181,7 @@ def table(baselines: list[Baseline], agent_runs: list[AgentRun], model: str | No
     return "\n".join(lines)
 
 
-async def main(scenarios: list[str], n_runs: int) -> int:
+async def main(scenarios: list[str], n_runs: int, out: Path | None = None) -> int:
     logging.getLogger("httpx2").setLevel(logging.WARNING)      # the SDK logs every request at INFO; the table is the output
     logging.getLogger("httpx").setLevel(logging.WARNING)
     client = GraphClient()
@@ -179,6 +205,10 @@ async def main(scenarios: list[str], n_runs: int) -> int:
     finally:
         await client.close()
     print(table(baselines, agent_runs, llm.name if llm else None))
+    if llm is not None and agent_runs and out is not None:
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_text(json.dumps(results(baselines, agent_runs, llm.name), indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+        print(f"\nwritten: {out}", file=sys.stderr)
     by_scenario = {b.scenario: b for b in baselines}
     return 1 if any(r.verdict(by_scenario[r.scenario]) in ("worse", "no plan", "not the model's") for r in agent_runs) else 0
 
@@ -188,7 +218,8 @@ if __name__ == "__main__":
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--runs", type=int, default=3, help="audit runs per scenario when a model is configured (default 3)")
     parser.add_argument("--scenarios", help="comma-separated scenario names (default: every file in scenarios/)")
+    parser.add_argument("--out", type=Path, default=about.EVAL_PATH, help="where the results are kept when a model ran (default docs/eval.json)")
     args = parser.parse_args()
     names = args.scenarios.split(",") if args.scenarios else sorted(
         read_scenario(path).spec.scenario for path in get_settings().scenarios_dir.glob("*.yaml"))
-    sys.exit(asyncio.run(main(names, max(1, args.runs))))
+    sys.exit(asyncio.run(main(names, max(1, args.runs), args.out)))
