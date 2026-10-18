@@ -8,7 +8,8 @@ import { Inbox } from "./pages/Inbox";
 import { MethodPage } from "./pages/Method";
 import { PosturePage } from "./pages/Posture";
 import { Landing } from "./landing/Landing";
-import { go, href, legacyOf, placeOf, readRoute } from "./route";
+import { CatalogPage } from "./pages/Catalog";
+import { CATALOG, go, href, legacyOf, placeOf, readRoute } from "./route";
 import { Shell } from "./Shell";
 import { useDeVries } from "./state";
 import { Empty, Loading, PageBody } from "./ui";
@@ -24,25 +25,27 @@ export default function App() {
     return () => window.removeEventListener("hashchange", onHash);
   }, []);
 
-  const c = useDeVries(route.scenario);
+  const atFront = route.scenario === CATALOG;
+  const c = useDeVries(atFront ? null : route.scenario);
   const { scenario, page, id, sub } = route;
 
   useEffect(() => {
-    document.title = scenario ? `${PLACE[placeOf(route, false)] ?? "DeVries"} · ${c.titleOf(scenario)} · DeVries` : "DeVries";
-  }, [route, scenario, c.titleOf]);
+    document.title = atFront ? "Scenarios · DeVries" : scenario ? `${PLACE[placeOf(route, false)] ?? "DeVries"} · ${c.titleOf(scenario)} · DeVries` : "DeVries";
+  }, [route, scenario, atFront, c.titleOf]);
 
   // older addresses land where their content now lives (route.ts, LEGACY); a plan's address waits for the plans to load
   useEffect(() => {
-    if (!scenario) return;
+    if (!scenario || atFront) return;
     const legacy = legacyOf(page);
     if (!legacy) return;
     const plan = id ? c.mitigations[id] : undefined;
     if (page === "fixes" && id && !plan && !c.findings) return;
     go(scenario, ...legacy.to(id, plan));
-  }, [page, id, scenario, c.mitigations, c.findings]);
+  }, [page, id, scenario, atFront, c.mitigations, c.findings]);
 
-  // a bare address is the landing page; the app starts at a scenario
-  if (!scenario) return <Landing scenarios={c.scenarios} queries={c.catalog.length} />;
+  // a bare address is the landing page; the app opens on its front door, every scenario as a card, or at a scenario
+  if (!scenario) return <Landing scenarios={c.scenarios} queries={c.catalog.length} about={c.about} />;
+  if (atFront) return <CatalogPage c={c} />;
 
   const all = c.findings ? [...c.findings.findings, ...c.findings.past] : [];
   const selected = page === "finding" && id ? all.find((f) => f.id === id) ?? null : null;

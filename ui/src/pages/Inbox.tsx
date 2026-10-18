@@ -5,6 +5,7 @@
 import type { Finding } from "../api";
 import { useState } from "react";
 import { headline } from "../brief";
+import { KindIcon } from "../icons";
 import { deskOf, exposure, recommendation, type Desk } from "../desk";
 import { href } from "../route";
 import type { DeVries } from "../state";
@@ -90,7 +91,7 @@ function Row({ finding, desk, names, scenario }: { finding: Finding; desk: Desk;
         <header className="case-strip">
           <span className="case-id">Finding {short(finding.id)}</span>
           <i>·</i>
-          <span className="case-kind">{KIND_WORDS[finding.kind]}</span>
+          <span className="case-kind"><KindIcon kind={finding.kind} size={13} />{KIND_WORDS[finding.kind]}</span>
           <i>·</i>
           <span className="case-fact"><span>severity</span> {finding.severity}</span>
           <span className="case-status">

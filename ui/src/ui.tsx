@@ -135,6 +135,8 @@ const ICONS = {
   import: <><path d="M12 4v10" /><path d="m8 10.5 4 4 4-4" /><path d="M4 15.5V18a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-2.5" /></>,
   posture: <><path d="M4 17.5a8 8 0 0 1 16 0" /><path d="M12 17.5 15.5 11" /><circle cx="12" cy="17.5" r="1.2" /></>,
   method: <><path d="M4 5.5h6a2 2 0 0 1 2 2v12a2 2 0 0 0-2-2H4z" /><path d="M20 5.5h-6a2 2 0 0 0-2 2v12a2 2 0 0 1 2-2h6z" /></>,
+  globe: <><circle cx="12" cy="12" r="8.5" /><path d="M3.5 12h17M12 3.5c2.6 2.6 2.6 14.4 0 17M12 3.5c-2.6 2.6-2.6 14.4 0 17" /></>,
+  copy: <><rect x="8.5" y="8.5" width="11" height="11" rx="2" /><path d="M15.5 8.5v-2a2 2 0 0 0-2-2h-7a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h2" /></>,
 } as const;
 export type IconName = keyof typeof ICONS;
 

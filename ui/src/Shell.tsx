@@ -1,9 +1,10 @@
-// The frame every page sits in: the sidebar with the scenario switch, the places to go in four groups, and
-// the session; and the page beside it. There is no top bar; each page carries its own header.
+// The frame every page sits in: a top bar with the brand, where you are and the session; under it the sidebar with
+// the scenario switch and the places to go in three groups, and the page beside it. Each page carries its own header.
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { deskOf } from "./desk";
-import { go, href, placeOf, type Page, type Route } from "./route";
+import { ScenarioIcon } from "./icons";
+import { CATALOG, go, href, placeOf, type Page, type Route } from "./route";
 import type { DeVries } from "./state";
 import { Icon, Mark, type IconName } from "./ui";
 
@@ -32,7 +33,7 @@ function ScenarioSwitch({ c, scenario }: { c: DeVries; scenario: string | null }
   return (
     <div className="switch" ref={box}>
       <button className="switch-button" onClick={() => setOpen((o) => !o)} aria-haspopup="listbox" aria-expanded={open} aria-label="Scenario">
-        <Mark />
+        <span className="switch-tile"><ScenarioIcon id={now?.imported ? "import" : scenario ?? "import"} size={16} /></span>
         <span className="switch-text">
           <span className="switch-name">{scenario ? c.titleOf(scenario) : "DeVries"}</span>
           <span className="switch-sub">{now ? (now.private ? `${now.id} · yours alone` : now.id) : c.ready ? "no scenario" : "connecting"}</span>
@@ -41,9 +42,16 @@ function ScenarioSwitch({ c, scenario }: { c: DeVries; scenario: string | null }
       </button>
       {open && (
         <ul className="switch-menu" role="listbox" aria-label="Scenarios">
+          <li role="option" aria-selected={false} className="switch-all">
+            <button onClick={() => { setOpen(false); go(CATALOG); }}>
+              <span className="switch-ico"><Icon name="graph" size={14} /></span>
+              <span className="switch-all-name">All scenarios, as cards →</span>
+            </button>
+          </li>
           {c.scenarios.map((s) => (
             <li key={s.id} role="option" aria-selected={s.id === scenario}>
               <button className={s.id === scenario ? "on" : ""} onClick={() => { setOpen(false); go(s.id); }}>
+                <span className="switch-ico"><ScenarioIcon id={s.imported ? "import" : s.id} size={14} /></span>
                 <span className="switch-name">{c.titleOf(s.id)}</span>
                 <span className={`switch-count${s.open_findings ? " some" : ""}`}>{s.open_findings} open</span>
                 <span className="switch-about">{s.description}</span>
@@ -52,6 +60,7 @@ function ScenarioSwitch({ c, scenario }: { c: DeVries; scenario: string | null }
           ))}
           <li role="option" aria-selected={false} className="switch-import">
             <button onClick={() => { setOpen(false); go(scenario ?? c.scenarios[0]?.id ?? null, "import"); }}>
+              <span className="switch-ico"><Icon name="import" size={14} /></span>
               <span className="switch-name">Audit your own config →</span>
               <span className="switch-about">Paste a client config or a tools/list; the audit starts by itself.</span>
             </button>
@@ -62,27 +71,60 @@ function ScenarioSwitch({ c, scenario }: { c: DeVries; scenario: string | null }
   );
 }
 
+/** Where you stand and what drives the runs, as two pills: the scope of this graph, and the model's standing. */
 function Session({ c }: { c: DeVries }) {
   const own = !!c.current?.own_copy;
   const model = c.session?.model;
-  // the badge says what drove the newest run on this scenario; a configured model only speaks for the next one
+  // the model pill says what drove the newest run on this scenario; a configured model only speaks for the next one
   const newest = c.runList[0] ?? c.run ?? null;
-  const badge = newest?.mode === "agent" ? `model · ${newest.model ?? model?.name ?? "a model"}`
-    : model?.configured ? (newest ? "scripted pass · model ready" : `no run yet · ${model.name ?? "model"} ready`)
-      : "scripted · no model";
+  const drove = newest?.mode === "agent";
+  const badge = drove ? `Model · ${newest?.model ?? model?.name ?? "a model"}`
+    : model?.configured ? (newest ? "Model ready · last pass scripted" : `Model ready · ${model.name ?? "model"}`)
+      : "Scripted · no model";
+  const why = drove ? "The newest run on this scenario was driven by the model."
+    : model?.configured ? "A key is set: the next audit run is the model's. The pass the app ran at start was the scripted search."
+      : "No key is set, so every run is the scripted search: the same tools, in a fixed order.";
+  const scope = c.current ? (own ? (c.current.private ? "Your import" : "Your sandbox copy") : "Shared scenario") : null;
   return (
     <div className="session">
-      <span className={`session-dot${c.connected ? "" : " off"}`} title={c.connected ? "Live: changes arrive as they happen" : "Reconnecting"} aria-hidden />
-      <span className="session-text">
-        <span className="session-name">{own ? (c.current?.private ? "Your import" : "Your sandbox copy") : "Shared scenario"}</span>
+      {scope && (
+        <span className={`pill pill-scope${own ? " own" : ""}`} title={own ? "What changes here is yours alone, until you reset." : "Everyone sees this graph. Approving a fix gives you a private copy to apply it on."}>
+          <Icon name={own ? "copy" : "globe"} size={13} />
+          <span className="session-name">{scope}</span>
+          {own && (
+            <button className="session-reset" onClick={c.reset} disabled={c.busy} title="Delete your copies and see the shared scenarios again" aria-label="Reset">
+              <Icon name="reset" size={13} />
+            </button>
+          )}
+        </span>
+      )}
+      <span className={`pill pill-model${model?.configured ? " on" : ""}`} title={`${why}${c.connected ? "" : " The live connection is being re-made."}`}>
+        <i className={`pill-dot${c.connected ? "" : " off"}`} aria-hidden />
         <span className="session-sub model-badge">{badge}</span>
       </span>
-      {own && (
-        <button className="session-reset" onClick={c.reset} disabled={c.busy} title="Delete your copies and see the shared scenarios again" aria-label="Reset">
-          <Icon name="reset" size={16} />
-        </button>
-      )}
     </div>
+  );
+}
+
+/** The bar over everything: the brand, which leads back to the front page; where you are; the session. */
+export function TopBar({ c, scenario }: { c: DeVries; scenario: string | null }) {
+  return (
+    <header className="topbar">
+      <a href="#/" className="topbar-brand" title="Back to the front page">
+        <Mark size={22} />
+        <span>DeVries</span>
+      </a>
+      <nav className="topbar-crumbs" aria-label="Where you are">
+        <a href={href(CATALOG)} className={`topbar-crumb${scenario ? "" : " on"}`}>Scenarios</a>
+        {scenario && (
+          <>
+            <span className="topbar-sep" aria-hidden>/</span>
+            <span className="topbar-crumb on"><ScenarioIcon id={c.current?.imported ? "import" : scenario} size={14} />{c.titleOf(scenario)}</span>
+          </>
+        )}
+      </nav>
+      <Session c={c} />
+    </header>
   );
 }
 
@@ -99,6 +141,8 @@ export function Shell({ c, route, closed = false, children }: { c: DeVries; rout
 
   return (
     <div className="shell">
+      <TopBar c={c} scenario={route.scenario} />
+      <div className="shell-body">
       <aside className="side">
         <ScenarioSwitch c={c} scenario={route.scenario} />
         <nav className="nav" aria-label="Places">
@@ -119,7 +163,6 @@ export function Shell({ c, route, closed = false, children }: { c: DeVries; rout
             </div>
           ))}
         </nav>
-        <Session c={c} />
       </aside>
       <main className="main">
         {c.dbDown && <p className="outage" role="status">FalkorDB is not answering. Retrying every few seconds.</p>}
@@ -131,6 +174,7 @@ export function Shell({ c, route, closed = false, children }: { c: DeVries; rout
         {/* keyed so a new page fades in; a finding is its own page, a selection inside a page is not; the queries drawer lies over whatever is under it */}
         <div className="view" key={`${route.scenario}/${route.page}${route.page === "finding" ? `/${route.id}` : ""}`}>{children}</div>
       </main>
+      </div>
     </div>
   );
 }
