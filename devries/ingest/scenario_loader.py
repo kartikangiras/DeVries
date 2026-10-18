@@ -11,8 +11,15 @@ from devries.analysis.models import ScanResult
 from devries.errors import InvalidScenario
 from devries.graph import keys, schema
 from devries.graph.client import GraphClient
-from devries.ingest.manifests import (capability_from_annotations, clean_description, definition_changes, load_manifest,
-                                      manifest_hash, poison_flags, tool_hashes)
+from devries.ingest.manifests import (
+    capability_from_annotations,
+    clean_description,
+    definition_changes,
+    load_manifest,
+    manifest_hash,
+    poison_flags,
+    tool_hashes,
+)
 from devries.ingest.models import ScenarioFile, server_suffix, tool_id
 
 
@@ -166,14 +173,19 @@ async def load_scenario(client: GraphClient, path: Path, *, strict: bool = False
     resolved = read_scenario(Path(path), root)
     graph_key = graph_key or keys.scenario_key(resolved.spec.scenario)
 
-    # what each server's tools looked like last time, read before the graph is replaced
+    # what each server's tools looked like last time, and the runs made here, read before the graph is replaced
     before: dict[str, dict] = {}
+    kept_runs: list[dict] = []
     if await client.exists(graph_key):
         before = {row["server_id"]: row for row in await client.run("drift.before", graph_key)}
+        kept_runs = await client.run("run.list", graph_key)
 
     await client.delete(graph_key)
     await schema.bootstrap(client, graph_key)
     node_counts, edge_counts = await write_graph(client, graph_key, resolved)
+    for row in kept_runs:                                 # a reload replaces the configuration, not the record of its audits
+        await client.run("run.record", graph_key, id=row["id"], kind=row["kind"], status=row["status"],
+                         started_at=row["started_at"], json=row["json"])
 
     scan = await findings_mod.scan(client, graph_key)     # rebuilds the projection first
     mismatches = compare(resolved.spec, scan)
