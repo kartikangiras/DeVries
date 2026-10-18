@@ -8,12 +8,18 @@ import json
 import time
 from secrets import token_hex
 
-from devries.errors import NotFound
 from devries.analysis.models import (
-    STANDING_KINDS, drift_fingerprint, poison_fingerprint,
-    Finding, PathEvidence, ScanResult, finding_id, injection_fingerprint, trifecta_fingerprint,
+    STANDING_KINDS,
+    Finding,
+    PathEvidence,
+    ScanResult,
+    drift_fingerprint,
+    finding_id,
+    injection_fingerprint,
+    poison_fingerprint,
+    trifecta_fingerprint,
 )
-from devries.errors import QueryTimeout
+from devries.errors import NotFound, QueryTimeout
 from devries.graph import projection
 from devries.graph.client import GraphClient
 
@@ -164,9 +170,10 @@ async def open_poisoned(client: GraphClient, graph_key: str, tool_id: str, descr
     return finding
 
 
-async def accept(client: GraphClient, graph_key: str, finding_id_: str, who: str) -> Finding:
-    """A person accepts an open finding as it is. Only a person can; no tool offers it."""
-    rows = await client.run("finding.accept", graph_key, id=finding_id_, who=who, now=int(time.time() * 1000))
+async def accept(client: GraphClient, graph_key: str, finding_id_: str, who: str, session: str | None = None) -> Finding:
+    """A person accepts an open finding as it is. Only a person can; no tool offers it. `session` is a hash of the
+    session that decided, as every decision records one."""
+    rows = await client.run("finding.accept", graph_key, id=finding_id_, who=who, session=session, now=int(time.time() * 1000))
     if not rows:
         raise NotFound(f"{finding_id_} is not an open finding in this scenario")
     return next(f for f in await stored(client, graph_key) if f.id == finding_id_)
@@ -196,6 +203,9 @@ async def last_scan(client: GraphClient, graph_key: str) -> dict | None:
 async def history(client: GraphClient, graph_key: str) -> list[dict]:
     """The scans kept on this graph, oldest first: when each ran and how many findings it left open."""
     return list(reversed(await client.run("scan.history", graph_key)))
+
+
+SCANS_KEPT = 200          # Scan nodes kept per graph; the posture page draws the last 50
 
 
 async def scan(client: GraphClient, graph_key: str) -> ScanResult:
@@ -239,6 +249,7 @@ async def scan(client: GraphClient, graph_key: str) -> ScanResult:
     await client.run("scan.keep", graph_key, scan_id=scan_id, at=started_at, duration_ms=duration_ms,
                      injection=injection, trifecta=trifecta, partial=partial,
                      open=sum(f.status == "open" for f in findings))
+    await client.run("scan.prune", graph_key, keep=SCANS_KEPT)      # the history a graph holds stays bounded
 
     return ScanResult(
         graph=graph_key, scan_id=scan_id, started_at=started_at,

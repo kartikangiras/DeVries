@@ -6,6 +6,7 @@ loudly if either is missing. It exists because of a real surprise: FalkorDB's
 BFS with a depth of 0, documented as unlimited, returns nothing at all.
 """
 
+import logging
 import time
 
 from pydantic import BaseModel
@@ -14,6 +15,8 @@ from devries.analysis import findings as findings_mod
 from devries.errors import CanaryFailed
 from devries.graph import keys, projection
 from devries.graph.client import GraphClient
+
+log = logging.getLogger("devries.canary")
 
 EXPECTED_INJECTION = {("src:canary-untrusted", "res:canary-high")}
 EXPECTED_TRIFECTA = {"agent:canary-tri"}
@@ -45,13 +48,13 @@ async def run_canary(client: GraphClient) -> CanaryResult:
         hops = len(chain.evidence[0].rules) if chain and chain.evidence else 0
         if chain is not None and hops != EXPECTED_HOPS:
             problems.append(f"the known path has {hops} hops in the evidence instead of {EXPECTED_HOPS}")
-    except Exception as e:                                  # the canary must never raise past here
+    except Exception as e:  # noqa: BLE001 - the canary must never raise past here: a failure is its answer
         problems.append(f"{type(e).__name__}: {e}")
     finally:
         try:
             await client.delete(key)
-        except Exception:
-            pass
+        except Exception as e:  # noqa: BLE001 - the sweep removes a canary graph that outlives this
+            log.debug("canary graph %s was not deleted: %s", key, type(e).__name__)
     return CanaryResult(
         ok=not problems,
         detail="known injection and trifecta found" if not problems else "; ".join(problems),
