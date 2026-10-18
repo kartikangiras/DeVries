@@ -2,6 +2,8 @@
 
 # DeVries
 
+[![ci](https://github.com/kartikangiras/cistern/actions/workflows/ci.yml/badge.svg)](https://github.com/kartikangiras/cistern/actions/workflows/ci.yml)
+
 DeVries audits a system of AI agents for the paths by which untrusted text can reach a high-impact action, and finds the smallest configuration change that closes each path without breaking the work the agents do. Agents, MCP tools, data sources and resources are one graph in [FalkorDB](https://www.falkordb.com/). Every finding is a graph query, every fix is tested in a throwaway copy of the graph, and nothing changes until a person approves.
 
 ## Status
@@ -48,22 +50,23 @@ make app                    # FalkorDB 6.0.2 and the app in containers: http://l
 | --- | --- |
 | `make up` | FalkorDB only, on `localhost:6380` (Browser on `:3000`) |
 | `make seed` | load the 9 scenarios and check each scan against its `expect` block |
-| `make test` | 318 tests against the running FalkorDB, about two minutes |
+| `make test` | 338 tests against the running FalkorDB, about a minute |
 | `make serve` | build the UI, run the app from source on `:8000` |
 | `make dev` | the app with reload beside the Vite dev server on `:5173` |
 | `make e2e` | drive the app in headless Chrome: `ui/e2e/gate.mjs` then `views.mjs` |
 | `make mcp` / `make mcp-config` | the MCP server over stdio / the client config entry |
 | `make agent-eval` | compare the auditor with the baseline search (`RUNS=3`) |
-| `make audit SCENARIO=acme_dev` | one audit on the shared scenario, with the model when a key is set; the run shows on its Record page |
+| `make audit SCENARIO=acme_dev` | one audit on the shared scenario, with the model when a key is set; the run shows on its Activity page |
+| `make lint` | ruff over the package and the tests |
 | `make queries-doc` | regenerate `docs/QUERIES.md` from the catalog |
 
-Settings (`.env.example` lists all, and `make app` passes all): `ANTHROPIC_API_KEY`, `LLM_MODEL` (default `claude-opus-5-5`), `LLM_DAILY_BUDGET_USD`, `DEVRIES_MCP_TOKEN`, `DEVRIES_PUBLIC`, `TRUST_PROXY`, `ALLOWED_HOSTS`, `SESSION_MAX` (30), `SESSION_TTL_MIN` (60), `PRERUN_AUDITS` (on), `PRERUN_MODEL` (on).
+Settings (`.env.example` lists every one, and `make app` passes every one): `ANTHROPIC_API_KEY`, `LLM_MODEL` (default `claude-opus-5-5`), `LLM_DAILY_BUDGET_USD`, `DEVRIES_MCP_TOKEN`, `DEVRIES_PUBLIC`, `TRUST_PROXY`, `ALLOWED_HOSTS`, `SESSION_MAX` (30), `SESSION_TTL_MIN` (60), `PRERUN_AUDITS` (on), `PRERUN_MODEL` (on).
 
 At start the app loads any missing scenario graph, scans it, and runs an audit to its first proposal on every scenario with an open finding and no proposed plan: with the model when a key is set (about $0.15 a scenario, once per database), scripted otherwise or with `PRERUN_MODEL=false`. A janitor repeats that every 60 s for a graph reseeded from outside, and sweeps sandboxes older than 10 min and session copies idle for 60 min.
 
 ## The pages
 
-The sidebar has three groups: **Findings** (Posture, Open, Closed), **System** (Explorer, Method), **Record** (Activity, Import). A visitor's changes land in their own copy of the scenario.
+The app opens on a front door at `#/scenarios`: every scenario as a card with its own icon, its description and its open count, the dev team first and recommended; Enter opens it. A top bar carries the brand, which leads back to the landing page, where you are, and two pills: the scope of the graph (shared, your sandbox copy, your import) and the model's standing (ready, drove the last run, or scripted with no key). The sidebar has three groups: **Findings** (Posture, Open, Closed), **System** (Explorer, Method), **Record** (Activity, Import). A visitor's changes land in their own copy of the scenario.
 
 | Page | Shows |
 | --- | --- |
@@ -74,6 +77,10 @@ The sidebar has three groups: **Findings** (Posture, Open, Closed), **System** (
 | Method | The rules, the flow layer, the fixes and the verdict, every figure's query, the OWASP table, and all 90 Cypher statements by name. |
 | Activity | Every scan, run, plan, decision, apply and write, newest first. Consecutive scans collapse to one line. A run opens to its trace. An ask box answers four kinds of question from the graph without a model. |
 | Import | Paste a client config or a `tools/list`; label what is untrusted and what matters; the audit runs to its first proposal. |
+
+<p align="center"><img src="docs/screenshots/posture.png" width="900" alt="Posture of the Acme dev team: two untrusted sources reach two high-impact resources through four agents; the open paths drawn as a map"></p>
+<p align="center"><img src="docs/screenshots/path.png" width="900" alt="A finding's Path step: six hops from GitHub issues to the main branch, each with its rule, and the evidence beside it"></p>
+<p align="center"><img src="docs/screenshots/fix.png" width="900" alt="A finding's Fix step: a gate on the coder's push, tested in a sandbox, waiting for a person to approve"></p>
 
 ## The graph
 
@@ -127,6 +134,39 @@ graph LR
 | 7 | Resource → DataSource | `FEEDS`: stored taint |
 
 Verdict queries traverse `FLOWS_TO` only, so a gate or a quarantine stops a path. Each edge carries `capacity`: the cost of the cheapest fix that cuts it without breaking a workflow that needs the hop (a revoke of a tool a workflow needs, a gate on an autonomous one, a dropped read of data a workflow needs all count as 1000), so the min cut lands on a plan a sandbox can pass.
+
+### How the auditor queries it
+
+The model, or the scripted search in its place, never reads a configuration file. It calls the MCP tools; each tool runs catalog queries on the graph and answers with ids, naming the queries it ran. A reason (`because`) that cites no id a tool returned is refused, so every decision traces back to a query.
+
+```mermaid
+sequenceDiagram
+  participant M as Model, or the scripted search
+  participant T as MCP tool
+  participant F as FalkorDB
+  M->>T: find_injection_paths(scenario, because)
+  T->>F: GRAPH.RO_QUERY reach.untrusted_to_high, find.trifecta, evidence.pair_paths
+  F-->>T: finding ids, node ids, paths
+  T-->>M: findings, with `queries` naming what ran
+  M->>T: propose_fix(plan, because="fnd:… is the most severe")
+  T->>F: GRAPH.COPY, fix.gate_call, projection.rebuild, the three verdicts, delete the copy
+  F-->>T: the verdict
+  T-->>M: mit:… proposed; a person decides
+```
+
+What each tool reads and writes, read off a run on `acme_support` (every name is a catalog entry; every tool also runs `graph.node_count` for the BFS depth and `node.names` for display names):
+
+| Tool | Reads, by query | Writes |
+| --- | --- | --- |
+| `scan` | `projection.rebuild` derives the flow layer; `reach.untrusted_to_high` and `find.trifecta` are the verdicts; `evidence.pair_paths` the paths | findings (`finding.upsert`, `finding.close_stale`) and a `Scan` node |
+| `find_injection_paths`, `find_trifecta_agents`, `rank_chokepoints` | `reach.untrusted_to_high`, `find.trifecta`, `evidence.pair_paths`, `finding.list` | nothing |
+| `rank_chokepoints` with `method: mincut` | `choke.maxflow`, `flow.edges` | nothing |
+| `rule_of_two` | `reach.agents_from_sources`, `agent.acts_on`, `ui.workflows` | nothing |
+| `trust_zones` | `zones.wcc`, `zones.communities` | nothing |
+| `what_if` | on a `GRAPH.COPY`: `whatif.grant_call` (or the change asked for), `projection.rebuild`, then `reach.untrusted_to_high`, `find.trifecta`, `wf.broken` | the copy, deleted after |
+| `simulate_mitigation` | on a `GRAPH.COPY`: `fix.gate_call` (or the fix kind), `projection.rebuild`, the three verdicts, `overview.counts` | the copy, deleted after |
+| `propose_fix` | the same verdict on a copy, then `config.edges` and `config.nodes` for the hash the plan is bound to | a `Mitigation` node (`mitigation.record`) |
+| `apply_fix` | the plan's `fix.*` statements on the working graph, behind the `SET NX` lock, then `projection.rebuild` and a scan | the configuration, for an approved plan only |
 
 ## Findings and verdicts
 
@@ -186,6 +226,21 @@ Phases: scan, investigate, mitigate, approval, apply, report. The model is offer
 - 8 model steps per phase, 40 per run, 8 simulations per target, a daily spend ceiling.
 
 Without a key, or when the provider fails mid-run, the run continues scripted from that phase and every step says who decided it (`model`, `loop`, `scripted`, `person`).
+
+
+**Where a decision comes from.** A scripted audit of `acme_dev` on 18 October 2026, as the Activity page shows it: each step, the queries it ran on the graph, and what came back. The next step's reason rests on these ids and nothing else.
+
+| Step | Tool | Queries on the graph | What came back |
+| ---: | --- | --- | --- |
+| 2 | `scan` | `projection.rebuild`, `reach.untrusted_to_high`, `find.trifecta`, `evidence.pair_paths` | 7 open findings, `fnd:9eb66ee317` first |
+| 3 | `find_injection_paths` | `reach.untrusted_to_high`, `evidence.pair_paths` | 4 injection paths; `src:github-issues` reaches `res:main-branch` |
+| 4 | `trust_zones` | `zones.wcc`, `zones.communities` | one zone, and it is a blast zone |
+| 5 | `rank_chokepoints` | `choke.maxflow`, `flow.edges` | the cheapest cut costs 2: `agent:coder` → `tool:git.push` |
+| 6 | `choose_targets` | | `fnd:9eb66ee317`, the most severe open finding |
+| 7 | `baseline_search` | the three verdicts on 7 `GRAPH.COPY` sandboxes | the cheapest plan that passed: gate the coder's push |
+| 8 | `propose_fix` | `fix.gate_call`, `projection.rebuild`, `wf.broken`, `mitigation.record` | `mit:fb4dd1c33c` proposed; the run stops for a person |
+
+With a model, the same tools answer the same way; what changes is who picks the next call and writes the reason, and the reason has to cite one of these ids.
 
 **Eval** (`make agent-eval`, `claude-opus-5-5`, three runs per scenario, each stopped at its proposal):
 
@@ -253,16 +308,16 @@ All data is synthetic except `devries_self`. Each file carries an `expect` block
 
 ## Tests
 
-`make test`: 318 tests in about two minutes against the running FalkorDB.
+`make test`: 338 tests in about a minute against the running FalkorDB.
 
 | Kind | Count | Checks |
 | --- | ---: | --- |
 | Probes | 9 | `algo.bfs` and `algo.SPpaths` output, read-only algorithms, atomic rebuild, `GRAPH.COPY`, timeouts |
-| Unit | 164 | each rule, each fix, sandbox verdicts, the search, apply (lock, progress), the catalog, the importer, the change compiler, the file write, the launch environment |
+| Unit | 181 | each rule, each fix, sandbox verdicts, the search, apply (lock, progress), the catalog, the importer, the change compiler, the file write, the launch environment |
 | Golden | 33 | every scenario's findings and winning fix, on test keys |
 | MCP contract | 28 | tool list and schemas, structured errors, size limits, both transports |
 | Agent | 41 | phases, `because`, grounding, budgets, fallback |
-| API | 43 | routes, sessions, the stream, cross-site refusal, approval before write, run persistence, imports, public mode |
+| API | 46 | routes, sessions, the stream, cross-site and host refusal, security headers, approval before write, run persistence, private questions, imports, public mode |
 
 `make e2e` drives the built UI in headless Chrome at 1440, 1100 and 420 px: the posture, the five steps, approve and the finding closing on two scenarios, reject then approve the split, both fixes on `acme_dev`, both renderers, tables, what-if, method, import, deep links. It fails on any console error, any 4xx or 5xx, and any request to another origin.
 
@@ -275,13 +330,15 @@ devries/mitigation/   the change language, sandbox verdicts, the search, store, 
 devries/ingest/       scenario files and MCP manifests to a graph; the importer
 devries/mcp_server/   the eleven tools
 devries/agent/        the auditor: loop, phases, prompts, the model adapter, grounding, the scripted fallback, runs, the eval
-devries/api/          routes, the event stream, sessions and the cross-site check
+devries/api/          one module per resource (scenarios, findings, mitigations, agent, session), the shared context, models, picture; sessions and the host and cross-site checks
+devries/about.py      the figures the pages quote: rules, fix costs, tool and query counts, the last eval
 devries/app.py        the process: startup, janitor, health
 devries/apply.py      write an approved plan to its file from the command line
 ui/                   React and Vite; src/graph/ draws the charts; src/landing/ is the landing page; e2e/ the browser suites
 scenarios/            the nine scenario files
 manifests/            the tool manifests they point at
-docs/QUERIES.md       every query, generated
+docs/QUERIES.md       every query, generated; docs/eval.json the last eval with a model; docs/screenshots/
 deploy/               compose overlay with Caddy, Caddyfile, uptime check, ci.yml
 tests/                probes, unit, golden, contracts, agent, api
+.github/workflows/    ci: lint, the suite against a FalkorDB service, the UI build
 ```
