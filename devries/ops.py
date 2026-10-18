@@ -98,8 +98,8 @@ async def search(client: GraphClient, key: str, finding_ids: list[str] | None = 
     return result
 
 
-async def approve(client: GraphClient, key: str, mitigation_id: str, approver: str) -> Mitigation:
-    mitigation = await apply_mod.approve(client, key, mitigation_id, approver)
+async def approve(client: GraphClient, key: str, mitigation_id: str, approver: str, session: str | None = None) -> Mitigation:
+    mitigation = await apply_mod.approve(client, key, mitigation_id, approver, session=session)
     bus.publish(key, "mitigation.approved", {"id": mitigation.id, "approved_by": approver})
     return mitigation
 
@@ -143,15 +143,16 @@ async def relabel(client: GraphClient, scenario: str, path, sources: dict[str, s
     return report
 
 
-async def accept_finding(client: GraphClient, key: str, finding_id_: str, approver: str):
+async def accept_finding(client: GraphClient, key: str, finding_id_: str, approver: str, session: str | None = None):
     """A person accepts a finding as it is (a drift finding, say): it stays on record, marked accepted."""
-    finding = await findings_mod.accept(client, key, finding_id_, approver)
+    finding = await findings_mod.accept(client, key, finding_id_, approver, session=session)
     bus.publish(key, "finding.accepted", {"id": finding.id, "kind": finding.kind, "accepted_by": approver})
     return finding
 
 
-async def reject(client: GraphClient, key: str, mitigation_id: str, approver: str, reason: str | None) -> Mitigation:
-    mitigation = await apply_mod.reject(client, key, mitigation_id, approver, reason)
+async def reject(client: GraphClient, key: str, mitigation_id: str, approver: str, reason: str | None,
+                 session: str | None = None) -> Mitigation:
+    mitigation = await apply_mod.reject(client, key, mitigation_id, approver, reason, session=session)
     bus.publish(key, "mitigation.rejected", {"id": mitigation.id, "rejected_by": approver, "reason": reason})
     return mitigation
 

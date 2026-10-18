@@ -1,8 +1,8 @@
 """python -m devries.apply --scenario NAME --mitigation mit:... [--yes] [--as WHO]
 
 Write a tested plan to the configuration it came from, from the command line. Without --yes it
-prints the draft (the diff and the note) and stops. With --yes it writes the file, keeps a backup
-beside it, reads the scenario again and rescans it. The one way other than the UI's Approve that
+prints the draft (the diff and the note) and stops. With --yes the plan is approved in your name
+(--as), the file is written with a backup beside it, and the scenario is read again and rescanned. The one way other than the UI's Approve that
 a file is changed, and it is a person typing it: no tool reaches this.
 """
 
@@ -10,10 +10,12 @@ import argparse
 import asyncio
 import sys
 
+from devries import ops
 from devries.config import get_settings
 from devries.errors import DeVriesError
 from devries.graph import keys
 from devries.graph.client import GraphClient
+from devries.mitigation import store
 from devries.mitigation import write as write_mod
 
 
@@ -33,6 +35,9 @@ async def main(scenario: str, mitigation_id: str, yes: bool, who: str) -> int:
         if not yes:
             print("Nothing was written. Add --yes to write it.")
             return 0
+        current = await store.get(client, key, mitigation_id)
+        if current.status == "proposed":                  # --yes typed at a prompt is this person's approval, and is recorded as one
+            await ops.approve(client, key, mitigation_id, who)
         receipt = await write_mod.write(client, key, key, path, mitigation_id, names, who, root=path.parent.parent if path else None)
         write_mod.announce(key, mitigation_id, receipt)
         print(f"written to {receipt.path} (backup at {receipt.backup}); closed: {', '.join(receipt.closed) or 'nothing'}; "

@@ -29,6 +29,8 @@ class Mitigation(BaseModel):
     source: str = "search"                  # search | agent | scripted
     config_hash: str | None = None          # the config it was verified against
     approved_by: str | None = None
+    approved_session: str | None = None     # a hash of the session that decided, never the session id itself
+    applied_fixes: int = 0                  # how many of the plan's fixes an apply has made so far
     decision_reason: str | None = None
     created_at: int | None = None
     updated_at: int | None = None           # the last status change: the decision, when one was made
@@ -42,7 +44,8 @@ def _from_row(row: dict) -> Mitigation:
         verdict=Verdict.model_validate_json(row["verdict_json"]) if row.get("verdict_json") else None,
         passed=bool(row.get("passed")), reason=row.get("reason"), rationale=row.get("rationale"),
         source=row.get("source") or "search", config_hash=row.get("config_hash"),
-        approved_by=row.get("approved_by"), decision_reason=row.get("decision_reason"),
+        approved_by=row.get("approved_by"), approved_session=row.get("approved_session"),
+        applied_fixes=int(row.get("applied_fixes") or 0), decision_reason=row.get("decision_reason"),
         created_at=row.get("created_at"), updated_at=row.get("updated_at"), applied_at=row.get("applied_at"),
     )
 
@@ -75,13 +78,27 @@ async def list_all(client: GraphClient, working_key: str) -> list[Mitigation]:
 
 async def set_status(client: GraphClient, working_key: str, mitigation_id_: str, status: Status, *,
                      allowed: list[Status], approved_by: str | None = None, applied_at: int | None = None,
-                     decision_reason: str | None = None) -> Mitigation:
+                     decision_reason: str | None = None, approved_session: str | None = None) -> Mitigation:
     rows = await client.run(
         "mitigation.set_status", working_key, id=mitigation_id_, status=status, allowed=allowed,
         now=int(time.time() * 1000), approved_by=approved_by, applied_at=applied_at, decision_reason=decision_reason,
+        approved_session=approved_session,
     )
     if not rows:
         current = await get(client, working_key, mitigation_id_)      # raises NotFound if it does not exist
         raise WrongStatus(f"{mitigation_id_} is {current.status}; it must be {' or '.join(allowed)} to become {status}",
                           status=current.status)
     return await get(client, working_key, mitigation_id_)
+
+
+async def set_progress(client: GraphClient, working_key: str, mitigation_id_: str, applied: int) -> None:
+    """How many fixes of an approved plan have been applied: written after each one, read by the next apply."""
+    await client.run("mitigation.progress", working_key, id=mitigation_id_, n=applied, now=int(time.time() * 1000))
+
+
+def session_hash(session_id: str | None) -> str | None:
+    """What a decision records about the session it came from: enough to tell two sessions apart, never the id itself."""
+    if not session_id:
+        return None
+    from hashlib import sha1
+    return sha1(session_id.encode()).hexdigest()[:10]

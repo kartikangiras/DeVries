@@ -1,6 +1,6 @@
 """The one write to a person's file DeVries makes: a draft, after a person has read it and said yes.
 
-It is refused on a public site, refused when the file is not the one that was imported, and done
+It is refused for a plan nobody has approved, refused on a public site, refused when the file is not the one that was imported, and done
 with a backup beside the file and an atomic replace. Afterwards the shared scenario is read again
 from the file and rescanned; the plan and the findings it closed are recorded on the new graph so
 the story survives the reload; and the receipt (hashes before and after, what closed) is kept on
@@ -102,6 +102,8 @@ async def edit(client: GraphClient, key: str, scenario_path: Path | None, mitiga
     draft = await draft_for(client, key, scenario_path, mitigation_id, names)
     if not draft.path:
         raise NotWritable("this draft is commands or a brief, not a file, so there is nothing to edit")
+    if draft.secrets:
+        raise NotWritable("this file holds secrets, which the page never shows, so its text cannot be edited here")
     draft.after = after_text
     draft.edited = after_text != draft.before
     draft.diff = _unified(draft.before, draft.after, draft.path)
@@ -129,8 +131,13 @@ async def write(client: GraphClient, source_key: str, shared_key: str, scenario_
     if settings.devries_public:
         raise ForbiddenWrite("this is a public site: it offers the change to copy or download, and never writes a file here")
     mitigation = await store.get(client, source_key, mitigation_id)
+    if mitigation.status not in ("approved", "applied"):
+        raise store.WrongStatus(f"{mitigation_id} is {mitigation.status}; a person approves a plan before its change is written "
+                                "to a file", status=mitigation.status)
     draft = await draft_for(client, source_key, scenario_path, mitigation_id, names)
     if after_text is not None and after_text != draft.after:
+        if draft.secrets:
+            raise NotWritable("this file holds secrets, so it is written as drafted; an edited text is not accepted for it")
         draft = await edit(client, source_key, scenario_path, mitigation_id, names, after_text)
     if not draft.path:
         raise NotWritable(f"a {draft.kind} draft is commands or a brief, not a file; copy it where it goes")
@@ -205,7 +212,8 @@ async def _carry_over(client: GraphClient, shared_key: str, mitigation: store.Mi
         return
     await store.record(client, shared_key, mitigation.verdict, config_hash=await sandbox.config_hash(client, shared_key),
                        source=mitigation.source, rationale=mitigation.rationale)
-    await store.set_status(client, shared_key, mitigation.id, "approved", allowed=["proposed"], approved_by=who)
+    await store.set_status(client, shared_key, mitigation.id, "approved", allowed=["proposed"],
+                           approved_by=mitigation.approved_by or who, approved_session=mitigation.approved_session)
     await store.set_status(client, shared_key, mitigation.id, "applied", allowed=["approved"], applied_at=written_at)
     for row in gone:
         await client.run("finding.upsert", shared_key, fingerprint=row["fingerprint"], id=row["id"], kind=row["kind"],
