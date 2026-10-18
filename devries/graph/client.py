@@ -38,6 +38,10 @@ class GraphClient:
             username=s.falkordb_username,
             password=s.falkordb_password,
             max_connections=32,
+            # a database that stops answering (paused, gone) fails a request in seconds instead of hanging it:
+            # longer than the longest query timeout the catalog allows, shorter than a person's patience
+            socket_connect_timeout=3,
+            socket_timeout=12,
         )
         # GRAPH.COPY: on FalkorDB 4.x only one fork runs at a time, and a second
         # copy issued meanwhile can fail. One at a time is right on every version.
@@ -131,6 +135,11 @@ class GraphClient:
     async def exists(self, graph_key: str) -> bool:
         return graph_key in await self.list_graphs()
 
+    @property
+    def connection(self):
+        """The Redis connection under the graph client, for the few non-graph commands (the apply lock, INFO)."""
+        return self._db.connection
+
     async def version(self) -> str | None:
         """The FalkorDB module's version as the server reports it, such as "6.0.2"."""
         try:
@@ -142,7 +151,8 @@ class GraphClient:
                 if (name.decode() if isinstance(name, bytes) else name) == "graph":
                     ver = int(fields["ver"])
                     return f"{ver // 10000}.{ver // 100 % 100}.{ver % 100}"
-        except Exception:
+        except (rex.RedisError, OSError, KeyError, ValueError, TypeError) as e:
+            log.debug("MODULE LIST did not say the version: %s", type(e).__name__)
             return None
         return None
 
@@ -152,14 +162,16 @@ class GraphClient:
             info = await self._db.connection.info("memory")
             used = info.get("used_memory") if isinstance(info, dict) else None
             return round(int(used) / 1_048_576, 1) if used is not None else None
-        except Exception:
+        except (rex.RedisError, OSError, ValueError, TypeError) as e:
+            log.debug("INFO memory did not answer: %s", type(e).__name__)
             return None
 
     async def ping(self) -> bool:
         try:
             await self.list_graphs()
             return True
-        except Exception:
+        except (rex.RedisError, OSError) as e:
+            log.debug("FalkorDB did not answer a ping: %s", type(e).__name__)
             return False
 
     async def close(self) -> None:
