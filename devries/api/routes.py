@@ -23,10 +23,9 @@ from devries import ops, views
 from devries.agent.llm import LLM, spend
 from devries.agent.loop import Auditor
 from devries.agent.runs import Run, runs
-from devries.analysis import chokepoints, scorecard
+from devries.analysis import chokepoints, scorecard, zones
 from devries.analysis import findings as findings_mod
 from devries.analysis import posture as posture_mod
-from devries.analysis import zones
 from devries.analysis.models import ChokepointReport, Finding
 from devries.analysis.models import finding_id as finding_id_of
 from devries.analysis.scorecard import AgentCard
@@ -164,14 +163,16 @@ async def graph_view(client: GraphClient, key: str, layer: str) -> dict[str, Any
     return {"layer": layer, "nodes": nodes, "links": links, "workflows": await client.run("ui.workflows", key)}
 
 
-def _sentence(open_findings: list, agents: list, counts: dict) -> str:
-    """The overview's title: one sentence a stranger can read, made from the counts."""
+def _sentence(open_findings: list, agents: list, counts: dict, cards: dict | None = None) -> tuple[str, str | None]:
+    """The overview's title and its second line: one short sentence a stranger can read, made from the counts, and the
+    trifecta count as a sentence of its own when both kinds are open. The figure beside it counts the Rule of Two
+    cards that hold all three properties, so when that differs from the agents with a way out, the sentence says both."""
     injections = [f for f in open_findings if f.kind == "injection"]
     trifectas = [f for f in open_findings if f.kind == "trifecta"]
     if not injections and not trifectas:
         if counts["untrusted_sources"] == 0:
-            return "No source here is written by outsiders, so nothing untrusted can flow at all."
-        return "Nothing untrusted reaches a high-impact resource, and no agent holds untrusted input, private data and a way out."
+            return "No source here is written by outsiders, so nothing untrusted can flow at all.", None
+        return "Nothing untrusted reaches a high-impact resource.", "No agent holds untrusted input, private data and a way out."
 
     def n(count: int, one: str, many: str) -> str:
         words = ["no", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten"]
@@ -185,9 +186,15 @@ def _sentence(open_findings: list, agents: list, counts: dict) -> str:
                      f"{n(len({f.target_id for f in injections}), 'high-impact resource', 'high-impact resources')} through "
                      f"{n(len(agents), 'agent', 'agents')}{', ' + span if span else ''}")
     if trifectas:
-        parts.append(f"{n(len(trifectas), 'agent holds', 'agents hold')} untrusted input, private data and a way out")
-    text = "; ".join(parts) + "."
-    return text[0].upper() + text[1:]
+        with_exit = len({getattr(f, "agent_id", None) or f.id for f in trifectas})
+        all_three = sum(1 for c in (cards or {}).values() if len(c.properties) == 3)
+        if cards and all_three != with_exit:
+            parts.append(f"{n(all_three, 'agent holds', 'agents hold')} all three of Meta's properties, "
+                         f"{n(with_exit, 'of them', 'of them')} with a way out of the organisation")
+        else:
+            parts.append(f"{n(with_exit, 'agent holds', 'agents hold')} untrusted input, private data and a way out")
+    first, *rest = [p[0].upper() + p[1:] + "." for p in parts]
+    return first, (rest[0] if rest else None)
 
 
 class Picture:
@@ -212,7 +219,11 @@ class Picture:
 
     @property
     def sentence(self) -> str:
-        return _sentence(self.open, self.agents_on, self.counts)
+        return _sentence(self.open, self.agents_on, self.counts, self.cards)[0]
+
+    @property
+    def sentence_more(self) -> str | None:
+        return _sentence(self.open, self.agents_on, self.counts, self.cards)[1]
 
     @property
     def summary_counts(self) -> dict[str, Any]:
@@ -302,8 +313,13 @@ def build_router(sessions: Sessions, llm: LLM | None, scenario_info: Callable[[]
 
     def spawn(run: Run, auditor: Auditor) -> None:
         async def go() -> None:
-            async with slots:
+            await slots.acquire()
+            auditor.slot, auditor.slot_held = slots, True
+            try:
                 await auditor.run(run)
+            finally:
+                if auditor.slot_held:                 # the auditor lets go of it while a person decides, and takes it back
+                    slots.release()
 
         task = asyncio.create_task(go(), name=run.id)
         tasks[run.id] = task
@@ -321,12 +337,23 @@ def build_router(sessions: Sessions, llm: LLM | None, scenario_info: Callable[[]
                            no_model_reason=why or reason))
         return run
 
-    def own_run(request: Request, run_id: str) -> Run:
+    async def own_run(request: Request, run_id: str) -> Run:
         run = runs.get(run_id)
         mine = f"ses:{request.state.session}:"
-        if run is None or not (run.graph.startswith(mine) or run.graph.startswith("scn:")):
+        if run is None:                                   # another process made it, or this one before a restart
+            client = get_client()
+            session = sessions.touch(request.state.session)
+            for graph in [*(keys.session_key(session.id, s) for s in sorted(session.copies)),
+                          *(k for k in await client.list_graphs() if k.startswith("scn:"))]:
+                await runs.hydrate(client, graph, again=graph.startswith("scn:"))
+            run = runs.get(run_id)
+        if run is None or not (run.graph.startswith(mine) or run.graph.startswith("scn:")) or not visible(run, request.state.session):
             raise NotFound(f"no run {run_id!r}")
         return run
+
+    def visible(run: Run, session_id: str) -> bool:
+        """An audit run is everyone's record of the scenario; a question is its asker's alone."""
+        return run.kind != "ask" or run.session in (None, store.session_hash(session_id))
 
     def ration(request: Request, limiter: RateLimiter) -> None:
         if settings.devries_public:
@@ -440,6 +467,7 @@ def build_router(sessions: Sessions, llm: LLM | None, scenario_info: Callable[[]
             "tools": [r["id"] for r in pic.rows if r["label"] == "Tool"],
         }
         return {"scenario": scenario, "own_copy": key.startswith("ses:"), "partial": pic.partial, "sentence": pic.sentence,
+                "sentence_more": pic.sentence_more,
                 "counts": pic.summary_counts, "columns": columns, "folded": folded, "ribbons": ribbons, "queries": ran}
 
     @router.get("/scenarios/{scenario}/posture")
@@ -461,6 +489,7 @@ def build_router(sessions: Sessions, llm: LLM | None, scenario_info: Callable[[]
             central = await chokepoints.betweenness(client, key)
             scans = await findings_mod.history(client, key)
         return {"scenario": scenario, "own_copy": key.startswith("ses:"), "partial": pic.partial, "sentence": pic.sentence,
+                "sentence_more": pic.sentence_more,
                 "counts": pic.summary_counts, "facts": facts, "exposure": exposure,
                 "rule_of_two": scorecard.tally_view(list(pic.cards.values())), "blast": blast, "targets": targets,
                 "chokes": posture_mod.chokes(pic.open, pic.node, central), "cut": cut_view(pic.cut), "scans": scans,
@@ -486,12 +515,18 @@ def build_router(sessions: Sessions, llm: LLM | None, scenario_info: Callable[[]
         """One list, newest first, of what happened here: scans, audit runs, plans tested, decisions, what was applied
         and what was written to a file. Runs come from this process; everything else from the graph."""
         client, key = await read_key(request, scenario)
+        shared = keys.scenario_key(scenario)
+        for graph in {key, shared}:
+            await runs.hydrate(client, graph, again=graph == shared)   # a run another process made (make audit) shows up
         with client.recording() as ran:
             items = [views.activity_of_scan(row) for row in await findings_mod.history(client, key)]
-            items += [views.activity_of_run(run) for run in runs.for_graphs(key, keys.scenario_key(scenario))]
+            items += [views.activity_of_run(run) for run in runs.for_graphs(key, shared) if visible(run, request.state.session)]
+            written: dict[str, list[dict]] = {}
+            for d in await client.run("draft.list", key):
+                if d.get("written_at"):
+                    written.setdefault(d["mitigation_id"], []).append(d)
             for m in await store.list_all(client, key):
-                drafts = await client.run("draft.for_mitigation", key, mitigation_id=m.id)
-                items += views.activity_of_mitigation(m, [(d, short_path(d["path"])) for d in drafts if d.get("written_at")])
+                items += views.activity_of_mitigation(m, [(d, short_path(d["path"])) for d in written.get(m.id, [])])
         items.sort(key=lambda item: -(item["at"] or 0))
         return {"scenario": scenario, "items": items, "queries": ran}
 
@@ -599,6 +634,8 @@ def build_router(sessions: Sessions, llm: LLM | None, scenario_info: Callable[[]
         servers = [{"id": sid_, "name": sid_[4:], **guess(sid_[4:])} for sid_ in result.servers]
         return {"scenario": name, "private": s.devries_public, "servers": servers, "tools": result.tools, "skipped": result.skipped,
                 "origin": result.origin.to_dict() if result.origin else None,
+                # an import declares no workflow, so a sandbox cannot say what a fix breaks until a person adds one
+                "unconstrained": not report.nodes.get("workflows"),
                 "findings": [views.finding_view(f) for f in report.scan.findings], "run": run.summary() if run else None}
 
     @router.get("/scenarios/{scenario}/servers")
@@ -710,11 +747,10 @@ def build_router(sessions: Sessions, llm: LLM | None, scenario_info: Callable[[]
     # ------------------------------------------------------------------ mitigations
 
     @router.post("/scenarios/{scenario}/findings/{finding_id}/accept")
-    async def accept_finding(request: Request, scenario: str, finding_id: str, body: Decision | None = None) -> dict[str, Any]:
+    async def accept_finding(request: Request, scenario: str, finding_id: str, body: Decision) -> dict[str, Any]:
         """A person accepts an open finding as it is. Only a person can: no MCP tool offers it."""
         client, key = await write_key(request, scenario)
-        decision = body or Decision()
-        finding = await ops.accept_finding(client, key, finding_id, decision.who())
+        finding = await ops.accept_finding(client, key, finding_id, body.who(), session=store.session_hash(request.state.session))
         return {"scenario": scenario, "finding": views.finding_view(finding)}
 
     @router.get("/scenarios/{scenario}/mitigations")
@@ -724,10 +760,10 @@ def build_router(sessions: Sessions, llm: LLM | None, scenario_info: Callable[[]
                 "mitigations": [views.mitigation_view(m) for m in await store.list_all(client, key)]}
 
     @router.post("/scenarios/{scenario}/mitigations/search")
-    async def search(request: Request, scenario: str, body: SearchBody | None = None) -> dict[str, Any]:
+    async def search(request: Request, scenario: str, body: SearchBody) -> dict[str, Any]:
         client, key = await write_key(request, scenario)
         with client.recording() as ran:
-            result = await ops.search(client, key, body.finding_ids if body else None)
+            result = await ops.search(client, key, body.finding_ids)
         return {"scenario": scenario, "targets": result.targets, "sandbox_runs": result.sandbox_runs,
                 "passing": [views.mitigation_view(m) for m in result.passing],
                 "failed": [views.mitigation_view(m) for m in result.failed], "queries": ran}
@@ -770,14 +806,14 @@ def build_router(sessions: Sessions, llm: LLM | None, scenario_info: Callable[[]
         return {"scenario": scenario, "mitigation_id": mitigation_id, "draft": d.view(), "can_write": not settings.devries_public and d.writable}
 
     @router.post("/scenarios/{scenario}/mitigations/{mitigation_id}/draft/write")
-    async def write_draft(request: Request, scenario: str, mitigation_id: str, body: WriteBody | None = None) -> dict[str, Any]:
-        """Write the draft to the file it came from. A person's click, never a tool's; refused on a public site. The shared
-        scenario is read again from the file and rescanned, and this visitor's copy is dropped, so what they see next is
-        the configuration as it now is."""
+    async def write_draft(request: Request, scenario: str, mitigation_id: str, body: WriteBody) -> dict[str, Any]:
+        """Write the draft of an approved plan to the file it came from. A person's click, never a tool's; refused for a plan
+        nobody approved and on a public site. The shared scenario is read again from the file and rescanned, and this
+        visitor's copy is dropped, so what they see next is the configuration as it now is."""
         if settings.devries_public:
             raise ForbiddenWrite("this is a public site: it offers the change to copy or download, and never writes a file here")
         client, sid = get_client(), request.state.session
-        decision = body or WriteBody()
+        decision = body
         source_key = sessions.key_for_read(sid, scenario)
         if not await client.exists(source_key):
             raise UnknownScenario(f"no scenario {scenario!r}")
@@ -811,17 +847,17 @@ def build_router(sessions: Sessions, llm: LLM | None, scenario_info: Callable[[]
         return {"scenario": scenario, "changes": [views.describe(c) for c in body.changes]} | views.diff_view(diff)
 
     @router.post("/scenarios/{scenario}/mitigations/{mitigation_id}/approve")
-    async def approve(request: Request, scenario: str, mitigation_id: str, body: Decision | None = None) -> dict[str, Any]:
+    async def approve(request: Request, scenario: str, mitigation_id: str, body: Decision) -> dict[str, Any]:
+        """A person approves a plan, by name, from their own session; the decision records both."""
         client, key = await write_key(request, scenario)
-        approved = await ops.approve(client, key, mitigation_id, (body or Decision()).who())
+        approved = await ops.approve(client, key, mitigation_id, body.who(), session=request.state.session)
         return {"scenario": scenario, "mitigation": views.mitigation_view(approved),
                 "applies": "the audit run waiting on it" if busy(key) else "POST .../apply"}
 
     @router.post("/scenarios/{scenario}/mitigations/{mitigation_id}/reject")
-    async def reject(request: Request, scenario: str, mitigation_id: str, body: Decision | None = None) -> dict[str, Any]:
+    async def reject(request: Request, scenario: str, mitigation_id: str, body: Decision) -> dict[str, Any]:
         client, key = await write_key(request, scenario)
-        decision = body or Decision()
-        rejected = await ops.reject(client, key, mitigation_id, decision.who(), decision.reason)
+        rejected = await ops.reject(client, key, mitigation_id, body.who(), body.reason, session=request.state.session)
         return {"scenario": scenario, "mitigation": views.mitigation_view(rejected)}
 
     @router.post("/scenarios/{scenario}/mitigations/{mitigation_id}/apply")
@@ -856,22 +892,26 @@ def build_router(sessions: Sessions, llm: LLM | None, scenario_info: Callable[[]
         ration(request, run_limiter)
         client, key = await read_key(request, body.scenario)      # an ask run writes nothing outside sandboxes
         model, reason = model_for(sid, "ask")
-        run = runs.create("ask", body.scenario, key, sessions.ref(sid, body.scenario), question=body.question)
+        run = runs.create("ask", body.scenario, key, sessions.ref(sid, body.scenario), question=body.question,
+                          session=store.session_hash(sid))         # a question is the asker's: listed to their session only
         spawn(run, Auditor(client, model, server=mcp_server, ref_for=lambda name: sessions.ref(sid, name),
                            no_model_reason=reason))
         return {"run": run.summary()}
 
     @router.get("/agent/runs/{run_id}")
     async def get_run(request: Request, run_id: str) -> dict[str, Any]:
-        return {"run": own_run(request, run_id).model_dump()}
+        return {"run": (await own_run(request, run_id)).model_dump()}
 
     @router.get("/scenarios/{scenario}/runs")
     async def scenario_runs(request: Request, scenario: str) -> dict[str, Any]:
         """The runs on this session's view of the scenario, and on the shared scenario a copy came from: the run the
         app made at start, which proposed the plan a visitor is reading, stays in their Audit after they approve it."""
-        _, key = await read_key(request, scenario)
+        client, key = await read_key(request, scenario)
         shared = keys.scenario_key(scenario)
-        return {"scenario": scenario, "runs": [r.summary() for r in reversed(runs.for_graphs(key, shared))]}
+        for graph in {key, shared}:
+            await runs.hydrate(client, graph, again=graph == shared)   # a run another process made (make audit) shows up
+        return {"scenario": scenario, "runs": [r.summary() for r in reversed(runs.for_graphs(key, shared))
+                                               if visible(r, request.state.session)]}
 
     # ------------------------------------------------------------------ events
 
