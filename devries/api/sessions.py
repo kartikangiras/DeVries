@@ -260,9 +260,15 @@ def cross_site(request: Request, trust_proxy: bool, allowed_hosts: str | None = 
     origin = request.headers.get("origin")
     if not origin and request.headers.get("sec-fetch-site") != "cross-site":
         return None
-    if origin not in {f"http://{host}", f"https://{host}"}:
-        return "a change is accepted only from this app's own page, not from another site"
-    return None
+    if origin in {f"http://{host}", f"https://{host}"}:
+        return None
+    # the page may be served from another of this app's own names, a UI host in front of the API: only a name
+    # that was configured counts, never the local defaults, so a page on another local port is still another site
+    configured = {h.strip() for h in (allowed_hosts or "").split(",") if h.strip()}
+    origin_host = origin.split("://", 1)[1] if origin and "://" in origin else ""
+    if origin_host and host_name(origin_host) in configured:
+        return None
+    return "a change is accepted only from this app's own page, not from another site"
 
 
 class SessionMiddleware:

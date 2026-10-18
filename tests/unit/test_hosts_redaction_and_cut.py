@@ -112,3 +112,17 @@ async def test_reading_runs_again_leaves_another_processes_unfinished_run_alone(
     assert await later.hydrate(client, graph, again=True) == 0 and later.get("run:aaaaaaaa") is None
     at_start = RunRegistry()
     assert await at_start.hydrate(client, graph) == 1 and at_start.get("run:aaaaaaaa").status == "failed"
+
+
+def test_a_configured_ui_host_in_front_of_the_api_is_this_apps_own_page():
+    """The UI on one name (Vercel) and the API on another (Railway): a POST whose Origin is the configured UI name is
+    accepted; the local defaults never count as such a name, so a page on another local port is still another site."""
+    from devries.api.sessions import cross_site
+
+    def request(headers):
+        return type("R", (), {"headers": headers})()
+
+    api = {"host": "devries.up.railway.app", "origin": "https://devries.example"}
+    assert cross_site(request(api), False, allowed_hosts="devries.example,devries.up.railway.app") is None
+    assert cross_site(request(api), False, allowed_hosts="devries.up.railway.app")
+    assert cross_site(request({"host": "localhost:8000", "origin": "http://localhost:3000"}), False)

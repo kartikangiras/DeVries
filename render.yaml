@@ -1,0 +1,60 @@
+# A Render Blueprint: FalkorDB as a private service with a disk, and the app as a web service built from the
+# Dockerfile. Render → New → Blueprint → this repository, then Apply. Render generates the MCP token, asks for the
+# host names and the optional model key, and wires the two services over its private network, where FalkorDB
+# is reachable only from the app and needs no password. The app serves the UI too; the Vercel project in ui/
+# proxies /api and /mcp to the web service's address. See deploy/README.md.
+services:
+  - type: pserv
+    name: falkordb
+    runtime: image
+    image:
+      url: docker.io/falkordb/falkordb:6.0.2
+    plan: starter                      # a disk needs a paid instance
+    region: singapore
+    disk:
+      name: falkordb-data
+      mountPath: /var/lib/falkordb/data
+      sizeGB: 1
+    envVars:
+      - key: FALKORDB_ARGS               # the image default cuts reads off after 1 s and sets no timeout on writes
+        value: "TIMEOUT_MAX 10000 TIMEOUT_DEFAULT 5000 MAX_QUEUED_QUERIES 200 RESULTSET_SIZE 10000"
+
+  - type: web
+    name: devries                      # the address is <name>.onrender.com when the name is free
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: starter                      # the free instance sleeps after 15 min and wakes slowly
+    region: singapore
+    healthCheckPath: /api/health
+    envVars:
+      - key: PORT
+        value: "8000"                    # the Dockerfile listens here
+      - key: FALKORDB_HOST
+        fromService:
+          type: pserv
+          name: falkordb
+          property: host
+      - key: FALKORDB_PORT
+        value: "6379"
+      - key: DEVRIES_PUBLIC
+        value: "true"                    # visitors never launch commands; imports are private; nothing is written to a file
+      - key: COOKIE_SECURE
+        value: "true"
+      - key: TRUST_PROXY
+        value: "true"                    # Render's proxy, and Vercel's in front of it, are the only things in front
+      - key: ALLOWED_HOSTS
+        sync: false                      # comma-separated: this service's onrender.com name and the UI's domain
+      - key: DEVRIES_MCP_TOKEN
+        generateValue: true              # /mcp answers only to this bearer token; read it in the dashboard
+      - key: ANTHROPIC_API_KEY
+        sync: false                      # optional: paste the key for model-driven runs, or leave empty for scripted ones
+      - key: LLM_DAILY_BUDGET_USD
+        value: "5"                       # past this, new runs are scripted
+      - key: PRERUN_MODEL
+        value: "false"                   # the start-up pass is scripted; the model is kept for visitors' runs
+      - key: SESSION_MAX
+        value: "12"
+      - key: FALKORDB_MEMORY_CEILING_MB
+        value: "350"                     # past this, the janitor drops the oldest idle copies
+      - key: STARTUP_DB_WAIT_S
+        value: "120"
