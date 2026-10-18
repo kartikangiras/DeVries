@@ -11,9 +11,20 @@ import uvicorn
 from mcp import Client, StdioServerParameters
 
 from devries.app import create_app
+from devries.config import get_settings
 from devries.ingest.scenario_loader import load_scenario
 
 ROOT = Path(__file__).resolve().parents[2]
+
+
+def db_env() -> dict[str, str]:
+    """The FalkorDB this suite runs against, for a server started as a subprocess. The MCP client hands a subprocess a
+    minimal environment, so without these the server would fall back to .env, or to the defaults where there is none,
+    and scan a database other than the one the test seeded."""
+    s = get_settings()
+    # every one is set, an empty value meaning none: a value from .env must not fill in for one the suite left unset
+    return {"FALKORDB_HOST": s.falkordb_host, "FALKORDB_PORT": str(s.falkordb_port),
+            "FALKORDB_USERNAME": s.falkordb_username or "", "FALKORDB_PASSWORD": s.falkordb_password or ""}
 
 
 def payload(result) -> dict:
@@ -23,7 +34,7 @@ def payload(result) -> dict:
 
 async def test_stdio_server_answers_like_claude_desktop_would_see_it(client):
     await load_scenario(client, ROOT / "scenarios" / "acme_support.yaml", strict=True)
-    server = StdioServerParameters(command=sys.executable, args=["-m", "devries.mcp_server"], cwd=str(ROOT))
+    server = StdioServerParameters(command=sys.executable, args=["-m", "devries.mcp_server"], cwd=str(ROOT), env=db_env())
     async with Client(server) as session:
         assert {t.name for t in (await session.list_tools()).tools} >= {"scan", "find_injection_paths"}
         scanned = payload(await session.call_tool("scan", {"scenario": "acme_support"}))
@@ -47,7 +58,7 @@ async def test_the_config_entry_launches_the_server_without_a_shell(client):
     await load_scenario(client, ROOT / "scenarios" / "acme_support.yaml", strict=True)
     entry = client_config()["mcpServers"]["devries"]
     assert Path(entry["command"]).is_absolute() and str(ROOT) in entry["args"]
-    bare = {"PATH": "/usr/bin:/bin:/usr/sbin:/sbin", "HOME": os.environ["HOME"]}
+    bare = {"PATH": "/usr/bin:/bin:/usr/sbin:/sbin", "HOME": os.environ["HOME"], **db_env()}   # a bare PATH, and only the database the suite uses
     server = StdioServerParameters(command=entry["command"], args=entry["args"], env=bare, cwd="/")
     async with Client(server) as session:
         assert len((await session.list_tools()).tools) == 11
