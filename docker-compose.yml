@@ -29,6 +29,11 @@ services:
     depends_on:
       falkordb:
         condition: service_healthy
+    env_file: .env                 # every setting .env.example lists; the values below win where both say something
+    # The container runs as uid 10001. On Linux, the two folders mounted below belong to you, so an import, a label
+    # or a written fix would be refused (409 not_writable): give the container your user instead,
+    #   user: "${UID:-1000}:${GID:-1000}"
+    # Docker Desktop on macOS and Windows maps ownership by itself.
     environment:
       FALKORDB_HOST: falkordb
       FALKORDB_PORT: "6379"
@@ -40,6 +45,8 @@ services:
       LLM_DAILY_BUDGET_USD: "${LLM_DAILY_BUDGET_USD:-}"
       DEVRIES_MCP_TOKEN: "${DEVRIES_MCP_TOKEN:-}"
       COOKIE_SECURE: "${COOKIE_SECURE:-false}"
+      TRUST_PROXY: "${TRUST_PROXY:-false}"
+      ALLOWED_HOSTS: "${ALLOWED_HOSTS:-}"
       SESSION_MAX: "${SESSION_MAX:-30}"
     ports:
       - "${APP_BIND:-127.0.0.1}:${APP_PORT:-8000}:8000"

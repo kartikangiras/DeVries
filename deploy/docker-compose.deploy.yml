@@ -14,6 +14,8 @@ services:
     restart: unless-stopped
     environment:
       COOKIE_SECURE: "true"
+      TRUST_PROXY: "true"            # Caddy is the only thing in front, so X-Forwarded-For is its word
+      ALLOWED_HOSTS: "${SITE_ADDRESS:?set SITE_ADDRESS to the public host name}"   # the API and /mcp answer to this name
       DEVRIES_MCP_TOKEN: "${DEVRIES_MCP_TOKEN:?set DEVRIES_MCP_TOKEN: /mcp must not be open on a public address}"
       LLM_DAILY_BUDGET_USD: "${LLM_DAILY_BUDGET_USD:-5}"
 

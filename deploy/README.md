@@ -19,7 +19,7 @@ overlay, the one thing reachable from outside the machine is Caddy, on ports 80 
 ## Steps
 
 1. A VM with Docker and the compose plugin, a DNS record for the host name pointing at it, and ports 80 and 443
-   open. On a laptop, at rest with four scenarios loaded, the app container used about 100 MB and FalkorDB
+   open. On a laptop, at rest with the nine scenarios loaded, the app container used about 100 MB and FalkorDB
    about 80 MB; a visitor's copy of a small scenario cost about 160 KB of FalkorDB memory when it was measured
    (PLAN.md section 17). Under load nothing has been measured, so check on the VM before raising `SESSION_MAX`.
 2. Clone the repository there, then write `.env`:
@@ -29,7 +29,7 @@ overlay, the one thing reachable from outside the machine is Caddy, on ports 80 
    # in .env, set:
    #   FALKORDB_PASSWORD=<a long random value>
    #   DEVRIES_MCP_TOKEN=<another long random value>   # external MCP clients send it as a bearer token
-   #   SITE_ADDRESS=devries.example.org                # the public host name
+   #   SITE_ADDRESS=devries.example.org                # the public host name; the overlay passes it as ALLOWED_HOSTS too
    #   ANTHROPIC_API_KEY=...                           # optional: without it every run is scripted, and says so
    #   LLM_DAILY_BUDGET_USD=5                          # the overlay's default; past it, new runs are scripted
    ```
@@ -48,7 +48,7 @@ To update: `git pull`, then the same `up` command. To stop and keep the data: th
 
 ## What a visitor can and cannot do
 
-- Read the four shared scenarios. The first change a visitor makes (running an audit, approving a plan) is made
+- Read the nine shared scenarios. The first change a visitor makes (running an audit, approving a plan) is made
   to their own copy of that scenario, kept for an hour; at most 30 sessions hold copies at once.
 - With a model configured: three audit runs and ten questions per session, then runs are scripted. Without one,
   every run is scripted.

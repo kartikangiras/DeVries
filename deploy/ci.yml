@@ -2,8 +2,9 @@
 #
 # Copy this into .github/workflows/ of the repository that holds the config, and point `--import` at the
 # file. Labels say what is untrusted and what matters; without them nothing is a finding, so give at least
-# the ones that are true of your system. Nothing is launched: the saved tools/list files under manifests/
-# are what the scan reads, so commit them (an earlier `devries.ingest --import` writes them).
+# the ones that are true of your system. With --no-launch nothing is launched in CI: each stdio server is
+# read from the tools/list file an earlier `devries.ingest --import` saved under manifests/, so commit those
+# files beside the config; a server with no saved file is skipped and named in the output.
 name: devries
 on: [push, pull_request]
 jobs:
@@ -17,13 +18,14 @@ jobs:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
       - name: Fetch DeVries
-        run: git clone --depth 1 https://github.com/your-org/devries devries && cd devries && uv sync --no-dev
+        run: git clone --depth 1 https://github.com/kartikangiras/cistern devries && cd devries && uv sync --no-dev
       - name: Scan the config
         env:
           FALKORDB_HOST: localhost
           FALKORDB_PORT: "6379"
         run: |
           cd devries
-          uv run python -m devries.ingest --import ../.mcp.json --name ci_scan \
+          mkdir -p manifests && cp -r ../manifests/. manifests/ 2>/dev/null || true
+          uv run python -m devries.ingest --import ../.mcp.json --name ci_scan --no-launch \
             --label src:github=untrusted --label res:filesystem=high \
             --fail-on open
