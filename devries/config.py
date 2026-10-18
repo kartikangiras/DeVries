@@ -51,7 +51,7 @@ class Settings(BaseSettings):
     # imports and runs are rationed per address. Nothing is ever written to a file on a public site.
     devries_public: bool = False
     import_dir: Path = ROOT / ".imports"          # per-session imports on a public site (scenarios/ and manifests/ under each)
-    import_timeout_s: float = 10.0                 # tools/list over HTTPS from a pasted config
+    import_timeout_s: float = 20.0                 # tools/list from a launched or remote server, CLI and API alike
     import_max_tools: int = 200                    # tools kept per server from a pasted config
     rate_imports_per_hour: int = 6                 # per address, public only
     rate_runs_per_hour: int = 30                   # audit runs and questions per address, public only

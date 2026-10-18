@@ -22,6 +22,7 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from mcp.server.transport_security import TransportSecuritySettings
 
+from devries import about
 from devries.agent.llm import configured_llm, spend
 from devries.agent.loop import Auditor
 from devries.agent.runs import Persister, runs
@@ -42,20 +43,6 @@ log = logging.getLogger("devries.app")
 
 JANITOR_EVERY_S = 60
 PRERUN_QUIET_S = 600         # a scenario whose last run ended this recently is left alone by the janitor
-
-
-def version() -> str:
-    """The one version string: the package's own, from its metadata."""
-    try:
-        from importlib.metadata import version as installed
-        return installed("devries")
-    except Exception:  # noqa: BLE001 - not installed as a package: read the project file
-        import tomllib
-
-        from devries.config import ROOT
-        with suppress(OSError, tomllib.TOMLDecodeError, KeyError):
-            return tomllib.loads((ROOT / "pyproject.toml").read_text())["project"]["version"]
-        return "0.0.0"
 
 
 async def needs_prerun(client: GraphClient, key: str, quiet_s: float = 0) -> bool:
@@ -178,6 +165,8 @@ def create_app() -> FastAPI:
         await sandbox.sweep(client, max_age_min=0)      # any sandbox present at start was left by a crash
         await sessions.recover(client)
         runs.persister = Persister(client)
+        spend.attach(client)
+        await spend.load()                              # today's model spend, shared with every other process
         for name in app.state.seeded:                   # the runs an earlier process made, back from the graphs
             await runs.hydrate(client, keys.scenario_key(name))
         app.state.db_ready = True
@@ -195,11 +184,12 @@ def create_app() -> FastAPI:
                         log.info("FalkorDB is reachable now; loading scenarios")
                         await bring_up(client)
                     continue
+                await spend.load()                      # another process may have spent since
                 swept = await sandbox.sweep(client) + await sessions.sweep(client, busy)
                 if settings.prerun_audits:              # a graph reseeded from outside has lost its plans: make them again
                     for name in list(app.state.seeded):
                         key = keys.scenario_key(name)
-                        if key in runs._hydrated and not await client.run("run.list", key) and runs.for_graph(key):
+                        if runs.is_hydrated(key) and not await client.run("run.list", key) and runs.for_graph(key):
                             runs.forget(key)            # the graph was replaced: what this process remembers of it is stale
                     await prerun(client, "the graph was loaded again, so the pass that proposes a plan ran again", quiet_s=PRERUN_QUIET_S)
                 if settings.falkordb_memory_ceiling_mb:
@@ -233,7 +223,7 @@ def create_app() -> FastAPI:
             if isinstance(runs.persister, Persister):
                 await runs.persister.flush()
 
-    app = FastAPI(title="DeVries", version=version(), lifespan=lifespan)
+    app = FastAPI(title="DeVries", version=about.version(), lifespan=lifespan)
     app.state.sessions = sessions
     app.add_middleware(SessionMiddleware)
     app.add_exception_handler(DeVriesError, lambda request, exc: error_response(exc))
@@ -269,7 +259,8 @@ def create_app() -> FastAPI:
         body["model"] = {"configured": llm is not None, "name": llm.name if llm else None,
                          "budget_spent": spend.exhausted(), "spent_today_usd": round(spend.today_usd, 4)}
         body["sessions"] = {"holding_copies": len(sessions.holders()), "max": settings.session_max}
-        body["runs"] = {"active": sum(1 for r in runs._runs.values() if r.status in ("running", "awaiting_approval"))}
+        body["runs"] = {"active": runs.active_count()}
+        body["version"] = about.version()
         healthy = reachable and bool(body["canary"] and body["canary"]["ok"]) and all(body["scenarios"].values())
         body["ok"] = healthy
         return JSONResponse(body, status_code=200 if healthy else 503)
