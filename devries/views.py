@@ -9,7 +9,7 @@ from typing import Any
 
 from devries.agent.runs import Run
 from devries.analysis.models import EdgeScore, Finding, PathEvidence, finding_id
-from devries.mitigation.dsl import Broken, Diff, FindingRef, Verdict, config_patch, describe
+from devries.mitigation.dsl import COST, Broken, Diff, FindingRef, Verdict, config_patch, describe
 from devries.mitigation.store import Mitigation
 
 
@@ -50,9 +50,12 @@ def cut_hop(score: EdgeScore) -> dict[str, Any]:
     edge = score.edge
     _, reversed_ = _BEHIND[edge.rule]
     a, b = (edge.to_id, edge.from_id) if reversed_ else (edge.from_id, edge.to_id)
+    priced = [kind for kind in score.fixes if COST.get(kind) == int(score.score)]
+    kinds = [kind for kind in score.fixes if kind in COST]
     return {"from_id": a, "to_id": b, "rule": edge.rule, "sentence": hop_sentence(edge.rule, a, b),
             "config": {"rel": edge.rel, "from_id": edge.from_id, "to_id": edge.to_id},
-            "capacity": int(score.score), "fixes": score.fixes}
+            "capacity": int(score.score), "fixes": score.fixes,
+            "fix": min(priced or kinds, key=COST.__getitem__) if kinds else None}      # the kind the capacity priced
 
 
 def path_view(path: PathEvidence) -> dict[str, Any]:
@@ -151,6 +154,7 @@ def verdict_view(v: Verdict) -> dict[str, Any]:
     return {
         "passed": v.passed,
         "reason": v.reason,
+        "unconstrained": v.unconstrained,
         "plan": v.plan.model_dump(), "cost": v.plan.cost,
         "summary": [describe(f) for f in v.plan.fixes],
         "targets": [finding_id(fp) for fp in v.targets],
@@ -165,8 +169,10 @@ def mitigation_view(m: Mitigation) -> dict[str, Any]:
         "patch": [config_patch(f) for f in m.plan.fixes],
         "targets": [finding_id(fp) for fp in m.targets],
         "reason": m.reason, "rationale": m.rationale,
-        "approved_by": m.approved_by, "decision_reason": m.decision_reason,
+        "approved_by": m.approved_by, "approved_session": m.approved_session, "decision_reason": m.decision_reason,
+        "applied_fixes": m.applied_fixes,
         "created_at": m.created_at, "applied_at": m.applied_at, "config_hash": m.config_hash,
+        "unconstrained": bool(m.verdict and m.verdict.unconstrained),
     }
     if m.verdict is not None:
         out |= {k: v for k, v in diff_view(m.verdict.diff).items()}

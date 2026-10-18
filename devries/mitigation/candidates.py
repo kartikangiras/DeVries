@@ -43,12 +43,14 @@ def candidates(report: ChokepointReport, capability: dict[str, str | None] | Non
 
 
 def cut_fixes(report: ChokepointReport) -> list[Fix]:
-    """The cut as fixes: the cheapest kind that can cut each hop, one per config edge. A hop no fix can cut is left
-    out, and the sandbox then says the plan falls short."""
+    """The cut as fixes, one per config edge: the kind whose cost the hop's capacity priced (a gate where a revoke
+    would break a workflow), else the cheapest kind that can cut the hop. A hop no fix can cut is left out, and the
+    sandbox then says the plan falls short."""
     fixes, seen = [], set()
     for scored in report.edges:
         kinds = [kind for kind in scored.fixes if kind in COST]
-        fix = fix_for(min(kinds, key=COST.__getitem__), scored.edge) if kinds else None
+        priced = [kind for kind in kinds if COST[kind] == scored.score]
+        fix = fix_for(min(priced or kinds, key=COST.__getitem__), scored.edge) if kinds else None
         if fix is not None and FixPlan(fixes=[fix]).canonical() not in seen:
             seen.add(FixPlan(fixes=[fix]).canonical())
             fixes.append(fix)
