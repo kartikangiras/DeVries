@@ -29,6 +29,12 @@ _RETRYABLE = (rex.ConnectionError, rex.TimeoutError, ConnectionError, OSError)
 _APPLY_TOKEN = object()
 
 
+def unreachable(e: BaseException) -> str:
+    """One sentence for a database that did not answer, for the command lines."""
+    s = get_settings()
+    return f"FalkorDB did not answer at {s.falkordb_host}:{s.falkordb_port} ({type(e).__name__}). Start it with `make up`, or check .env"
+
+
 class GraphClient:
     def __init__(self, settings: Settings | None = None):
         s = settings or get_settings()

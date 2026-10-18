@@ -30,6 +30,7 @@ from pathlib import Path
 import yaml
 from mcp import Client, StdioServerParameters
 
+from devries.config import get_settings
 from devries.errors import InvalidScenario
 from devries.ingest.manifests import TOOL_NAME_RE, Manifest, ManifestTool, capability_from_annotations, load_manifest
 
@@ -46,7 +47,6 @@ CLIENT_CONFIGS: dict[str, list[Path]] = {
 # Claude Code reads permission rules from every one of these; a rule in any applies.
 CLAUDE_CODE_SETTINGS = [Path.cwd() / ".claude" / "settings.json", Path.cwd() / ".claude" / "settings.local.json",
                         Path.home() / ".claude" / "settings.json"]
-FETCH_TIMEOUT_S = 20.0
 
 # Guesses from a server's name, offered as guesses: a person confirms them before they mean anything.
 UNTRUSTED_NAMES = ("github", "gitlab", "jira", "linear", "fetch", "http", "web", "brave", "search", "browser",
@@ -164,7 +164,10 @@ def _from_config_data(data, where: str) -> list[ServerSource]:
     for name, entry in entries.items():
         if not isinstance(entry, dict):
             continue
-        src = ServerSource(id=f"srv:{slug(name)}", name=name)
+        base = slug(name)
+        taken = {s.id for s in out}
+        ident = next(c for c in (f"srv:{base}" if n == 1 else f"srv:{base}-{n}" for n in range(1, 100)) if c not in taken)
+        src = ServerSource(id=ident, name=name)      # my-server and my_server slug the same: the second gets a suffix
         if entry.get("url"):
             src.url = str(entry["url"])
         elif entry.get("command"):
@@ -186,8 +189,9 @@ def _cause(e: BaseException) -> str:
     return f"{type(e).__name__}: {text}" if text else type(e).__name__
 
 
-async def fetch_tools(server: ServerSource, timeout: float = FETCH_TIMEOUT_S) -> Manifest:
+async def fetch_tools(server: ServerSource, timeout: float | None = None) -> Manifest:
     """The server's `tools/list`, as a manifest. A stdio server is launched with this user's environment."""
+    timeout = get_settings().import_timeout_s if timeout is None else timeout
     if server.manifest_path:
         return load_manifest(server.manifest_path)
     if server.url:
@@ -413,7 +417,7 @@ def _check_name(name: str) -> str:
     return name
 
 
-async def _fetch_all(found: list[ServerSource], timeout: float, max_tools: int | None = None, *, launch: bool = True,
+async def _fetch_all(found: list[ServerSource], timeout: float | None, max_tools: int | None = None, *, launch: bool = True,
                      manifest_dir: Path | None = None, name: str | None = None) -> tuple[list[tuple[ServerSource, Manifest]], list[str]]:
     fetched: list[tuple[ServerSource, Manifest]] = []
     skipped: list[str] = []
@@ -444,7 +448,7 @@ async def _fetch_all(found: list[ServerSource], timeout: float, max_tools: int |
 
 
 async def import_install(source: str, root: Path, name: str | None = None, labels: dict[str, str] | None = None,
-                         timeout: float = FETCH_TIMEOUT_S, *, launch: bool = True) -> ImportResult:
+                         timeout: float | None = None, *, launch: bool = True) -> ImportResult:
     """Discover, fetch, draft and write. The caller loads the file afterwards (so that it can say what it found).
     With `launch` off (CI), a stdio server is read from the tools/list a previous import saved, or skipped."""
     client_name, found = discover(source)
@@ -458,7 +462,7 @@ async def import_install(source: str, root: Path, name: str | None = None, label
 
 
 async def import_pasted(data: dict, root: Path, name: str, client_name: str = "pasted config", labels: dict[str, str] | None = None,
-                        *, public: bool = False, timeout: float = FETCH_TIMEOUT_S, max_tools: int | None = None) -> ImportResult:
+                        *, public: bool = False, timeout: float | None = None, max_tools: int | None = None) -> ImportResult:
     """An import from JSON a person pasted: a client config (`mcpServers`) or a saved tools/list (`tools`).
     On a public site no command is ever launched: only servers with a `url` are asked for their tools."""
     name = _check_name(name)

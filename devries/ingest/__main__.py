@@ -19,16 +19,22 @@ import asyncio
 import sys
 from pathlib import Path
 
+import redis.exceptions as rex
+
 from devries.analysis import canary
 from devries.config import get_settings
 from devries.errors import DeVriesError
 from devries.graph import keys
-from devries.graph.client import GraphClient
+from devries.graph.client import GraphClient, unreachable
 from devries.ingest.scenario_loader import load_scenario, read_scenario
 
 
 async def main(paths: list[Path], strict: bool, missing_only: bool, fail_on: str | None = None) -> int:
-    client = GraphClient()
+    try:
+        client = GraphClient()
+    except (rex.RedisError, OSError) as e:
+        print(unreachable(e))
+        return 2
     failed = False
     try:
         check = await canary.ensure(client)
@@ -58,12 +64,15 @@ async def main(paths: list[Path], strict: bool, missing_only: bool, fail_on: str
                 print(f"  MISMATCH: {problem}")
             failed = failed or (strict and bool(report.mismatches))
             if fail_on:                                   # a CI gate: exit 1 when a finding of that standing is open
-                open_ = [f for f in counts if f.status == "open"] + ([] if fail_on == "open" else [])
+                open_ = [f for f in counts if f.status == "open"]
                 if open_:
                     print(f"  FAIL: {len(open_)} open finding(s), and --fail-on {fail_on} was asked for")
                     failed = True
     except DeVriesError as e:
         print(f"FAILED: {e.message}")
+        failed = True
+    except (rex.RedisError, OSError) as e:
+        print(f"FAILED: {unreachable(e)}")
         failed = True
     finally:
         await client.close()

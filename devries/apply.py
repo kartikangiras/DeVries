@@ -10,17 +10,23 @@ import argparse
 import asyncio
 import sys
 
+import redis.exceptions as rex
+
 from devries import ops
 from devries.config import get_settings
 from devries.errors import DeVriesError
 from devries.graph import keys
-from devries.graph.client import GraphClient
+from devries.graph.client import GraphClient, unreachable
 from devries.mitigation import store
 from devries.mitigation import write as write_mod
 
 
 async def main(scenario: str, mitigation_id: str, yes: bool, who: str) -> int:
-    client = GraphClient()
+    try:
+        client = GraphClient()
+    except (rex.RedisError, OSError) as e:
+        print(unreachable(e))
+        return 2
     try:
         key = keys.scenario_key(scenario)
         if not await client.exists(key):
@@ -43,6 +49,9 @@ async def main(scenario: str, mitigation_id: str, yes: bool, who: str) -> int:
         print(f"written to {receipt.path} (backup at {receipt.backup}); closed: {', '.join(receipt.closed) or 'nothing'}; "
               f"open now: {', '.join(receipt.open_after) or 'nothing'}")
         return 0
+    except (rex.RedisError, OSError) as e:
+        print(unreachable(e))
+        return 2
     except DeVriesError as e:
         print(f"FAILED: {e.message}")
         return 1

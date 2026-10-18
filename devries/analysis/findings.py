@@ -205,7 +205,7 @@ async def history(client: GraphClient, graph_key: str) -> list[dict]:
     return list(reversed(await client.run("scan.history", graph_key)))
 
 
-SCANS_KEPT = 200          # Scan nodes kept per graph; the posture page draws the last 50
+SCANS_KEPT = 200          # Scan nodes kept per graph; the posture page draws the last 24, Activity lists them all
 
 
 async def scan(client: GraphClient, graph_key: str) -> ScanResult:

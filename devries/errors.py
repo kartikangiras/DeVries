@@ -43,10 +43,6 @@ class CanaryFailed(DeVriesError):
     code = "canary_failed"
 
 
-class NotAvailable(DeVriesError):
-    code = "not_available"
-
-
 class InvalidFix(DeVriesError):
     code = "invalid_fix"
 
