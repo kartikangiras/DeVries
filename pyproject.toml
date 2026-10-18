@@ -18,8 +18,8 @@ dependencies = [
 ]
 
 [project.urls]
-Repository = "https://github.com/kartikangiras/cistern"
-Issues = "https://github.com/kartikangiras/cistern/issues"
+Repository = "https://github.com/kartikangiras/DeVries"
+Issues = "https://github.com/kartikangiras/DeVries/issues"
 
 [dependency-groups]
 dev = [

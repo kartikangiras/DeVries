@@ -18,7 +18,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
       - name: Fetch DeVries
-        run: git clone --depth 1 https://github.com/kartikangiras/cistern devries && cd devries && uv sync --no-dev
+        run: git clone --depth 1 https://github.com/kartikangiras/DeVries devries && cd devries && uv sync --no-dev
       - name: Scan the config
         env:
           FALKORDB_HOST: localhost
