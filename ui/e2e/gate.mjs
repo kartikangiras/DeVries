@@ -49,8 +49,10 @@ for (const [scenario, fix, cut] of [["acme_support", "gate one call", "set gate 
   need(r.postureFigures.length === 5, `${scenario}: the posture should open on five figures, got ${r.postureFigures}`);
   need((await page.locator(".bars li").count()) >= 2, `${scenario}: the posture should draw the blast radius and the exposure as bars`);
   need((await page.locator(".chokes li").count()) >= 1, `${scenario}: the posture should rank the choke points`);
-  await page.locator(".posture-tally summary").click();
+  // the Rule of Two is open by default, above the history; its cards are there without a click
   await page.waitForSelector(".tally-card");
+  need(await page.locator(".posture-tally").evaluate((d) => d.open), `${scenario}: the Rule of Two should be open by default`);
+  need((await page.locator(".bars-key").count()) === 2, `${scenario}: each bar chart should carry a key`);
   await page.locator(".posture-owasp summary").click();
   await page.waitForSelector(".owasp-code");
   need((await page.locator(".owasp-code").count()) === 10, `${scenario}: the posture should list the ten OWASP classes under its fold`);
@@ -68,6 +70,8 @@ for (const [scenario, fix, cut] of [["acme_support", "gate one call", "set gate 
   r.openBefore = await page.locator(".case.status-open").count();
   r.inboxCount = await place("Open").locator(".nav-count").innerText();
   r.session = await first(".session");
+  // the badge speaks for the newest run: the start-up pass is scripted, so a configured model is only "ready"
+  need(withModel ? /scripted pass · model ready|model · / .test(r.session) : /scripted · no model/.test(r.session), `${scenario}: the session badge should say what drove the newest run: ${r.session}`);
   r.recommended = await first(".case .transform-to");
   r.next = await first(".case .case-next");
   need(/ open\.$/.test(r.title), `${scenario}: the list does not say how many findings are open: ${r.title}`);
@@ -154,6 +158,7 @@ for (const [scenario, fix, cut] of [["acme_support", "gate one call", "set gate 
   await page.waitForSelector(".hops-after li.changed", { timeout: 60000 });
   r.figures = await texts(".figures dd");
   need(r.figures.length >= 4, `${scenario}: the fix should be summed up in figures, got ${r.figures}`);
+  need(/^[A-Z]/.test(await first(".brief-title")), `${scenario}: the fix step's title should start with a capital: ${await first(".brief-title")}`);
   r.change = await first(".approval .approval-change");
   r.numbers = await first(".approval .approval-numbers");
   r.patch = await texts(".drafted .patch");
@@ -224,7 +229,7 @@ for (const [scenario, fix, cut] of [["acme_support", "gate one call", "set gate 
   r.mitigated = await page.locator(".case.status-mitigated").count();
   need(r.mitigated >= 1, `${scenario}: the closed finding is not listed under Closed`);
 
-  // the posture after the fix: one more scan, the drop, nothing exposed
+  // the posture after the fix: one more scan, so the history (drawn once there are two scans) shows the drop, nothing exposed
   await place("Posture").click();
   await page.waitForSelector(".figures dd", { timeout: 240000 });
   await page.waitForFunction((before) => document.querySelectorAll(".scans .scan").length > before, r.scansBefore, { timeout: 240000 });

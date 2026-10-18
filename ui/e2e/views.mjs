@@ -38,29 +38,42 @@ const stepTo = (page, name) => page.locator(".workflow-step", { has: page.locato
 {
   const { context, page } = await open(1440);
 
+  // the landing: its counts are the server's, its demo plays by itself, and it does not claim there is nothing to install
+  await page.goto(`${base}/#/`);
+  await page.waitForSelector(".l-band-n");
+  const listedScenarios = (await (await page.request.get(`${base}/api/scenarios`)).json()).scenarios.length;
+  const publishedQueries = (await (await page.request.get(`${base}/api/queries`)).json()).queries.length;
+  await page.waitForFunction((n) => [...document.querySelectorAll(".l-band")].some((b) => /Scenarios/.test(b.textContent ?? "") && (b.textContent ?? "").includes(String(n))), listedScenarios, { timeout: 10000 }).catch(() => {});
+  out.bands = await page.locator(".l-band").allInnerTexts().then((all) => all.map((t) => t.replace(/\s+/g, " ").trim()));
+  need(out.bands.some((b) => b.startsWith(`Scenarios ${listedScenarios}`)) && out.bands.some((b) => b.startsWith(`Queries ${publishedQueries}`)), `the landing's counts should be the server's (${listedScenarios} scenarios, ${publishedQueries} queries): ` + out.bands);
+  need(/one command, runs locally/.test(await text(page, ".l-price-unit")), "the landing should say it runs locally, not that there is nothing to install");
+  need((await page.locator(".ld").count()) === 1 && (await page.locator(".ld-play").count()) === 0, "the hero demo should play by itself, with no tap-to-play poster");
+  need(/method\/queries$/.test(await page.locator(".l-enterprise-link").getAttribute("href")), "the landing's query link should land on the method page's queries");
+
   // the posture: the one sentence, the open paths as a live flow between cards, the figures, the cut as rules
   await page.goto(`${base}/#/acme_support`);
   await page.waitForSelector(".riskflow .river", { state: "attached", timeout: 240000 });
   out.postureTitle = await text(page, ".page-head h1");
   out.ribbons = await page.locator(".riskflow .river").count();
   out.figures = await page.locator(".figures div").allInnerTexts().then((all) => all.map((t) => t.replace(/\s+/g, " ").trim()));
-  need(/^One untrusted source reaches one high-impact resource through one agent, in 4 hops\./.test(out.postureTitle), "the posture should open on its sentence: " + out.postureTitle);
+  // the title is the sentence's first clause; a second clause, when there is one, opens the meta line
+  need(/^One untrusted source reaches one high-impact resource/.test(out.postureTitle) && out.postureTitle.split(" ").length <= 16, "the posture should open on one short clause: " + out.postureTitle);
   need(out.ribbons === 2, `the support posture should draw one finding as two hops, got ${out.ribbons}`);
   out.cards = await page.locator(".riskflow .rcard").allInnerTexts().then((all) => all.map((t) => t.replace(/\s+/g, " ").trim()));
   need(out.cards.length === 3 && out.cards.some((c) => /UNTRUSTED SOURCE Customer tickets/.test(c)) && out.cards.some((c) => /HIGH-IMPACT ACTION Payments API/.test(c)), "the flow should draw the source, the agent and the action as cards: " + out.cards);
-  need(out.figures.some((c) => /^1 open finding$/i.test(c)) && out.figures.some((c) => /^1 cheapest cut, cost$/i.test(c)), "the figures should give the open findings and the cheapest cut: " + out.figures);
+  need(out.figures.some((c) => /^1 open finding$/i.test(c)) && out.figures.some((c) => /^2 cheapest cut, cost$/i.test(c)), "the figures should give the open findings and the cheapest cut: " + out.figures);
   await page.locator(".riskflow .river .react-flow__edge-interaction").first().dispatchEvent("mouseover");
   await page.waitForFunction(() => /click to open/.test(document.querySelector(".riskflow .chart-over")?.textContent ?? ""), null, { timeout: 5000 }).catch(() => {});
   out.overRibbon = await text(page, ".riskflow .chart-over");
   need(/Customer tickets reaches Payments API through Support bot in four hops/.test(out.overRibbon) && /click to open/.test(out.overRibbon), "hovering a ribbon did not read the finding: " + out.overRibbon);
   await page.waitForSelector(".cut-line");
   out.cut = await text(page, ".cut-line");
-  need(/Cheapest cut: cost 1\./.test(out.cut) && /Support bot calls get_ticket/.test(out.cut), "the cheapest cut should be named on the posture: " + out.cut);
+  need(/Cheapest cut: cost 2\./.test(out.cut) && /Support bot can call issue_refund/.test(out.cut) && /by gating the call/.test(out.cut) && !/revoking/.test(out.cut),
+       "the cheapest cut should be named on the posture, priced as the gate the sandbox passes: " + out.cut);
   await page.locator(".policy summary").click();
   out.policy = await page.locator(".policy pre").first().innerText();
-  need(/"deny":\s*\[\s*"mcp__helpdesk__get_ticket"/.test(out.policy), "the cut as a Claude Code rule should deny the one tool: " + out.policy);
-  await page.locator(".posture-tally summary").click();
-  await page.waitForSelector(".tally-card");
+  need(/"ask":\s*\[\s*"mcp__payments__issue_refund"/.test(out.policy), "the cut as a Claude Code rule should ask before the one tool: " + out.policy);
+  await page.waitForSelector(".tally-card");                                     // the Rule of Two is open by default
   out.tally = await page.locator(".tally-card").allInnerTexts().then((all) => all.map((t) => t.replace(/\s+/g, " ").trim()));
   need(out.tally.length === 1 && /Support bot/.test(out.tally[0]) && /two of three/.test(out.tally[0]), "the tally should give the support bot two of three: " + out.tally);
   out.blast = await text(page, ".posture-blast .bars li");
@@ -70,7 +83,7 @@ const stepTo = (page, name) => page.locator(".workflow-step", { has: page.locato
   await page.getByRole("button", { name: "Propose it as one plan" }).click();
   await page.waitForSelector(".cut-line .whatif-error, .cut-line a", { timeout: 60000 });
   out.proposeCut = await text(page, ".cut-line");
-  need(/refused it/.test(out.proposeCut) && /refund-request|Refund request/.test(out.proposeCut), "proposing the cut should be refused by the sandbox with the workflow named: " + out.proposeCut);
+  need(/Passed in a sandbox/.test(out.proposeCut) && /read it on the fix step/.test(out.proposeCut), "proposing the cut should pass the sandbox and point at the fix step: " + out.proposeCut);
 
   // the explorer: every node, as cards in lanes, the open paths lit; what is under the pointer is named, a clicked card is read out beside the chart
   await page.goto(`${base}/#/acme_support/graph`);
@@ -110,6 +123,12 @@ const stepTo = (page, name) => page.locator(".workflow-step", { has: page.locato
   await tab(page, "Tree").click();
   await page.waitForTimeout(1200);
   await shot(page, "views-explorer-canvas");
+  // the renderer is remembered per kind of page: the Explorer on the canvas leaves a finding's Path step on DeVries's chart
+  await page.goto(`${base}/#/acme_support/finding/fnd%3Adce0910d42/path`);
+  await page.waitForSelector(".chart .fcard", { timeout: 60000 });
+  need((await page.locator("falkordb-canvas").count()) === 0, "the Path step should not inherit the Explorer's renderer");
+  await page.goto(`${base}/#/acme_support/graph`);
+  await page.waitForSelector("falkordb-canvas", { timeout: 60000 });
   await tab(page, "DeVries").click();
 
   // the config layer and its edges as a table
@@ -126,7 +145,7 @@ const stepTo = (page, name) => page.locator(".workflow-step", { has: page.locato
   await tab(page, "Cheapest cut").click();
   await page.waitForSelector(".chart .cut-mark", { timeout: 60000 });
   out.cutMarks = await page.locator(".chart .wire.cut").evaluateAll((wires) => wires.map((w) => w.getAttribute("data-hop")));
-  need(out.cutMarks.join() === "tool:helpdesk.get_ticket>agent:support-bot", "the cut should be marked on the hop it is: " + out.cutMarks);
+  need(out.cutMarks.join() === "agent:support-bot>tool:payments.issue_refund", "the cut should be marked on the hop it is: " + out.cutMarks);
   await shot(page, "views-explorer-cut");
 
   // the most central nodes, by betweenness: ranked on the chart, listed under it
@@ -317,7 +336,8 @@ const stepTo = (page, name) => page.locator(".workflow-step", { has: page.locato
   out.devWorst = await page.locator(".riskflow .rcard.worst").count();
   need(out.devRibbons === out.devOpen, `the dev posture should draw every open finding as a path: ${out.devRibbons} of ${out.devOpen}`);
   need(out.devWorst >= 1, "an agent that holds all three properties and runs unattended should be marked");
-  need((await page.locator(".scans .scan").count()) >= 1, "the posture should show at least the scan at start");
+  // one scan is a note, not a one-bar chart; the history is drawn once there are two
+  need((await page.locator(".scans .scan").count()) >= 2 || /One scan so far/.test(await text(page, ".posture-scans-note")), "with one scan the posture should say the history starts with the next");
   await shot(page, "views-dev-posture");
   await page.goto(`${base}/#/acme_dev/graph/agent%3Arelease-bot`);
   await page.waitForSelector(".read.picked .whatif-line", { timeout: 60000 });
@@ -426,6 +446,13 @@ for (const width of [1100, 420]) {
     await page.waitForSelector(ready, { timeout: 60000 });
     const o = await page.evaluate(() => ({ scrollW: document.documentElement.scrollWidth, clientW: document.documentElement.clientWidth }));
     need(o.scrollW <= o.clientW, `the ${name} page scrolls sideways at ${width} px: ${o.scrollW} > ${o.clientW}`);
+    if (name === "finding") {
+      // all five steps on screen, and the status word in view however long the strip is
+      const steps = await page.locator(".workflow-step").evaluateAll((els) => els.map((e) => { const r = e.getBoundingClientRect(); return [Math.round(r.left), Math.round(r.right)]; }));
+      need(steps.length === 5 && steps.every(([l, r]) => l >= 0 && r <= o.clientW + 1), `at ${width} px all five steps should be on screen: ${JSON.stringify(steps)}`);
+      const phase = await page.locator(".strip .phase").boundingBox();
+      need(!!phase && phase.x + phase.width <= o.clientW + 1, `at ${width} px the finding's status word should stay on screen`);
+    }
     await shot(page, `views-${width}-${name}`);
   }
   await context.close();
