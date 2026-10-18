@@ -1,12 +1,10 @@
-// The landing page: what DeVries is, before the app. Its structure, its measurements and its motion
-// follow Manthan's landing page (manthan-ui/src/pages/Landing.tsx, Copyright 2026 Manthan
-// Engineering, Apache-2.0; see ui/THIRD_PARTY_NOTICES.md), rewritten as plain React and CSS for
-// DeVries's own content, with the accent moved from emerald to iris and the videos replaced by a
-// drawn background. Routes stay in the hash: the bare address is this page, "#/acme_support" is the app.
+// The landing page: what DeVries is, before the app, in plain React and CSS with a drawn background.
+// Routes stay in the hash: the bare address is this page, "#/acme_support" is the app.
 
 import { useEffect, useRef, useState, type CSSProperties, type MouseEvent } from "react";
 import type { Scenario } from "../api";
 import { href } from "../route";
+import { capital, countWord } from "../text";
 import { Mark } from "../ui";
 import { Anatomy } from "./Anatomy";
 import { Ambient, Arrow, PlayGlyph, Reveal, ServerIcon } from "./bits";
@@ -14,13 +12,15 @@ import { HeroDemo } from "./HeroDemo";
 import { ExplainScene, FixScene, ScanScene } from "./Scenes";
 import { MARQUEE } from "./servers";
 
-const HACKATHON = "https://www.wemakedevs.org/hackathons/falkordb";
 const FALKORDB = "https://www.falkordb.com/";
 
-export function Landing({ scenarios }: { scenarios: Scenario[] }) {
+/** `scenarios` and `queries` are what the server lists; the counts on the page are theirs, not typed in. */
+export function Landing({ scenarios, queries }: { scenarios: Scenario[]; queries: number }) {
   const first = scenarios[0]?.id ?? "acme_support";
   const app = href(first);
-  const queries = href(first, "queries");
+  const queriesHref = href(first, "method", "queries");
+  // the lists arrive a moment after the page; until then the figures are what the server shipped with
+  const counts = { scenarios: scenarios.length || 9, queries: queries || 84 };
   useEffect(() => {
     document.body.classList.add("landing-body");
     return () => document.body.classList.remove("landing-body");
@@ -32,8 +32,8 @@ export function Landing({ scenarios }: { scenarios: Scenario[] }) {
       <Stack />
       <HowItWorks />
       <AnatomySection />
-      <RunIt app={app} queries={queries} />
-      <Footer app={app} queries={queries} />
+      <RunIt app={app} queries={queriesHref} counts={counts} />
+      <Footer app={app} queries={queriesHref} scenarios={counts.scenarios} />
     </div>
   );
 }
@@ -84,13 +84,6 @@ function Hero({ app }: { app: string }) {
       </nav>
 
       <div ref={copy} className="l-hero-copy">
-        <div className="l-enter d0">
-          <a className="l-announce" href={HACKATHON} target="_blank" rel="noopener noreferrer">
-            <span className="l-chip">Graph Hacks</span>
-            <span className="l-announce-text">Track 01 · Agents that act on connected data</span>
-            <span className="l-announce-arrow" aria-hidden>→</span>
-          </a>
-        </div>
         <h1 className="l-h1 l-enter d1">
           The audit layer for
           <br />
@@ -265,7 +258,7 @@ const STEPS = [
     num: "01",
     verb: "Scan.",
     copy:
-      "Seven rules turn the configuration into a second layer of edges that say where text and data can flow. Two graph queries over that layer find every injection path and every lethal trifecta, with FalkorDB doing the search, in milliseconds.",
+      "Seven rules turn the configuration into a second layer of edges that say where text and data can flow. Two graph queries over that layer find every injection path and every lethal trifecta, an agent holding untrusted input, private data and a way out at once; FalkorDB does the search, in milliseconds.",
     scene: <ScanScene />,
   },
   {
@@ -328,25 +321,28 @@ function AnatomySection() {
   );
 }
 
-/* ---- 6 · run it: where Manthan prices, DeVries says one command */
+/* ---- 6 · run it: one command */
 
 const CLOSED = ["The finding is gone", "No new finding appeared", "Every workflow still has what it needs"];
-const COUNTS: [string, string][] = [["Rules", "7"], ["Kinds of fix", "5"], ["Queries", "81"], ["MCP tools", "11"], ["Scenarios", "4"]];
+type Counts = { scenarios: number; queries: number };
 
-function RunIt({ app, queries }: { app: string; queries: string }) {
+function RunIt({ app, queries, counts }: { app: string; queries: string; counts: Counts }) {
   const importHref = app.replace(/\/?$/, "/import");
+  // the rules, the kinds of fix and the auditor's own tools are fixed by the code; the queries and the scenarios are counted
+  const bands: [string, string][] = [["Rules", "7"], ["Kinds of fix", "5"], ["Queries", String(counts.queries)], ["MCP tools", "11"], ["Scenarios", String(counts.scenarios)]];
+  const more = counts.scenarios - 4;
   return (
     <section id="run" className="l-run">
       <div className="l-wrap-4xl l-center">
         <Reveal as="h2" className="l-h2" y={16} delay={0.05} duration={0.5}>
-          Four scenarios, already audited, in <em>one click.</em>
+          {capital(countWord(counts.scenarios))} scenarios, already audited, in <em>one click.</em>
         </Reveal>
         <Reveal className="l-price" y={24} scale={0.96} delay={0.15} duration={0.7} margin="-80px">
           <span className="l-price-cmd l-price-word">Try it.</span>
-          <span className="l-price-unit">/ nothing to install</span>
+          <span className="l-price-unit">/ one command, runs locally</span>
         </Reveal>
         <Reveal as="p" className="l-run-sub" y={0} delay={0.3} duration={0.5} margin="-80px">
-          The support desk, the executive office, the dev team and DeVries itself are loaded, scanned, and their first plans tested. Paste your own client config or a tools/list to audit what you actually run.
+          The support desk, the executive office, the dev team, DeVries itself{more > 0 ? ` and ${countWord(more)} more` : ""} are loaded, scanned, and their first plans tested. Paste your own client config or a tools/list to audit what you actually run.
         </Reveal>
         <Reveal className="l-run-ctas" y={12} delay={0.35} duration={0.5} margin="-80px">
           <a href={app} className="l-btn-accent">Open the app <Arrow /></a>
@@ -363,11 +359,11 @@ function RunIt({ app, queries }: { app: string; queries: string }) {
           ))}
         </Reveal>
         <Reveal className="l-bands" y={16} delay={0.55} duration={0.55} margin="-60px">
-          {COUNTS.map(([label, n], i) => (
+          {bands.map(([label, n], i) => (
             <span key={label} className="l-band">
               <span className="l-band-label">{label}</span>
               <span className="l-band-n">{n}</span>
-              {i < COUNTS.length - 1 && <span className="l-sep">·</span>}
+              {i < bands.length - 1 && <span className="l-sep">·</span>}
             </span>
           ))}
         </Reveal>
@@ -401,7 +397,7 @@ function FooterCol({ title, links }: { title: string; links: FLink[] }) {
   );
 }
 
-function Footer({ app, queries }: { app: string; queries: string }) {
+function Footer({ app, queries, scenarios }: { app: string; queries: string; scenarios: number }) {
   const [copied, setCopied] = useState(false);
   const copy = async () => {
     try {
@@ -421,7 +417,6 @@ function Footer({ app, queries }: { app: string; queries: string }) {
   const project: FLink[] = [
     { label: "The queries", href: queries },
     { label: "FalkorDB", href: FALKORDB, ext: true },
-    { label: "Graph Hacks", href: HACKATHON, ext: true },
   ];
   return (
     <footer className="l-footer">
@@ -444,7 +439,6 @@ function Footer({ app, queries }: { app: string; queries: string }) {
             <span className="l-fsocial-say">Built on FalkorDB.</span>
             <div className="l-fsocial-links">
               <a href={FALKORDB} target="_blank" rel="noopener noreferrer">FalkorDB ↗</a>
-              <a href={HACKATHON} target="_blank" rel="noopener noreferrer">Graph Hacks ↗</a>
             </div>
           </div>
         </Reveal>
@@ -466,12 +460,12 @@ function Footer({ app, queries }: { app: string; queries: string }) {
             <FooterCol title="Project" links={project} />
           </div>
           <div className="l-fbottom">
-            <span className="l-fcopy">© {new Date().getFullYear()} DeVries. Built for Graph Hacks: Context for AI Agents.</span>
+            <span className="l-fcopy">© {new Date().getFullYear()} DeVries. Built on FalkorDB.</span>
             <div className="l-fsub">
               <h4>
                 Run it yourself.
                 <br />
-                <strong>One command, nine scenarios.</strong>
+                <strong>One command, {countWord(scenarios)} scenarios.</strong>
               </h4>
               <div className="l-copy-box">
                 <code>make app</code>

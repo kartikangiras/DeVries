@@ -11,7 +11,7 @@ import {
 
 export type Server = { id: string; name: string; icon: SimpleIcon; ink?: boolean };
 
-export const SERVERS: Server[] = [
+const SERVERS: Server[] = [
   { id: "github", name: "GitHub", icon: siGithub, ink: true },
   { id: "linear", name: "Linear", icon: siLinear },
   { id: "notion", name: "Notion", icon: siNotion, ink: true },

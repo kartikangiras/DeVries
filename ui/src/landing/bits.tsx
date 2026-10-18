@@ -1,5 +1,5 @@
 // Small pieces the landing page is built from: an in-view hook, a reveal wrapper that stands in for
-// motion's whileInView, the ambient background that stands in for Manthan's hero video, the marks of
+// motion's whileInView, the ambient background drawn on a canvas, the marks of
 // MCP servers, and a few glyphs drawn here so no icon library is needed.
 
 import { createElement, useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";

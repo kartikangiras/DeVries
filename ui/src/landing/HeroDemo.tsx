@@ -1,11 +1,9 @@
-// The showcase in the hero: one finding on the support desk, from the scan to its closing, in a
-// run the visitor starts and nods through. The frame, its phases and its measurements follow
-// Manthan's LandingHeroDemo (manthan-ui/src/components/landing/LandingHeroDemo.tsx, Apache-2.0;
-// see ui/THIRD_PARTY_NOTICES.md). The content is DeVries's: the hops, the verdicts and the receipts
-// are what the app shows on acme_support.
+// The showcase in the hero: one finding on the support desk, from the scan to its closing, as a
+// fifteen-second loop that plays by itself while it is on screen; the visitor can approve the fix
+// early, or pause it. The hops, the verdicts and the receipts are what the app shows on acme_support.
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { Arrow, Check, Cross, PlayGlyph, Replay, Spinner, useInView } from "./bits";
+import { Arrow, Check, Cross, Spinner, useInView } from "./bits";
 
 const FINDING = {
   id: "dce0910d42",
@@ -40,7 +38,7 @@ const PASSED = CANDIDATES.filter((c) => c.passed);
 type Step = { doing: string; done: string; title: string; target: string; ref: string };
 const APPLY: Step[] = [
   { doing: "Applying", done: "Applied", title: "Gate issue_refund behind a person.", target: "MATCH (a:Agent {id:'agent:support-bot'})-[c:CAN_CALL]->(:Tool {id:'tool:payments.issue_refund'}) SET c.gate = 'human_approval'", ref: "mit:b68c44c5ab" },
-  { doing: "Rebuilding", done: "Rebuilt", title: "The flow layer, in one statement.", target: "projection.rebuild · every FLOWS_TO and GATED_FLOW edge rewritten · 3 ms", ref: "GATED_FLOW {rule: 3}" },
+  { doing: "Rebuilding", done: "Rebuilt", title: "The flow layer, in one statement.", target: "projection.rebuild · every flow edge rewritten, gates included · 3 ms", ref: "rule 3 · gated" },
   { doing: "Rescanning", done: "Rescanned", title: "No path from an outsider to a payment.", target: "reach.untrusted_to_high · find.trifecta · 0 injection · 0 trifecta · 8 ms", ref: "scan:9c2e01f4" },
 ];
 
@@ -54,13 +52,13 @@ const RECEIPTS: { label: string; text: string; ref: string }[] = [
 
 type Phase = "scan" | "explaining" | "testing" | "brief" | "applying" | "closed";
 const ORDER: Phase[] = ["scan", "explaining", "testing", "brief", "applying", "closed"];
-const DUR: Record<Phase, number> = { scan: 4, explaining: 14, testing: 15, brief: 5, applying: 9, closed: 6 };
+/** Seconds each phase takes: fifteen in all, then the loop starts over. The approval on the brief is taken for the
+ *  visitor when they do not click it themselves. */
+const DUR: Record<Phase, number> = { scan: 1.2, explaining: 4, testing: 4.2, brief: 1.6, applying: 2.4, closed: 1.6 };
 const LABEL: Record<Phase, string> = { scan: "Scanning", explaining: "Explaining", testing: "Testing fixes", brief: "Brief", applying: "Applying", closed: "Closed" };
 const TOTAL = ORDER.reduce((s, p) => s + DUR[p], 0);
-const PRE = DUR.scan + DUR.explaining + DUR.testing + DUR.brief;
 
-/** idle: the poster and a play button. pre: scan to brief. awaiting: the brief, until the visitor nods. post: applying to closed. */
-type Playback = "idle" | "pre" | "awaiting" | "post" | "finished";
+type Playback = "playing" | "paused";
 
 function startOf(p: Phase): number {
   let acc = 0;
@@ -75,30 +73,19 @@ const pad = (n: number) => String(n).padStart(2, "0");
 
 export function HeroDemo({ appHref }: { appHref: string }) {
   const [wrap, inView] = useInView<HTMLDivElement>({ amount: 0.15, once: false });
-  const [playback, setPlayback] = useState<Playback>("idle");
+  const [playback, setPlayback] = useState<Playback>("playing");
   const [phase, setPhase] = useState<Phase>("scan");
   const [elapsed, setElapsed] = useState(0);
+  // a jump (an early approval) restarts the clock from the phase it lands on
+  const [epoch, setEpoch] = useState(0);
 
-  // The clock runs only through the two automatic stretches, and only on screen.
+  // The clock runs while the demo plays and is on screen, and wraps at the end: the loop never stops on its own.
   useEffect(() => {
-    const auto = playback === "pre" || playback === "post";
-    if (!auto || !inView) return;
+    if (playback !== "playing" || !inView) return;
     const t0 = performance.now();
     const from = startOf(phase) + elapsed;
     const id = window.setInterval(() => {
-      const t = from + (performance.now() - t0) / 1000;
-      if (playback === "pre" && t >= PRE) {
-        setPhase("brief");
-        setElapsed(DUR.brief);
-        setPlayback("awaiting");
-        return;
-      }
-      if (playback === "post" && t >= TOTAL) {
-        setPhase("closed");
-        setElapsed(DUR.closed);
-        setPlayback("finished");
-        return;
-      }
+      const t = (from + (performance.now() - t0) / 1000) % TOTAL;
       let cum = 0;
       for (const p of ORDER) {
         if (t < cum + DUR[p]) {
@@ -111,89 +98,64 @@ export function HeroDemo({ appHref }: { appHref: string }) {
     }, 100);
     return () => window.clearInterval(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [playback, inView]);
+  }, [playback, inView, epoch]);
 
-  const start = () => {
-    setPhase("scan");
-    setElapsed(0);
-    setPlayback("pre");
-  };
   const approve = () => {
     setPhase("applying");
     setElapsed(0);
-    setPlayback("post");
+    setEpoch((e) => e + 1);
+  };
+  const toggle = () => {
+    setPlayback((p) => (p === "playing" ? "paused" : "playing"));
+    setEpoch((e) => e + 1);
   };
 
   const stamp = useMemo(() => {
     const base = 14 * 3600 + 21 * 60;
-    const offset = playback === "idle" ? startOf("brief") + 2 : Math.floor(startOf(phase) + elapsed);
-    const total = base + offset;
+    const total = base + Math.floor(startOf(phase) + elapsed);
     return `${pad(Math.floor(total / 3600) % 24)}:${pad(Math.floor((total % 3600) / 60))}:${pad(total % 60)} UTC`;
-  }, [playback, phase, elapsed]);
-
-  const glass = playback === "idle" || playback === "finished";
-  const live = playback === "pre" || playback === "awaiting" || playback === "post";
+  }, [phase, elapsed]);
 
   const progress = (() => {
-    if (playback === "idle") return "Tap to play";
-    if (playback === "awaiting") return "Click Approve to apply";
-    if (playback === "finished") return "Nothing changed until you said so";
+    if (playback === "paused") return "Paused";
     if (phase === "explaining") return `Hop ${pad(Math.min(HOPS.length, Math.floor(elapsed / (DUR.explaining / HOPS.length)) + 1))} of ${pad(HOPS.length)}`;
     if (phase === "testing") return `Sandbox ${pad(Math.min(CANDIDATES.length, Math.floor(elapsed / (DUR.testing / CANDIDATES.length)) + 1))} of ${pad(CANDIDATES.length)}`;
     if (phase === "applying") return `Step ${pad(Math.min(APPLY.length, Math.floor(elapsed / (DUR.applying / APPLY.length)) + 1))} of ${pad(APPLY.length)}`;
-    if (phase === "brief") return "Awaiting your approval";
-    if (phase === "closed") return "Finding closed";
+    if (phase === "brief") return "Awaiting approval";
+    if (phase === "closed") return "Finding closed · 15 s, looping";
     return "Scanning…";
   })();
 
-  const tone = playback === "awaiting" ? " amber" : glass || phase === "closed" ? " quiet" : " accent";
-  const headWord = playback === "awaiting" ? "Awaiting your approval" : playback === "idle" ? "Tap to play" : playback === "finished" ? "Closed" : LABEL[phase];
+  const tone = phase === "brief" ? " amber" : phase === "closed" ? " quiet" : " accent";
 
   return (
-    <div ref={wrap} className={`ld${glass ? " glass" : ""}`}>
+    <div ref={wrap} className="ld">
       <header className="ld-head">
         <span className="ld-lights" aria-hidden><i /><i /><i /></span>
         <span className="ld-id">FINDING&nbsp;{FINDING.id}</span>
         <span className="ld-dot" aria-hidden>·</span>
         <span className="ld-scn">{FINDING.scenario}</span>
-        <span className={`ld-phase${tone}`}>{headWord}</span>
+        <span className={`ld-phase${tone}`}>{LABEL[phase]}</span>
       </header>
 
       <div className="ld-canvas">
-        <div className={`ld-content${live ? "" : " dim"}`}>
-          {live ? (
-            <div key={phase} className="ld-pane">
-              {phase === "scan" && <ScanCanvas elapsed={elapsed} />}
-              {phase === "explaining" && <ExplainingCanvas elapsed={elapsed} />}
-              {phase === "testing" && <TestingCanvas elapsed={elapsed} />}
-              {phase === "brief" && <BriefCanvas elapsed={elapsed} awaiting={playback === "awaiting"} onApprove={approve} />}
-              {phase === "applying" && <ApplyingCanvas elapsed={elapsed} />}
-              {phase === "closed" && <ClosedCanvas appHref={appHref} />}
-            </div>
-          ) : playback === "idle" ? (
-            <div key="poster" className="ld-pane"><Poster /></div>
-          ) : null}
-        </div>
-        {playback === "idle" && (
-          <button type="button" className="ld-overlay ld-play" onClick={start} aria-label="Play the demo">
-            <span className="ld-play-glyph"><PlayGlyph /></span>
-            <span className="ld-play-say">Watch a finding close</span>
-            <span className="ld-play-sub">60 seconds · scan → your approval → closed</span>
-          </button>
-        )}
-        {playback === "finished" && (
-          <div className="ld-overlay ld-done">
-            <span className="ld-done-eyebrow">Finding closed</span>
-            <h3 className="ld-done-h">Now open the app.</h3>
-            <p className="ld-done-p">Four scenarios are loaded. Run the audit on the dev team and watch seven findings close in two rounds.</p>
-            <a href={appHref} className="ld-done-cta">Open the app <Arrow size={14} /></a>
-            <button type="button" className="ld-done-again" onClick={start}><Replay /> Watch again</button>
+        <div className="ld-content">
+          <div key={phase} className="ld-pane">
+            {phase === "scan" && <ScanCanvas elapsed={elapsed} />}
+            {phase === "explaining" && <ExplainingCanvas elapsed={elapsed} />}
+            {phase === "testing" && <TestingCanvas elapsed={elapsed} />}
+            {phase === "brief" && <BriefCanvas elapsed={elapsed} awaiting onApprove={approve} />}
+            {phase === "applying" && <ApplyingCanvas elapsed={elapsed} />}
+            {phase === "closed" && <ClosedCanvas appHref={appHref} />}
           </div>
-        )}
+        </div>
       </div>
 
       <footer className="ld-foot">
         <span className="ld-stamp">{stamp}</span>
+        <button type="button" className="ld-ctl" onClick={toggle} aria-label={playback === "playing" ? "Pause the demo" : "Play the demo"}>
+          <span aria-hidden>{playback === "playing" ? "❚❚" : "▶"}</span> {playback === "playing" ? "Pause" : "Play"}
+        </button>
         <span className="ld-progress">{progress}</span>
       </footer>
     </div>
@@ -242,7 +204,7 @@ function ActionBar({ awaiting, pulse, firing, onClick }: { awaiting?: boolean; p
 
 const PATH = ["tickets", "get_ticket", "support-bot", "issue_refund", "payments-api"];
 
-/** The path as five dots in a row; the hop being explained is lit. */
+/** The path as five dots in a row, their names on two alternating rows so each has room; the hop being explained is lit. */
 function PathGlyph({ lit }: { lit: number }) {
   return (
     <svg className="ld-path" viewBox="0 0 340 84" aria-hidden>
@@ -252,7 +214,7 @@ function PathGlyph({ lit }: { lit: number }) {
       {PATH.map((name, i) => (
         <g key={name} className={`${i <= lit + 1 ? "on" : ""}${i === 0 ? " src" : i === PATH.length - 1 ? " sink" : ""}`}>
           <circle cx={30 + i * 70} cy={30} r={5} />
-          <text x={30 + i * 70} y={58} textAnchor="middle">{name}</text>
+          <text x={30 + i * 70} y={56 + (i % 2) * 17} textAnchor="middle">{name}</text>
         </g>
       ))}
     </svg>
@@ -272,32 +234,6 @@ function SandboxGlyph({ verdict }: { verdict: boolean | null }) {
 
 // ---- canvases, one per phase
 
-function Poster() {
-  return (
-    <div className="ld-grid ld-grid-brief">
-      <div className="ld-col">
-        <Eyebrow>Brief</Eyebrow>
-        <h2 className="ld-title">{FINDING.title} <em>{FINDING.em}</em></h2>
-      </div>
-      <div className="ld-col ld-col-rail">
-        <Eyebrow>Plans that passed</Eyebrow>
-        <ol className="ld-list">
-          {PASSED.map((c, i) => (
-            <li key={c.kind} className="ld-item">
-              <span className="ld-n">{i + 1}.</span>
-              <div className="min0">
-                <Word label={`${c.kind} · cost ${c.cost}`} />
-                <div className="ld-item-title">{c.title}</div>
-              </div>
-            </li>
-          ))}
-        </ol>
-        <ActionBar />
-      </div>
-    </div>
-  );
-}
-
 function ScanCanvas({ elapsed }: { elapsed: number }) {
   return (
     <div className="ld-center">
@@ -311,7 +247,7 @@ function ScanCanvas({ elapsed }: { elapsed: number }) {
         <Word label="Queries" />
         <span className="ld-mono">projection.rebuild → reach.untrusted_to_high → find.trifecta · 8 ms</span>
       </div>
-      {elapsed > 1.9 && (
+      {elapsed > DUR.scan * 0.5 && (
         <div className="ld-routed ld-in">
           <Eyebrow accent>↳ Found</Eyebrow>
           <span className="ld-serif">
@@ -327,7 +263,7 @@ function ExplainingCanvas({ elapsed }: { elapsed: number }) {
   const per = DUR.explaining / HOPS.length;
   const idx = Math.min(HOPS.length - 1, Math.floor(elapsed / per));
   const local = elapsed - idx * per;
-  const show = local > per - 1.0;
+  const show = local > per * 0.6;
   const hop = HOPS[idx];
   const done = HOPS.slice(0, idx + (show ? 1 : 0));
   return (
@@ -364,7 +300,7 @@ function TestingCanvas({ elapsed }: { elapsed: number }) {
   const per = DUR.testing / CANDIDATES.length;
   const idx = Math.min(CANDIDATES.length - 1, Math.floor(elapsed / per));
   const local = elapsed - idx * per;
-  const show = local > per - 1.0;
+  const show = local > per * 0.6;
   const c = CANDIDATES[idx];
   const done = CANDIDATES.slice(0, idx + (show ? 1 : 0));
   return (
@@ -398,7 +334,7 @@ function TestingCanvas({ elapsed }: { elapsed: number }) {
 }
 
 function BriefCanvas({ elapsed, awaiting, onApprove }: { elapsed: number; awaiting: boolean; onApprove: () => void }) {
-  const settled = elapsed > 2.4;
+  const settled = elapsed > DUR.brief * 0.5;
   const [firing, setFiring] = useState(false);
   const click = () => {
     if (firing || !awaiting) return;
@@ -451,7 +387,7 @@ function ApplyingCanvas({ elapsed }: { elapsed: number }) {
   const per = DUR.applying / APPLY.length;
   const idx = Math.min(APPLY.length - 1, Math.floor(elapsed / per));
   const local = elapsed - idx * per;
-  const fired = local > per - 1.4;
+  const fired = local > per * 0.55;
   const step = APPLY[idx];
   return (
     <div className="ld-center wide">

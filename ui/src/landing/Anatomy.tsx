@@ -1,8 +1,6 @@
 // Six cards, each a small working surface: how a finding is cited, how fixes are judged, what a
 // brief looks like, the rules as switches, the model beside the search, and the trail a run
-// leaves. The cards and their visuals follow Manthan's CaseAnatomy and its six visuals
-// (manthan-ui/src/pages/Landing.tsx, Apache-2.0; see ui/THIRD_PARTY_NOTICES.md), rewritten for
-// what DeVries shows.
+// leaves. Each visual is drawn from what DeVries shows.
 
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { Check, Reveal } from "./bits";
@@ -25,7 +23,7 @@ export function Anatomy() {
       <Card
         delay={0.16}
         title="A brief your reviewer will sign"
-        body="Every finding lands as a plain-English memo, not a model dump. The paragraph, the plans that passed and the evidence are on one page, each claim ending in a numbered citation to the rule and the edge behind it. The cheapest plan that passed waits for your approval. No tool can approve, and the trace says so."
+        body="Every finding lands as a plain-English memo, not a model dump. The paragraph, the plans that passed and the evidence are on one page, each claim ending in a numbered citation to the rule and the edge behind it. The cheapest plan that passed waits for your approval, which only a person can give, as the trace records."
         visual={<BriefVisual />}
       />
       <Card

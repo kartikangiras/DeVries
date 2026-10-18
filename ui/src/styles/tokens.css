@@ -1,14 +1,7 @@
 /*
- * Design tokens and base rules.
- *
- * Adapted from Manthan's "Operations Memo" design system
- * (https://github.com/akash-mondal/manthan: manthan-ui/src/globals.css and manthan-ui/.impeccable.md),
- * Copyright 2026 Manthan Engineering, licensed under the Apache License, Version 2.0.
- * A copy of the licence is in ui/licenses/Apache-2.0.txt. What was taken and what was changed is
- * listed in ui/THIRD_PARTY_NOTICES.md. In short: the colour values, radii, easings, the eyebrow,
- * footnote-marker and hairline rules and the base element rules are Manthan's; the names are
- * shortened, Tailwind is not used, the light theme is left out, the display serif is Instrument
- * Serif throughout, and the fonts are served by the app instead of fetched from Google.
+ * Design tokens and base rules: the colour values, radii, easings, the eyebrow, the footnote marker, the
+ * hairline rules and the base element rules. Dark only; the display serif is Instrument Serif throughout, and
+ * the fonts are served by the app instead of fetched from Google.
  */
 
 :root {
@@ -29,12 +22,10 @@
   --ink: oklch(0.92 0.004 75);
   --ink-strong: oklch(0.98 0.003 75);
   --ink-muted: oklch(0.78 0.006 75);
-  --ink-faint: oklch(0.60 0.006 75);
-  --ink-ghost: oklch(0.45 0.006 75);
+  --ink-faint: oklch(0.66 0.006 75);
+  --ink-ghost: oklch(0.55 0.006 75);
 
-  /* the one accent: what can be acted on, and what has been approved. No glow.
-     Manthan's is a desaturated emerald (hue 150); DeVries's is a desaturated iris (hue 285) at the
-     same chroma, so that the app and the landing page are not mistaken for Manthan's. */
+  /* the one accent: what can be acted on, and what has been approved. No glow. A desaturated iris (hue 285). */
   --accent: oklch(0.64 0.15 285);
   --accent-hover: oklch(0.68 0.15 285);
   --accent-soft: oklch(0.64 0.15 285 / 0.12);
