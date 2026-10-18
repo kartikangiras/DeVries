@@ -1,9 +1,18 @@
 # Putting DeVries on a public address
 
-**This has not been done.** Nothing here has run on a server. The overlay was brought up on a laptop with
-`SITE_ADDRESS=localhost` and checked through the proxy (the list at the end); the steps below are what that
-check implies for one small VM. Where to host is still an open
-decision (N2 in section 18).
+**Where it runs, since 18 October 2026.** The UI is a Vercel project built from `ui/` (`ui/vercel.json`), at
+[devries-falkor.vercel.app](https://devries-falkor.vercel.app); its `/api` and `/mcp` paths are rewritten to the app,
+which runs with FalkorDB in one container from `deploy/Dockerfile.single` on Railway's free plan, at
+`devries-production.up.railway.app`, in public mode (`DEVRIES_PUBLIC`, `ALLOWED_HOSTS` naming both hosts, `TRUST_PROXY`,
+`COOKIE_SECURE`, a generated `DEVRIES_MCP_TOKEN`, no model key). The container keeps nothing on disk: at start the app
+loads the nine scenario graphs and runs its scripted pass, so a restart or a wake from sleep heals itself. Checked from
+outside: the health check, the session cookie, a POST passing the cross-site check through Vercel's proxy, a POST from
+another origin refused, the event stream through the proxy, `/mcp` refusing without the token and answering with it,
+and a headless browser over the landing, the front door, a posture, the open list and the activity page with no error.
+`render.yaml` describes the same single container as one free Render web service, for anyone who prefers it.
+
+**The VM overlay below has not run on a server.** It was brought up on a laptop with `SITE_ADDRESS=localhost` and
+checked through the proxy (the list at the end); the steps are what that check implies for one small VM.
 
 ## What is here
 

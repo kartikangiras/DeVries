@@ -6,15 +6,15 @@
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "https://devries.onrender.com/api/:path*"
+      "destination": "https://devries-production.up.railway.app/api/:path*"
     },
     {
       "source": "/mcp",
-      "destination": "https://devries.onrender.com/mcp"
+      "destination": "https://devries-production.up.railway.app/mcp"
     },
     {
       "source": "/mcp/:path*",
-      "destination": "https://devries.onrender.com/mcp/:path*"
+      "destination": "https://devries-production.up.railway.app/mcp/:path*"
     }
   ],
   "headers": [

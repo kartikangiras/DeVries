@@ -8,7 +8,7 @@ DeVries audits a system of AI agents for the paths by which untrusted text can r
 
 ## Status
 
-- It runs locally with one command. There is no live deployment. `deploy/` holds an HTTPS overlay, an uptime check and a CI example.
+- It runs locally with one command, and a public copy is at [devries-falkor.vercel.app](https://devries-falkor.vercel.app): the UI on Vercel, proxying `/api` and `/mcp` to the app and FalkorDB in one free Railway container (`deploy/Dockerfile.single`), which sleeps when idle and reloads its graphs on waking. `deploy/` holds that image, a Render Blueprint for the same, an HTTPS overlay for one VM, an uptime check and a CI example.
 - The auditor runs with Claude when `ANTHROPIC_API_KEY` is set and scripted otherwise. Every run says which it was.
 - The code was written on 13 October 2026. Five scenarios were added on 16 October and a hardening pass was made on 18 October.
 - Written with Claude Code as the coding assistant throughout: the code, the tests and this file.
