@@ -6,14 +6,19 @@ from pathlib import Path
 
 import pytest
 import yaml
+from helpers import broken
 
 from devries.analysis import findings
 from devries.graph import keys
 from devries.ingest.scenario_loader import load_scenario
 from devries.mitigation import apply, search
-from helpers import broken
 
 SCENARIOS = sorted((Path(__file__).resolve().parents[2] / "scenarios").glob("*.yaml"))
+
+
+def tkey(path: Path) -> str:
+    """The test's own graph for a scenario file: the running app's scn:<name> is never replaced by a test."""
+    return keys.scenario_key(f"t_{path.stem}")
 
 
 def test_there_is_at_least_one_scenario():
@@ -22,7 +27,7 @@ def test_there_is_at_least_one_scenario():
 
 @pytest.mark.parametrize("path", SCENARIOS, ids=lambda p: p.stem)
 async def test_scan_matches_the_expect_block(client, path):
-    report = await load_scenario(client, path, strict=True)        # strict: a mismatch raises
+    report = await load_scenario(client, path, strict=True, graph_key=tkey(path))        # strict: a mismatch raises
     expect = yaml.safe_load(path.read_text())["expect"]
     found_injection = sorted([f.source_id, f.target_id] for f in report.scan.findings if f.kind == "injection")
     found_trifecta = sorted(f.agent_id for f in report.scan.findings if f.kind == "trifecta")
@@ -34,19 +39,19 @@ async def test_scan_matches_the_expect_block(client, path):
 
 @pytest.mark.parametrize("path", SCENARIOS, ids=lambda p: p.stem)
 async def test_reloading_and_rescanning_is_stable(client, path):
-    first = await load_scenario(client, path, strict=True)
-    key = keys.scenario_key(first.scenario)
+    first = await load_scenario(client, path, strict=True, graph_key=tkey(path))
+    key = first.graph
     again = await findings.scan(client, key)
     assert [f.id for f in again.findings] == [f.id for f in first.scan.findings]
     assert len(await client.run("finding.list", key)) == len(first.scan.findings)
-    second = await load_scenario(client, path, strict=True)         # a reload replaces the graph
+    second = await load_scenario(client, path, strict=True, graph_key=tkey(path))         # a reload replaces the graph
     assert second.nodes == first.nodes and second.edges == first.edges
     assert [f.id for f in second.scan.findings] == [f.id for f in first.scan.findings]
 
 
 async def test_acme_support_tells_the_refund_story(client):
     path = next(p for p in SCENARIOS if p.stem == "acme_support")
-    report = await load_scenario(client, path, strict=True)
+    report = await load_scenario(client, path, strict=True, graph_key=tkey(path))
     assert len(report.scan.findings) == 1
     finding = report.scan.findings[0]
     assert finding.path_ids == [
@@ -66,7 +71,7 @@ async def test_acme_support_tells_the_refund_story(client):
 
 @pytest.mark.parametrize("path", SCENARIOS, ids=lambda p: p.stem)
 async def test_fix_search_ends_the_way_the_expect_block_says(client, path):
-    report = await load_scenario(client, path, strict=True)
+    report = await load_scenario(client, path, strict=True, graph_key=tkey(path))
     expect = yaml.safe_load(path.read_text())["expect"]
     try:
         result = await search.search(client, report.graph)
@@ -90,12 +95,12 @@ async def test_fix_search_ends_the_way_the_expect_block_says(client, path):
         assert len(after.closed_fingerprints) == patch.evidence["resolved"] >= 1
         assert await broken(client, report.graph) == already_broken
     finally:
-        await load_scenario(client, path, strict=True)               # leave the scenario as the file describes it
+        await client.delete(tkey(path))
 
 
 async def test_acme_exec_is_fixed_by_quarantine_because_the_digest_runs_unattended(client):
     path = next(p for p in SCENARIOS if p.stem == "acme_exec")
-    report = await load_scenario(client, path, strict=True)
+    report = await load_scenario(client, path, strict=True, graph_key=tkey(path))
     try:
         assert sorted(f.agent_id for f in report.scan.findings) == ["agent:exec-assistant", "agent:inbox-reader"]
         assistant = next(f for f in report.scan.findings if f.agent_id == "agent:exec-assistant")
@@ -115,13 +120,13 @@ async def test_acme_exec_is_fixed_by_quarantine_because_the_digest_runs_unattend
         assert "needs a person's approval" in on_send["gate_call"] and "autonomous" in on_send["gate_call"]
         assert "can call tool:mail.send any more" in on_send["revoke_call"]
     finally:
-        await load_scenario(client, path, strict=True)
+        await client.delete(tkey(path))
 
 
 async def test_acme_dev_takes_two_fixes(client):
     """A gate on the push closes both injections; then revoking the tool no workflow needs closes every trifecta."""
     path = next(p for p in SCENARIOS if p.stem == "acme_dev")
-    report = await load_scenario(client, path, strict=True)
+    report = await load_scenario(client, path, strict=True, graph_key=tkey(path))
     try:
         issue = next(f for f in report.scan.findings if f.source_id == "src:github-issues")
         # six hops: the triage agent's results return up to the planner (rule 6) and pass down to the coder (rule 4)
@@ -149,12 +154,12 @@ async def test_acme_dev_takes_two_fixes(client):
         assert (await findings.scan(client, report.graph)).findings == []
         assert await broken(client, report.graph) == set()
     finally:
-        await load_scenario(client, path, strict=True)
+        await client.delete(tkey(path))
 
 
 async def test_devries_itself_is_clean_and_only_because_of_its_gate(client):
     path = next(p for p in SCENARIOS if p.stem == "devries_self")
-    report = await load_scenario(client, path, strict=True)
+    report = await load_scenario(client, path, strict=True, graph_key=tkey(path))
     try:
         assert report.scan.findings == []
         gated = await client.run("flow.gated_edges", report.graph)
@@ -168,7 +173,7 @@ async def test_devries_itself_is_clean_and_only_because_of_its_gate(client):
             ("injection", "src:approver-notes", "res:agent-config"), ("injection", "src:manifest-text", "res:agent-config")]
         assert all(f.path_ids[-3:] == ["agent:auditor", "tool:devries.apply_fix", "res:agent-config"] for f in opened)
     finally:
-        await load_scenario(client, path, strict=True)
+        await client.delete(tkey(path))
 
 
 async def test_the_self_audit_manifest_is_what_the_server_answers(client):
