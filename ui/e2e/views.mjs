@@ -46,9 +46,19 @@ const stepTo = (page, name) => page.locator(".workflow-step", { has: page.locato
   await page.waitForFunction((n) => [...document.querySelectorAll(".l-band")].some((b) => /Scenarios/.test(b.textContent ?? "") && (b.textContent ?? "").includes(String(n))), listedScenarios, { timeout: 10000 }).catch(() => {});
   out.bands = await page.locator(".l-band").allInnerTexts().then((all) => all.map((t) => t.replace(/\s+/g, " ").trim()));
   need(out.bands.some((b) => b.startsWith(`Scenarios ${listedScenarios}`)) && out.bands.some((b) => b.startsWith(`Queries ${publishedQueries}`)), `the landing's counts should be the server's (${listedScenarios} scenarios, ${publishedQueries} queries): ` + out.bands);
-  need(/one command, runs locally/.test(await text(page, ".l-price-unit")), "the landing should say it runs locally, not that there is nothing to install");
+  await page.locator("#run").scrollIntoViewIfNeeded();
+  await page.waitForSelector(".l-live .chart svg g, .l-live .chart canvas", { timeout: 30000 }).catch(() => {});
+  out.liveCaption = await text(page, ".l-live-caption");
+  need((await page.locator(".l-live .chart").count()) === 1 && /reach\.untrusted_to_high|choke\.|zones\./.test(out.liveCaption), "the landing should draw the support desk with the app's own chart and name the query under it: " + out.liveCaption);
+  need((await page.locator(".l-pill-white").getAttribute("href")) === "#/scenarios", "Open the app should lead to the front door, every scenario as a card");
   need((await page.locator(".ld").count()) === 1 && (await page.locator(".ld-play").count()) === 0, "the hero demo should play by itself, with no tap-to-play poster");
-  need(/method\/queries$/.test(await page.locator(".l-enterprise-link").getAttribute("href")), "the landing's query link should land on the method page's queries");
+  await page.waitForFunction(() => !/Scanning/.test(document.querySelector(".ld-phase")?.textContent ?? ""), null, { timeout: 8000 }).catch(() => {});
+  need(!/Scanning/.test(await text(page, ".ld-phase")), "the hero demo should start by itself and move past the scan");
+  out.facts = await text(page, ".l-facts");
+  need(/BFS over the flow layer in FalkorDB/.test(out.facts) && /GRAPH\.COPY/.test(out.facts) && /max flow/.test(out.facts), "the line under the hero should state FalkorDB's three jobs: " + out.facts);
+  out.places = await page.locator(".l-place-where").allInnerTexts().then((all) => all.map((t) => t.trim().toLowerCase()));   // innerText carries the uppercase the style gives it
+  need(out.places.length === 8 && out.places.includes("explorer") && out.places.includes("mcp"), "the landing should show the eight places in the app: " + out.places);
+  need((await page.locator(".l-place-queries").allInnerTexts()).every((t) => t.trim().length > 0), "every place on the landing should name the queries that feed it");
 
   // the posture: the one sentence, the open paths as a live flow between cards, the figures, the cut as rules
   await page.goto(`${base}/#/acme_support`);
@@ -86,7 +96,7 @@ const stepTo = (page, name) => page.locator(".workflow-step", { has: page.locato
   need(/Passed in a sandbox/.test(out.proposeCut) && /read it on the fix step/.test(out.proposeCut), "proposing the cut should pass the sandbox and point at the fix step: " + out.proposeCut);
 
   // the explorer: every node, as cards in lanes, the open paths lit; what is under the pointer is named, a clicked card is read out beside the chart
-  await page.goto(`${base}/#/acme_support/graph`);
+  await page.goto(`${base}/#/acme_support/explorer`);
   await tab(page, "DeVries").click();
   await page.waitForSelector(".chart .fcard", { timeout: 60000 });
   out.explorerTitle = await text(page, ".page-head h1");
@@ -105,7 +115,7 @@ const stepTo = (page, name) => page.locator(".workflow-step", { has: page.locato
   need(/^rule 3: Support bot can call issue_refund/.test(out.overEdge), "hovering an arc did not say what it stands for: " + out.overEdge);
   await page.locator('.fcard[data-id="agent:support-bot"]').click();
   await page.waitForSelector(".read.picked");
-  need(/graph\/agent%3Asupport-bot$/.test(await page.evaluate(() => location.hash)), "a picked card should be in the address: " + await page.evaluate(() => location.hash));
+  need(/explorer\/agent%3Asupport-bot$/.test(await page.evaluate(() => location.hash)), "a picked card should be in the address: " + await page.evaluate(() => location.hash));
   out.read = (await text(page, ".read.picked")).slice(0, 220);
   need(/findings through it/i.test(await text(page, ".read.picked")), "clicking a card did not fill the panel with what it is");
   need((await page.locator(".read .card a").count()) === 1, "the panel should link to the finding through the card");
@@ -127,7 +137,7 @@ const stepTo = (page, name) => page.locator(".workflow-step", { has: page.locato
   await page.goto(`${base}/#/acme_support/finding/fnd%3Adce0910d42/path`);
   await page.waitForSelector(".chart .fcard", { timeout: 60000 });
   need((await page.locator("falkordb-canvas").count()) === 0, "the Path step should not inherit the Explorer's renderer");
-  await page.goto(`${base}/#/acme_support/graph`);
+  await page.goto(`${base}/#/acme_support/explorer`);
   await page.waitForSelector("falkordb-canvas", { timeout: 60000 });
   await tab(page, "DeVries").click();
 
@@ -159,7 +169,7 @@ const stepTo = (page, name) => page.locator(".workflow-step", { has: page.locato
   need(/one zone, and a blast zone/.test(await text(page, ".figure .chart-note")), "a one-zone graph should say so in words");
 
   // blast zones: acme_exec has no high-impact resource, so nothing is in one
-  await page.goto(`${base}/#/acme_exec/graph`);
+  await page.goto(`${base}/#/acme_exec/explorer`);
   await page.waitForSelector('.chart .fcard[data-id="agent:exec-assistant"]', { timeout: 60000 }); // not the chart of the scenario just left
   out.execLanes = await page.locator(".chart .lane").allTextContents();
   need(out.execLanes.some((l) => /delegates/i.test(l)), "a delegate should stand in a lane of its own: " + out.execLanes);
@@ -169,7 +179,7 @@ const stepTo = (page, name) => page.locator(".workflow-step", { has: page.locato
   need(/none a blast zone/.test(await text(page, ".figure .chart-note")), "acme_exec has no high-impact resource, so no zone is a blast zone");
   await shot(page, "views-explorer-exec-zones");
   // a finding's path, lit from its page
-  await page.goto(`${base}/#/acme_exec/graph/fnd%3A97fb560344`);
+  await page.goto(`${base}/#/acme_exec/explorer/fnd%3A97fb560344`);
   await page.waitForSelector(".chart .fcard", { timeout: 60000 });
   await page.waitForSelector(".figure .chart-note", { timeout: 60000 });
   need(/Lit: the path of Executive assistant/.test(await page.locator(".figure .chart-note").allInnerTexts().then((all) => all.join(" "))), "a finding's id in the address should light its path");
@@ -177,7 +187,7 @@ const stepTo = (page, name) => page.locator(".workflow-step", { has: page.locato
   need((await page.locator(".chart .wire.traced").count()) >= 3, "the lit finding's hops should be traced on the chart");
 
   // the explorer's tables: every kind of thing, and the servers with what a sandbox says removing one would do
-  await page.goto(`${base}/#/acme_dev/graph/tables`);
+  await page.goto(`${base}/#/acme_dev/explorer/tables`);
   await page.waitForSelector(".inventory .table tbody tr", { timeout: 60000 });
   out.inventoryTabs = await page.locator(".tabs [role=tab]").allInnerTexts();
   need(/^Agents\s*4$/.test(out.inventoryTabs[0] ?? ""), "the agents tab should count the dev team's four agents: " + out.inventoryTabs);
@@ -201,7 +211,7 @@ const stepTo = (page, name) => page.locator(".workflow-step", { has: page.locato
   await tab(page, /Tools/).click();
   await page.locator(".inventory .table tbody tr").first().click();
   await page.waitForSelector(".read.picked");
-  need(/graph\/tool%3A/.test(await page.evaluate(() => location.hash)), "an inventory row should open the thing in the explorer: " + await page.evaluate(() => location.hash));
+  need(/explorer\/tool%3A/.test(await page.evaluate(() => location.hash)), "an inventory row should open the thing in the explorer: " + await page.evaluate(() => location.hash));
 
   // the method page: the rules with their statements, then every query: the Cypher of one, where it is used, the find box
   await page.goto(`${base}/#/acme_exec/method`);
@@ -221,7 +231,7 @@ const stepTo = (page, name) => page.locator(".workflow-step", { has: page.locato
   out.queries = await page.locator(".catalog-group a").count();
   out.cypher = (await text(page, ".cypher")).slice(0, 60);
   const published = (await (await page.request.get(`${base}/api/queries`)).json()).queries.length;
-  need(out.queries === published && published > 50, `the catalogue lists ${out.queries} of the ${published} queries the API publishes`);
+  need(out.queries === published && published > 50, `the catalog lists ${out.queries} of the ${published} queries the API publishes`);
   need(/algo\.WCC/.test(out.cypher) && (await page.locator(".cypher .c-fn").count()) >= 1, "the Cypher of zones.wcc should show its algorithm");
   need(/Explorer/.test(await text(page, ".catalog .rail")), "a query should say where on screen its answer shows");
   await page.getByLabel("Find a query").fill("fix.");
@@ -238,7 +248,7 @@ const stepTo = (page, name) => page.locator(".workflow-step", { has: page.locato
 
   // the scenario switch with its way to an import, and a deep link straight to a finding's step
   await page.locator(".switch-button").click();
-  out.scenarios = await page.locator(".switch-menu li:not(.switch-import) .switch-name").allInnerTexts();
+  out.scenarios = await page.locator(".switch-menu li:not(.switch-import):not(.switch-all) .switch-name").allInnerTexts();
   const listed = (await (await page.request.get(`${base}/api/scenarios`)).json()).scenarios.length;
   need(out.scenarios.length === listed && out.scenarios.includes("DeVries itself"), `the switch should list all ${listed} scenarios by their titles: ` + out.scenarios);
   need((await page.locator(".switch-menu .switch-import").count()) === 1, "the switch should offer an import of your own config");
@@ -246,24 +256,39 @@ const stepTo = (page, name) => page.locator(".workflow-step", { has: page.locato
   await page.waitForFunction(() => location.hash === "#/acme_support");
   await page.waitForSelector(".figures dd", { timeout: 60000 });
   out.switched = await text(page, ".switch-name");
+
+  // the front door: every scenario as a card, the dev team first and recommended; the brand leads back to the landing
+  await page.goto(`${base}/#/scenarios`);
+  await page.waitForSelector(".front-card .front-title");
+  out.front = await page.locator(".front-card .front-title").allInnerTexts();
+  need(out.front.length === listed + 1 && out.front[0] === "Acme dev team" && (await page.locator(".front-card.recommended").count()) === 1, "the front door should list every scenario with the dev team first and recommended: " + out.front);
+  need((await page.locator(".topbar-brand").getAttribute("href")) === "#/", "the brand in the top bar should lead back to the landing");
+  need(/Shared scenario|Scripted|Model/.test(await text(page, ".topbar .session")), "the top bar should carry the session pills");
   await page.goto(`${base}/#/acme_support/finding/fnd%3Adce0910d42/rule`);
   await page.waitForSelector(".rule-needs li");
   out.deepLink = await text(page, ".brief-title");
-  need(/^Rule 1/.test(out.deepLink), "the deep link did not open the finding on its rule step: " + out.deepLink);
+  need(/^Check 1/.test(out.deepLink), "the deep link did not open the finding on its rule step: " + out.deepLink);
   need(/ASI01/.test(await text(page, ".strip .owasp")), "the finding strip should carry the OWASP class");
   await page.goto(`${base}/#/acme_support/finding/fnd%3Anot-a-finding`);
   await page.waitForSelector(".empty");
   need(/No finding/.test(await text(page, ".empty")), "an unknown finding should say so");
   // an older address lands where its content now lives
   await page.goto(`${base}/#/acme_support/whatif`);
-  await page.waitForFunction(() => location.hash === "#/acme_support/graph", null, { timeout: 60000 });
+  await page.waitForFunction(() => location.hash === "#/acme_support/explorer", null, { timeout: 60000 });
   await page.goto(`${base}/#/acme_support/servers`);
-  await page.waitForFunction(() => location.hash === "#/acme_support/graph/tables/servers", null, { timeout: 60000 });
+  await page.waitForFunction(() => location.hash === "#/acme_support/explorer/tables/servers", null, { timeout: 60000 });
   await page.goto(`${base}/#/acme_support/inventory/tools`);
-  await page.waitForFunction(() => location.hash === "#/acme_support/graph/tables/tools", null, { timeout: 60000 });
+  await page.waitForFunction(() => location.hash === "#/acme_support/explorer/tables/tools", null, { timeout: 60000 });
+  // the pages' first names (inbox, done, graph, audit) still open the same pages, and the nav knows which row they are
+  await page.goto(`${base}/#/acme_support/graph`);
+  await page.waitForSelector(".chart .fcard", { timeout: 60000 });
+  need((await place(page, "Explorer").getAttribute("class")).includes("on"), "#/graph should still open the Explorer");
+  await page.goto(`${base}/#/acme_support/audit`);
+  await page.waitForSelector(".activity-row", { timeout: 60000 });
+  need((await place(page, "Activity").getAttribute("class")).includes("on"), "#/audit should still open Activity");
 
   // a plan a person rejects: nothing changes, the finding is open again and the options remember
-  await page.goto(`${base}/#/acme_support/inbox`);
+  await page.goto(`${base}/#/acme_support/open`);
   await page.waitForSelector(".case .phase.t-amber", { timeout: 240000 });
   await page.locator(".case").first().click();
   await page.waitForSelector(".brief-title");
@@ -311,13 +336,13 @@ const stepTo = (page, name) => page.locator(".workflow-step", { has: page.locato
   await page.waitForFunction(() => document.querySelector(".session-name")?.textContent === "Shared scenario", null, { timeout: 240000 });
 
   // DeVries audited by DeVries: nothing open, and the one hop that would open something is gated
-  await page.goto(`${base}/#/devries_self/inbox`);
+  await page.goto(`${base}/#/devries_self/open`);
   await page.waitForFunction(() => document.querySelector(".page-head h1")?.textContent === "Nothing open.");
   await page.goto(`${base}/#/devries_self`);
   await page.waitForSelector(".riskflow", { state: "attached", timeout: 60000 });
   need(/Nothing is drawn because nothing is open/.test(await text(page, ".riskflow .chart-over")), "with nothing open the posture's picture should say so");
   need(/Nothing untrusted reaches/.test(await text(page, ".page-head h1")), "with nothing open the posture should say so in its sentence");
-  await page.goto(`${base}/#/devries_self/graph`);
+  await page.goto(`${base}/#/devries_self/explorer`);
   await tab(page, "DeVries").click();
   await page.waitForSelector('.chart .fcard[data-id="agent:auditor"]', { timeout: 60000 });
   out.selfGated = await page.locator(".chart .wire.gated").evaluateAll((wires) => wires.map((w) => w.getAttribute("data-hop")));
@@ -327,7 +352,7 @@ const stepTo = (page, name) => page.locator(".workflow-step", { has: page.locato
   await shot(page, "views-self-explorer");
 
   // acme_dev takes two fixes, each approved from its finding, with a what-if asked in the explorer on the way
-  await page.goto(`${base}/#/acme_dev/inbox`);
+  await page.goto(`${base}/#/acme_dev/open`);
   await page.waitForSelector(".case .phase.t-amber", { timeout: 240000 });
   out.devOpen = await page.locator(".case.status-open").count();
   await page.goto(`${base}/#/acme_dev`);
@@ -339,7 +364,7 @@ const stepTo = (page, name) => page.locator(".workflow-step", { has: page.locato
   // one scan is a note, not a one-bar chart; the history is drawn once there are two
   need((await page.locator(".scans .scan").count()) >= 2 || /One scan so far/.test(await text(page, ".posture-scans-note")), "with one scan the posture should say the history starts with the next");
   await shot(page, "views-dev-posture");
-  await page.goto(`${base}/#/acme_dev/graph/agent%3Arelease-bot`);
+  await page.goto(`${base}/#/acme_dev/explorer/agent%3Arelease-bot`);
   await page.waitForSelector(".read.picked .whatif-line", { timeout: 60000 });
   await page.locator(".read .whatif-line select").nth(1).selectOption("tool:http.request");
   await page.getByRole("button", { name: "Test in a sandbox" }).click();
@@ -351,7 +376,7 @@ const stepTo = (page, name) => page.locator(".workflow-step", { has: page.locato
   await shot(page, "views-dev-whatif");
 
   for (const round of [1, 2]) {
-    await page.goto(`${base}/#/acme_dev/inbox`);
+    await page.goto(`${base}/#/acme_dev/open`);
     await page.waitForSelector(".case .phase.t-amber", { timeout: 240000 });
     await page.locator(".case", { has: page.locator(".phase.t-amber") }).first().click();
     await page.waitForSelector(".brief-title");
@@ -426,14 +451,14 @@ const stepTo = (page, name) => page.locator(".workflow-step", { has: page.locato
   await context.close();
 }
 
-// the catalogue stays beside the sidebar at the width where the old drawer used to slide under it
+// the catalog stays beside the sidebar at the width where the old drawer used to slide under it
 {
   const { context, page } = await open(1180, 800);
   await page.goto(`${base}/#/acme_exec/method/queries`);
   await page.waitForSelector(".cypher");
   const list = await page.locator(".catalog-list").boundingBox();
   const side = await page.locator(".side").boundingBox();
-  need(list && side && list.x >= side.x + side.width - 1, `at 1180 px the catalogue should start right of the sidebar: ${list?.x} vs ${side?.x + side?.width}`);
+  need(list && side && list.x >= side.x + side.width - 1, `at 1180 px the catalog should start right of the sidebar: ${list?.x} vs ${side?.x + side?.width}`);
   await shot(page, "views-1180-queries");
   await context.close();
 }
@@ -441,7 +466,7 @@ const stepTo = (page, name) => page.locator(".workflow-step", { has: page.locato
 // narrower screens: the rail drops under the brief, then the sidebar becomes a strip; nothing scrolls sideways
 for (const width of [1100, 420]) {
   const { context, page } = await open(width);
-  for (const [name, hash, ready] of [["posture", "#/acme_exec", ".figures dd"], ["inbox", "#/acme_exec/inbox", ".case"], ["finding", "#/acme_exec/finding/fnd%3A97fb560344", ".path-words"], ["path", "#/acme_exec/finding/fnd%3A97fb560344/path", ".chart .fcard"], ["explorer", "#/acme_exec/graph", ".chart .fcard"], ["tables", "#/acme_exec/graph/tables", ".inventory"], ["activity", "#/acme_exec/audit", ".activity-row"], ["method", "#/acme_exec/method", ".method-block"], ["queries", "#/acme_exec/method/queries", ".cypher"], ["import", "#/acme_exec/import", ".import textarea"]]) {
+  for (const [name, hash, ready] of [["posture", "#/acme_exec", ".figures dd"], ["open", "#/acme_exec/open", ".case"], ["finding", "#/acme_exec/finding/fnd%3A97fb560344", ".path-words"], ["path", "#/acme_exec/finding/fnd%3A97fb560344/path", ".chart .fcard"], ["explorer", "#/acme_exec/explorer", ".chart .fcard"], ["tables", "#/acme_exec/explorer/tables", ".inventory"], ["activity", "#/acme_exec/activity", ".activity-row"], ["method", "#/acme_exec/method", ".method-block"], ["queries", "#/acme_exec/method/queries", ".cypher"], ["import", "#/acme_exec/import", ".import textarea"]]) {
     await page.goto(`${base}/${hash}`);
     await page.waitForSelector(ready, { timeout: 60000 });
     const o = await page.evaluate(() => ({ scrollW: document.documentElement.scrollWidth, clientW: document.documentElement.clientWidth }));

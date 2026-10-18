@@ -71,7 +71,7 @@ for (const [scenario, fix, cut] of [["acme_support", "gate one call", "set gate 
   r.inboxCount = await place("Open").locator(".nav-count").innerText();
   r.session = await first(".session");
   // the badge speaks for the newest run: the start-up pass is scripted, so a configured model is only "ready"
-  need(withModel ? /scripted pass · model ready|model · / .test(r.session) : /scripted · no model/.test(r.session), `${scenario}: the session badge should say what drove the newest run: ${r.session}`);
+  need(withModel ? /Model ready|Model · /.test(r.session) : /Scripted · no model/.test(r.session), `${scenario}: the model pill should say what drove the newest run: ${r.session}`);
   r.recommended = await first(".case .transform-to");
   r.next = await first(".case .case-next");
   need(/ open\.$/.test(r.title), `${scenario}: the list does not say how many findings are open: ${r.title}`);
@@ -118,7 +118,7 @@ for (const [scenario, fix, cut] of [["acme_support", "gate one call", "set gate 
   r.rule = await first(".brief-title");
   r.needs = await texts(".rule-needs li");
   r.analysis = await texts(".analysis-rows li");
-  need(/^Rule [12]/.test(r.rule), `${scenario}: the rule step should name the rule: ${r.rule}`);
+  need(/^Check [12]/.test(r.rule), `${scenario}: the rule step should name the check: ${r.rule}`);
   need(r.needs.length === 4, `${scenario}: the rule has four needs, got ${r.needs.length}`);
   if (scenario === "acme_exec") {
     r.grid = await texts(".rot-row[data-agent] .rot-agent");
@@ -140,7 +140,7 @@ for (const [scenario, fix, cut] of [["acme_support", "gate one call", "set gate 
   r.restsOn = await texts(".rests-on li");
   need(r.hops.every((h) => /(cut by|cannot be cut|no fix yet|blocked by)/.test(h)), `${scenario}: a hop row does not say whether it can be cut`);
   need(r.restsOn.length === 2 && r.restsOn.every((q) => /algo\./.test(q)), `${scenario}: the queries a finding rests on should name their algorithm`);
-  need(/graph\/fnd/.test(await page.locator(".chart-link").getAttribute("href")), `${scenario}: the path should open in the explorer with itself lit`);
+  need(/explorer\/fnd/.test(await page.locator(".chart-link").getAttribute("href")), `${scenario}: the path should open in the explorer with itself lit`);
   need((await page.locator(".fold.source").count()) === 0, `${scenario}: the path step should not explain itself; the method page does`);
   await page.getByRole("tab", { name: "FalkorDB canvas" }).click();
   await page.waitForSelector("falkordb-canvas");
@@ -271,13 +271,13 @@ for (const [scenario, fix, cut] of [["acme_support", "gate one call", "set gate 
   await page.waitForSelector(".servers .table tbody tr", { timeout: 60000 });
   need((await page.locator(".servers .table tbody tr").count()) >= 1, `${scenario}: the tables should list the servers`);
   await shot(`${scenario}-8-tables`);
-  // the method page: the rules with their statements, and the catalogue
+  // the method page: the rules with their statements, and the catalog
   await place("Method").click();
   await page.waitForSelector(".method-block .statement .cypher", { timeout: 60000 });
   need((await page.locator(".method-block").count()) >= 4, `${scenario}: the method page should open on the rules`);
   await page.getByRole("tab", { name: /^Queries/ }).click();
   await page.waitForSelector(".catalog .cypher", { timeout: 60000 });
-  need((await page.locator(".catalog-group a").count()) > 50, `${scenario}: the method page should list the whole catalogue`);
+  need((await page.locator(".catalog-group a").count()) > 50, `${scenario}: the method page should list the whole catalog`);
   await shot(`${scenario}-9-method`);
 }
 
