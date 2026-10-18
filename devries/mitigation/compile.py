@@ -62,6 +62,7 @@ class Draft:
     commands: list[str] = field(default_factory=list)   # docker-mcp-gateway: what the person runs
     writable: bool = False                     # True when `after` can be written to `path` by write.py
     edited: bool = False
+    secrets: bool = False                      # the file holds values under secret-looking keys: shown redacted, never editable here
 
     @property
     def before_hash(self) -> str:
@@ -72,9 +73,18 @@ class Draft:
         return sha256(self.after.encode()).hexdigest()
 
     def view(self) -> dict[str, Any]:
-        return {"id": self.id, "kind": self.kind, "path": self.path, "after": self.after, "diff": self.diff, "note": self.note,
-                "commands": self.commands, "writable": self.writable, "edited": self.edited,
+        """What the page is given. A file with secrets shows its text redacted and is not editable from the page."""
+        return {"id": self.id, "kind": self.kind, "path": self.path, "after": self.shown_after(), "diff": self.diff, "note": self.note,
+                "commands": self.commands, "writable": self.writable, "edited": self.edited, "editable": not self.secrets,
                 "before_hash": self.before_hash, "after_hash": self.after_hash, "changes": self.after != self.before}
+
+    def shown_after(self) -> str:
+        if not self.secrets or not self.after.strip():
+            return self.after
+        try:
+            return _json_text(_redact(json.loads(self.after)))
+        except json.JSONDecodeError:
+            return "(the text holds secrets and is not valid JSON, so it is not shown)"
 
 
 def file_hash(path: Path) -> str:
@@ -99,13 +109,43 @@ def server_key(origin: Origin | None, server_id: str) -> str:
     return server_id.split(":", 1)[1]
 
 
+# a command-line flag that carries a secret in the next argument (`--api-key sk-…`) or after `=` (`--token=…`)
+SECRET_FLAG = re.compile(r"^--?[\w-]*(key|token|secret|password|passwd|auth|credential)[\w-]*$", re.IGNORECASE)
+SECRET_FLAG_EQ = re.compile(r"^(--?[\w-]*(?:key|token|secret|password|passwd|auth|credential)[\w-]*=)(.+)$", re.IGNORECASE)
+# a value shaped like a known kind of credential, whatever it is called
+SECRET_VALUE = re.compile(r"^(sk-[A-Za-z0-9_-]{8,}|ghp_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|gh[ousr]_[A-Za-z0-9]{20,}|"
+                          r"xox[abprs]-[A-Za-z0-9-]{10,}|AKIA[0-9A-Z]{12,}|Bearer\s+\S{8,}|"
+                          r"eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]+)$")
+
+
+def _redact_string(value: str) -> str:
+    m = SECRET_FLAG_EQ.match(value)
+    return f"{m.group(1)}•••" if m else "•••"
+
+
 def _redact(value: Any, under_secret: bool = False) -> Any:
-    """A copy with every value under a secret-looking key replaced, for a diff a person may paste anywhere."""
+    """A copy with every secret replaced, for a diff a person may paste anywhere: every value under a secret-looking
+    key, the argument after a flag such as `--api-key`, the value in `--token=…`, and any string shaped like a known
+    credential wherever it sits."""
     if isinstance(value, dict):
         return {k: _redact(v, under_secret or str(k).lower() in SECRET_KEYS) for k, v in value.items()}
     if isinstance(value, list):
-        return [_redact(v, under_secret) for v in value]
-    return "•••" if under_secret and isinstance(value, str) and value else value
+        out, after_flag = [], False
+        for item in value:
+            if isinstance(item, str) and item and (under_secret or after_flag or SECRET_FLAG_EQ.match(item) or SECRET_VALUE.match(item)):
+                out.append(_redact_string(item))
+            else:
+                out.append(_redact(item, under_secret))
+            after_flag = isinstance(item, str) and bool(SECRET_FLAG.match(item))
+        return out
+    if isinstance(value, str) and value and (under_secret or SECRET_FLAG_EQ.match(value) or SECRET_VALUE.match(value)):
+        return _redact_string(value)
+    return value
+
+
+def _has_secrets(value: Any, under_secret: bool = False) -> bool:
+    """Whether anything in it would be redacted."""
+    return _redact(value, under_secret) != value
 
 
 def _unified(before: str, after: str, path: str | None) -> str:
@@ -190,7 +230,8 @@ def _claude_code(origin: Origin, mitigation_id: str, fixes: list, names: dict[st
     if not before:
         note = f"{path} does not exist yet; it will be created with these rules. " + note
     return Draft(id=draft_id(mitigation_id, "claude-code", str(path)), kind="claude-code", path=str(path), before=before,
-                 after=after if changed else before, diff=_unified(before, after, str(path)) if changed else "", note=note, writable=writable)
+                 after=after if changed else before, diff=_unified(_json_text(_redact(json.loads(before))) if before.strip() else "", _json_text(_redact(data)), str(path)) if changed else "",
+                 note=note, writable=writable, secrets=_has_secrets(data))
 
 
 def _servers_config(origin: Origin, mitigation_id: str, fixes: list, names: dict[str, str], tools_of: dict[str, list[str]]) -> Draft:
@@ -237,7 +278,7 @@ def _servers_config(origin: Origin, mitigation_id: str, fixes: list, names: dict
     diff = _unified(_json_text(_redact(json.loads(before))) if before.strip() else "", _json_text(_redact(data)), str(path)) if removed else ""
     note = " ".join(notes) or f"This plan changes nothing {client} can read from its file."
     return Draft(id=draft_id(mitigation_id, origin.kind, str(path)), kind=origin.kind, path=str(path) if path else None, before=before,
-                 after=after, diff=diff, note=note, writable=bool(removed))
+                 after=after, diff=diff, note=note, writable=bool(removed), secrets=_has_secrets(data) or _has_secrets(json.loads(before) if before.strip() else {}))
 
 
 def _docker_gateway(origin: Origin, mitigation_id: str, fixes: list, names: dict[str, str]) -> Draft:
