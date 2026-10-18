@@ -37,7 +37,7 @@ def _index(label: str, prop: str) -> NamedQuery:
 INDEXES: list[tuple[str, str]] = [
     ("Agent", "id"), ("Tool", "id"), ("MCPServer", "id"), ("DataSource", "id"),
     ("Resource", "id"), ("Workflow", "id"), ("Finding", "fingerprint"),
-    ("DataSource", "trust"), ("Resource", "impact"), ("Mitigation", "id"), ("Draft", "id"),
+    ("DataSource", "trust"), ("Resource", "impact"), ("Mitigation", "id"), ("Draft", "id"), ("Run", "id"),
 ]
 
 # Labels that get a UNIQUE and a MANDATORY constraint on `id` (created through
@@ -52,7 +52,10 @@ _QUERIES: list[NamedQuery] = [
     NamedQuery(
         name="projection.rebuild",
         doc="Rebuild the derived FLOWS_TO / GATED_FLOW layer from the config edges, atomically. Each flow edge "
-            "carries the cost of the cheapest fix that can cut it as its capacity (1000 where no fix can), for the min cut. "
+            "carries as its capacity, for the min cut, the cost of the cheapest fix that cuts it without breaking a "
+            "workflow that needs the hop: 1000 where no fix can cut it, where a workflow (run by the agent or by one that "
+            "delegates to it) needs the tool a revoke would take, where that workflow is autonomous so a gate would stop it "
+            "too, or where a workflow needs the data a dropped read would lose. The cut then lands on a plan a sandbox passes. "
             "A tool that acts has two sides in this layer: what it reads leaves the Tool node toward its callers (rules 1, 2), "
             "and a call enters a ToolAct node and leaves only toward the resource (rules 3, 5). With one node for both, "
             "one agent's context would flow into every other caller of a tool that reads and acts. The acting side is "
@@ -68,13 +71,23 @@ MATCH (t:Tool)-[:WRITES]->(:Resource)
 WITH DISTINCT t
 MERGE (x:ToolAct {id: t.id + '#act'}) SET x.of = t.id, x.name = t.name
 WITH count(*) AS c2
-MATCH (t:Tool)-[:READS]->(d:DataSource) MERGE (d)-[:FLOWS_TO {rule:1, capacity:3}]->(t)
+MATCH (t:Tool)-[:READS]->(d:DataSource)
+OPTIONAL MATCH (w:Workflow)-[:RUN_BY]->(:Agent)-[:DELEGATES_TO*0..]->(:Agent)-[:CAN_CALL]->(t) WHERE (w)-[:NEEDS_DATA]->(d)
+WITH t, d, count(w) AS needed
+MERGE (d)-[f1:FLOWS_TO {rule:1}]->(t) SET f1.capacity = CASE WHEN needed = 0 THEN 3 ELSE 1000 END
 WITH count(*) AS c3
-MATCH (a:Agent)-[:CAN_CALL]->(t:Tool)-[:READS]->(:DataSource) MERGE (t)-[:FLOWS_TO {rule:2, capacity:1}]->(a)
+MATCH (a:Agent)-[:CAN_CALL]->(t:Tool)-[:READS]->(:DataSource)
+WITH DISTINCT a, t
+OPTIONAL MATCH (w:Workflow)-[:RUN_BY]->(:Agent)-[:DELEGATES_TO*0..]->(a) WHERE (w)-[:NEEDS]->(t) OR (w)-[:NEEDS_DATA]->(:DataSource)<-[:READS]-(t)
+WITH a, t, count(w) AS needed
+MERGE (t)-[f2:FLOWS_TO {rule:2}]->(a) SET f2.capacity = CASE WHEN needed = 0 THEN 1 ELSE 1000 END
 WITH count(*) AS c4
-MATCH (a:Agent)-[c:CAN_CALL]->(t:Tool)-[:WRITES]->(:Resource) WHERE c.gate IS NULL WITH DISTINCT a, t.id + '#act' AS xid
+MATCH (a:Agent)-[c:CAN_CALL]->(t:Tool)-[:WRITES]->(:Resource) WHERE c.gate IS NULL
+WITH DISTINCT a, t, t.id + '#act' AS xid
+OPTIONAL MATCH (w:Workflow)-[:RUN_BY]->(:Agent)-[:DELEGATES_TO*0..]->(a) WHERE (w)-[:NEEDS]->(t)
+WITH a, xid, collect(w.mode) AS modes
 MATCH (x:ToolAct {id: xid})
-MERGE (a)-[:FLOWS_TO {rule:3, capacity:1}]->(x)
+MERGE (a)-[f3:FLOWS_TO {rule:3}]->(x) SET f3.capacity = CASE WHEN size(modes) = 0 THEN 1 WHEN 'autonomous' IN modes THEN 1000 ELSE 2 END
 WITH count(*) AS c5
 MATCH (a:Agent)-[c:CAN_CALL]->(t:Tool)-[:WRITES]->(:Resource) WHERE c.gate IS NOT NULL WITH DISTINCT a, t.id + '#act' AS xid, c.gate AS gate
 MATCH (x:ToolAct {id: xid})
@@ -124,9 +137,11 @@ ORDER BY from_id, rule, to_id
     # ------------------------------------------------------------------ verdicts
     NamedQuery(
         name="graph.node_count",
-        doc="Node count: the BFS depth for every verdict, and the hop limit for the evidence retry.",
+        doc="The count of nodes a flow path can visit (config nodes and the acting sides of tools): the BFS depth for every "
+            "verdict, and the hop limit for the evidence retry. Audit records (findings, plans, scans, runs, drafts) are not "
+            "counted, so the depth does not grow with the history.",
         mode="ro", targets=BOTH, timeout_ms=1_000,
-        cypher="MATCH (n) RETURN count(n) AS nodes",
+        cypher="MATCH (n) WHERE n:Agent OR n:Tool OR n:ToolAct OR n:DataSource OR n:Resource OR n:Workflow OR n:MCPServer RETURN count(n) AS nodes",
     ),
     NamedQuery(
         name="reach.untrusted_to_high",
@@ -179,13 +194,13 @@ RETURN a.id AS agent, untrusted, private_data, collect(DISTINCT x.id) AS exits
         mode="ro", targets=BOTH, timeout_ms=2_000,
         cypher="""
 MATCH (w:Workflow)-[:RUN_BY]->(a:Agent), (w)-[:NEEDS]->(t:Tool)
-OPTIONAL MATCH (a)-[:DELEGATES_TO*0..3]->(:Agent)-[c:CAN_CALL]->(t)
+OPTIONAL MATCH (a)-[:DELEGATES_TO*0..]->(:Agent)-[c:CAN_CALL]->(t)
 WITH w, t, count(c) AS grants, sum(CASE WHEN c IS NOT NULL AND c.gate IS NULL THEN 1 ELSE 0 END) AS ungated
 WHERE grants = 0 OR (w.mode = 'autonomous' AND ungated = 0)
 RETURN w.id AS workflow, 'tool' AS kind, t.id AS missing, w.mode AS mode, grants > 0 AS gated
 UNION
 MATCH (w:Workflow)-[:RUN_BY]->(a:Agent), (w)-[:NEEDS_DATA]->(d:DataSource)
-OPTIONAL MATCH p = (a)-[:DELEGATES_TO*0..3]->(:Agent)-[:CAN_CALL]->(:Tool)-[:READS]->(d)
+OPTIONAL MATCH p = (a)-[:DELEGATES_TO*0..]->(:Agent)-[:CAN_CALL]->(:Tool)-[:READS]->(d)
 WITH w, d, count(p) AS ways
 WHERE ways = 0
 RETURN w.id AS workflow, 'data' AS kind, d.id AS missing, w.mode AS mode, false AS gated
@@ -433,7 +448,7 @@ RETURN s.id AS server_id, s.manifest_hash AS manifest_hash,
         mode="rw", targets=WORKING, timeout_ms=2_000,
         cypher="""
 MATCH (f:Finding {id: $id}) WHERE f.status = 'open'
-SET f.status = 'accepted', f.accepted_by = $who, f.updated_at = $now
+SET f.status = 'accepted', f.accepted_by = $who, f.accepted_session = $session, f.updated_at = $now
 RETURN f.id AS id, f.status AS status
 """,
     ),
@@ -464,7 +479,7 @@ RETURN v.i AS i, n.id AS id ORDER BY i
         doc="Node and open-finding counts for the scenario list.",
         mode="ro", targets=WORKING, timeout_ms=2_000,
         cypher="""
-MATCH (n) WHERE NOT n:Finding AND NOT n:Mitigation AND NOT n:Scan AND NOT n:ToolAct AND NOT n:Draft
+MATCH (n) WHERE NOT n:Finding AND NOT n:Mitigation AND NOT n:Scan AND NOT n:ToolAct AND NOT n:Draft AND NOT n:Run
 WITH count(n) AS nodes
 OPTIONAL MATCH (f:Finding {status: 'open'})
 RETURN nodes, count(f) AS open_findings
@@ -502,6 +517,16 @@ RETURN s.at AS at
 """,
     ),
     NamedQuery(
+        name="scan.prune", mode="rw", targets=WORKING, timeout_ms=2_000, idempotent=True,
+        doc="Delete the Scan nodes beyond the newest $keep, so the history a graph holds stays bounded.",
+        cypher="""
+MATCH (s:Scan) WHERE s.id <> 'last'
+WITH s ORDER BY s.at DESC SKIP $keep
+DELETE s
+RETURN count(*) AS removed
+""",
+    ),
+    NamedQuery(
         name="scan.history", mode="ro", targets=WORKING, timeout_ms=2_000,
         doc="The last 50 scans of a working graph, newest first. A graph loaded before scans were kept has none.",
         cypher="""
@@ -509,6 +534,27 @@ MATCH (s:Scan) WHERE s.id <> 'last'
 RETURN s.scan_id AS scan_id, s.at AS at, s.duration_ms AS duration_ms,
        s.injection AS injection, s.trifecta AS trifecta, s.open AS open, s.partial AS partial
 ORDER BY s.at DESC LIMIT 50
+""",
+    ),
+
+    # ------------------------------------------------------------------ runs (audit records)
+    NamedQuery(
+        name="run.record", mode="rw", targets=WORKING, timeout_ms=5_000, idempotent=True,
+        doc="Keep an auditor run on the graph it worked on, as one node holding the whole record as JSON: every step, who "
+            "took it and why. Written as the run moves, so a restart loses nothing a person saw.",
+        cypher="""
+MERGE (r:Run {id: $id})
+SET r.kind = $kind, r.status = $status, r.started_at = $started_at, r.json = $json
+RETURN r.id AS id
+""",
+    ),
+    NamedQuery(
+        name="run.list", mode="ro", targets=WORKING, timeout_ms=5_000,
+        doc="Every run kept on a working graph, oldest first.",
+        cypher="""
+MATCH (r:Run)
+RETURN r.id AS id, r.kind AS kind, r.status AS status, r.started_at AS started_at, r.json AS json
+ORDER BY r.started_at, r.id
 """,
     ),
 
@@ -800,11 +846,13 @@ RETURN m.id AS id, m.status AS status
     ),
     NamedQuery(
         name="mitigation.set_status", mode="rw", targets=WORKING, timeout_ms=2_000,
-        doc="Move a mitigation from one of the allowed statuses to a new one; no row means it was not in one of them.",
+        doc="Move a mitigation from one of the allowed statuses to a new one; no row means it was not in one of them. A decision "
+            "records who made it and a hash of the session it came from.",
         cypher="""
 MATCH (m:Mitigation {id: $id}) WHERE m.status IN $allowed
 SET m.status = $status, m.updated_at = $now,
     m.approved_by = CASE WHEN $approved_by IS NULL THEN m.approved_by ELSE $approved_by END,
+    m.approved_session = CASE WHEN $approved_session IS NULL THEN m.approved_session ELSE $approved_session END,
     m.applied_at = CASE WHEN $applied_at IS NULL THEN m.applied_at ELSE $applied_at END,
     m.decision_reason = CASE WHEN $decision_reason IS NULL THEN m.decision_reason ELSE $decision_reason END
 RETURN m.id AS id, m.status AS status
@@ -818,8 +866,19 @@ MATCH (m:Mitigation {id: $id})
 RETURN m.id AS id, m.status AS status, m.fix_json AS fix_json, m.cost AS cost, m.config_hash AS config_hash,
        m.target_fingerprints AS target_fingerprints, m.verdict_json AS verdict_json, m.passed AS passed,
        m.reason AS reason, m.rationale AS rationale, m.source AS source, m.approved_by AS approved_by,
+       m.approved_session AS approved_session, m.applied_fixes AS applied_fixes,
        m.decision_reason AS decision_reason, m.created_at AS created_at, m.applied_at AS applied_at,
        m.updated_at AS updated_at
+""",
+    ),
+    NamedQuery(
+        name="mitigation.progress", mode="rw", targets=WORKING, timeout_ms=2_000, idempotent=True,
+        doc="How many of an approved plan's fixes have been applied so far. Written after each fix, so a process that dies "
+            "mid-plan leaves a plan the next apply can finish instead of one it can never apply.",
+        cypher="""
+MATCH (m:Mitigation {id: $id})
+SET m.applied_fixes = $n, m.updated_at = $now
+RETURN m.id AS id, m.applied_fixes AS applied_fixes
 """,
     ),
     NamedQuery(
@@ -830,6 +889,7 @@ MATCH (m:Mitigation)
 RETURN m.id AS id, m.status AS status, m.fix_json AS fix_json, m.cost AS cost, m.config_hash AS config_hash,
        m.target_fingerprints AS target_fingerprints, m.verdict_json AS verdict_json, m.passed AS passed,
        m.reason AS reason, m.rationale AS rationale, m.source AS source, m.approved_by AS approved_by,
+       m.approved_session AS approved_session, m.applied_fixes AS applied_fixes,
        m.decision_reason AS decision_reason, m.created_at AS created_at, m.applied_at AS applied_at,
        m.updated_at AS updated_at
 ORDER BY m.created_at DESC, m.id
@@ -972,6 +1032,16 @@ RETURN d.id AS id, d.status AS status, d.kind AS kind, d.path AS path, d.before_
        d.diff AS diff, d.note AS note, d.commands_json AS commands_json, d.after_text AS after_text, d.writable AS writable,
        d.edited AS edited, d.created_at AS created_at, d.updated_at AS updated_at,
        d.written_at AS written_at, d.written_by AS written_by, d.receipt_json AS receipt_json
+ORDER BY d.created_at
+""",
+    ),
+    NamedQuery(
+        name="draft.list", mode="ro", targets=WORKING, timeout_ms=2_000,
+        doc="Every draft on a working graph with the plan it belongs to, for the activity list: one query, not one per plan.",
+        cypher="""
+MATCH (m:Mitigation)-[:DRAFTS]->(d:Draft)
+RETURN m.id AS mitigation_id, d.id AS id, d.status AS status, d.kind AS kind, d.path AS path, d.written_at AS written_at,
+       d.written_by AS written_by, d.receipt_json AS receipt_json
 ORDER BY d.created_at
 """,
     ),
