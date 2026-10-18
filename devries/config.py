@@ -42,6 +42,10 @@ class Settings(BaseSettings):
     session_runs: int = 3                          # audit runs with a model, per session
     session_questions: int = 10                    # questions with a model, per session
     cookie_secure: bool = False                    # set on the public deployment, which is served over https
+    trust_proxy: bool = False                      # believe X-Forwarded-For and X-Forwarded-Host: only behind the shipped reverse proxy
+    # host names, comma-separated, on which a browser may change things and MCP clients may connect, beside localhost:
+    # the site's public name, or a LAN address the demo is served on. A request for another Host is refused.
+    allowed_hosts: str | None = None
 
     # a public address: visitors never launch commands, an import is private to the session that made it, and
     # imports and runs are rationed per address. Nothing is ever written to a file on a public site.
@@ -52,7 +56,8 @@ class Settings(BaseSettings):
     rate_imports_per_hour: int = 6                 # per address, public only
     rate_runs_per_hour: int = 30                   # audit runs and questions per address, public only
     falkordb_memory_ceiling_mb: int | None = None  # past this, the janitor drops the oldest idle copies
-    prerun_audits: bool = True                     # at start, audit each shared scenario to its proposal, scripted
+    prerun_audits: bool = True                     # at start, audit each shared scenario to its proposal
+    prerun_model: bool = True                      # that pass uses the configured model when there is one; off: scripted
     startup_db_wait_s: int = 60                    # how long the app waits for FalkorDB before starting without it
 
     # the built UI, served by the app when the directory exists
