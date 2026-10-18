@@ -215,15 +215,59 @@ class RateLimiter:
 
 
 def client_ip(request: Request) -> str:
-    """The visitor's address, behind the reverse proxy the deployment puts in front of the app."""
-    forwarded = request.headers.get("x-forwarded-for", "")
+    """The visitor's address. X-Forwarded-For is believed only when TRUST_PROXY is set, which the shipped overlay does:
+    without a proxy in front, the header is whatever the caller typed."""
+    forwarded = request.headers.get("x-forwarded-for", "") if get_settings().trust_proxy else ""
     if forwarded:
         return forwarded.split(",")[0].strip()[:64]
     return (request.client.host if request.client else "unknown")[:64]
 
 
+LOCAL_HOSTS = {"localhost", "127.0.0.1", "[::1]"}
+
+# what every response carries: the UI loads nothing from anywhere but this app, so the policy can say so
+SECURITY_HEADERS = {
+    "content-security-policy": ("default-src 'self'; script-src 'self' 'wasm-unsafe-eval' blob:; style-src 'self' 'unsafe-inline'; "
+                                "img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; worker-src 'self' blob:; "
+                                "frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'"),
+    "x-content-type-options": "nosniff",
+    "x-frame-options": "DENY",
+    "referrer-policy": "same-origin",
+}
+
+
+def host_name(host: str) -> str:
+    """The name in a Host header, without the port: `[::1]:8000` is `[::1]`, `example.org:443` is `example.org`."""
+    if host.startswith("["):
+        return host.split("]", 1)[0] + "]"
+    return host.rsplit(":", 1)[0] if ":" in host else host
+
+
+def host_allowed(host: str, allowed_hosts: str | None) -> bool:
+    """Whether a Host names this machine or a host the settings allow. A page served from a name an attacker points
+    at 127.0.0.1 (DNS rebinding) sends a matching Origin and Host pair, so the pair alone proves nothing."""
+    names = {n.strip().lower() for n in (allowed_hosts or "").split(",") if n.strip()}
+    return host_name(host).lower() in LOCAL_HOSTS | names
+
+
+def cross_site(request: Request, trust_proxy: bool, allowed_hosts: str | None = None) -> str | None:
+    """Why a state-changing request is refused, or None when it is the person's own: it came from a page on another
+    origin, or it names a Host this app does not serve. A browser sends Origin with every POST; a request with none
+    (curl, a test, an older client) is taken as the person's own."""
+    host = (request.headers.get("x-forwarded-host") if trust_proxy else None) or request.headers.get("host", "")
+    if not host_allowed(host, allowed_hosts):
+        return f"this app does not serve {host_name(host)!r}: add it to ALLOWED_HOSTS if it is yours"
+    origin = request.headers.get("origin")
+    if not origin and request.headers.get("sec-fetch-site") != "cross-site":
+        return None
+    if origin not in {f"http://{host}", f"https://{host}"}:
+        return "a change is accepted only from this app's own page, not from another site"
+    return None
+
+
 class SessionMiddleware:
-    """Gives every /api request a session id, and guards /mcp with a bearer token when one is configured."""
+    """Gives every /api request a session id, refuses a change asked for from another site, and guards /mcp with a
+    bearer token when one is configured."""
 
     def __init__(self, app):
         self.app = app
@@ -233,6 +277,14 @@ class SessionMiddleware:
             return await self.app(scope, receive, send)
         path = scope["path"]
         settings = get_settings()
+
+        async def send(message, _send=send):
+            if message["type"] == "http.response.start":
+                headers = MutableHeaders(scope=message)
+                for name, value in SECURITY_HEADERS.items():
+                    if name not in headers:
+                        headers.append(name, value)
+            await _send(message)
 
         if path.startswith("/mcp") and settings.devries_mcp_token:
             given = Request(scope).headers.get("authorization", "")
@@ -244,6 +296,12 @@ class SessionMiddleware:
 
         if not path.startswith("/api"):
             return await self.app(scope, receive, send)
+
+        if scope.get("method") in ("POST", "PUT", "PATCH", "DELETE"):
+            refused = cross_site(Request(scope), settings.trust_proxy, settings.allowed_hosts)
+            if refused:
+                response = JSONResponse({"error": {"code": "cross_site", "message": refused, "retryable": False}}, status_code=403)
+                return await response(scope, receive, send)
 
         session_id = Request(scope).cookies.get(COOKIE, "")
         is_new = not keys.SESSION_RE.fullmatch(session_id)
