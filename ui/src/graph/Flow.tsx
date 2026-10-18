@@ -6,7 +6,7 @@
 // carries a spark along it, hop after hop, and the spark stops where a gate stops the text; a hovered
 // card lifts its own arcs. All of it is off under prefers-reduced-motion.
 
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type FocusEvent, type KeyboardEvent } from "react";
 import {
   BaseEdge, EdgeLabelRenderer, Handle, Position, ReactFlow, ReactFlowProvider, getBezierPath, useReactFlow,
   type Edge, type EdgeProps, type Node, type NodeProps,
@@ -44,6 +44,8 @@ export type FlowProps = {
   heightRange?: [number, number];
   /** How far a small graph may be enlarged to fill its box; the finding's chart stops at 1.5, the explorer goes further. */
   fitZoom?: number;
+  /** The zoom the chart is never shrunk below, so its smallest type stays legible; a graph wider than the box at it pans. */
+  minZoom?: number;
 };
 
 type CardData = {
@@ -58,9 +60,12 @@ type Arc = Edge<ArcData, "arc">;
 type LaneNode = Node<{ label: string }, "lane">;
 
 const SANS = '500 12.5px "Geist Sans", ui-sans-serif, system-ui, sans-serif';
-/** How far a small graph is enlarged to fill its box, and the margin left around it. */
+/** How far a small graph is enlarged to fill its box, how far a wide one may be shrunk, and the margin left around it. */
 const FIT_ZOOM = 1.5;
-const FIT_PAD = 0.05;
+const MIN_FIT = 1;
+const GUTTER = 20;
+/** The band across the top of the drawing area where the zoom buttons stand, clear of the lane captions. */
+const TOP = GUTTER + 34;
 const MONO = '400 11px "Geist Mono", ui-monospace, monospace';
 const CARD_H = 46;
 
@@ -131,9 +136,13 @@ function ArcView({ id, sourceX, sourceY, targetX, targetY, sourcePosition, targe
 const NODE_TYPES = { card: CardView, lane: LaneView };
 const EDGE_TYPES = { arc: ArcView };
 
-/** Places the cards with ELK, in lanes, left to right. Loaded on first use so the page's own bundle stays small. */
+/** The layout engine, loaded on first use so the page's own bundle stays small. Posture asks for it early, while
+ *  it is idle, so the Explorer and a finding's Path step open faster. */
+export const loadElk = () => import("elkjs/lib/elk.bundled.js");
+
+/** Places the cards with ELK, in lanes, left to right. */
 async function place(cards: { id: string; width: number; height: number; lane: number }[], arcs: { id: string; source: string; target: string }[]) {
-  const { default: ELK } = await import("elkjs/lib/elk.bundled.js");
+  const { default: ELK } = await loadElk();
   const elk = new ELK();
   const laid = await elk.layout({
     id: "root",
@@ -182,6 +191,7 @@ function chainsOf(hops: Hop[]): Map<string, Link> {
 function Inner(props: FlowProps) {
   const { graph, names, focus, only, cuts, cutsMean, rings, communities, cites, badges, picked, onPick, idle, height } = props;
   const fitZoom = props.fitZoom ?? FIT_ZOOM;
+  const floor = props.minZoom ?? MIN_FIT;
   const [positions, setPositions] = useState<Map<string, { x: number; y: number }> | null>(null);
   const [over, setOver] = useState<string | null>(null);
   const [boxWidth, setBoxWidth] = useState(900);
@@ -232,8 +242,27 @@ function Inner(props: FlowProps) {
 
   const overCard = over && model.cards.some((c) => c.id === over) ? over : null;
 
-  const { nodes, extent } = useMemo(() => {
-    if (!positions) return { nodes: [] as (Card | LaneNode)[], extent: { w: 900, h: 320 } };
+  // one caption per lane that has a card in it, above the cards; and the drawing's extent, captions included
+  const { laneNodes, extent } = useMemo(() => {
+    const none = { laneNodes: [] as LaneNode[], extent: { x: 0, y: 0, w: 900, h: 320 } };
+    if (!positions || !model.cards.length) return none;
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    const byLane = new Map<number, number[]>();
+    for (const c of model.cards) {
+      const p = positions.get(c.id) ?? { x: 0, y: 0 };
+      minX = Math.min(minX, p.x); minY = Math.min(minY, p.y); maxX = Math.max(maxX, p.x + c.width); maxY = Math.max(maxY, p.y + c.height);
+      byLane.set(c.lane, [...(byLane.get(c.lane) ?? []), p.x + c.width / 2]);
+    }
+    const laneNodes: LaneNode[] = [...byLane].map(([lane, xs]) => ({
+      id: `lane:${lane}`, type: "lane", position: { x: xs.reduce((a, b) => a + b, 0) / xs.length - 70, y: minY - 38 }, width: 140, height: 20,
+      draggable: false, selectable: false, connectable: false, focusable: false, data: { label: LANES[lane] },
+    }));
+    for (const l of laneNodes) { minX = Math.min(minX, l.position.x); maxX = Math.max(maxX, l.position.x + 140); }
+    return { laneNodes, extent: { x: minX, y: minY - 38, w: maxX - minX, h: maxY - minY + 38 } };
+  }, [positions, model]);
+
+  const nodes = useMemo(() => {
+    if (!positions) return [] as (Card | LaneNode)[];
     const lit = focus?.nodes ?? null;
     const cards: Card[] = model.cards.map(({ id, node, name, fact, width, height, lane }) => ({
       id, type: "card", position: positions.get(id) ?? { x: 0, y: 0 }, width, height, draggable: false, connectable: false, selectable: false,
@@ -243,17 +272,8 @@ function Inner(props: FlowProps) {
         community: communities ? node.data.community : undefined,
       },
     }));
-    // one caption per lane that has a card in it, above the cards
-    let minY = Infinity, maxY = -Infinity, maxX = 0;
-    for (const c of cards) { minY = Math.min(minY, c.position.y); maxY = Math.max(maxY, c.position.y + (c.height ?? CARD_H)); maxX = Math.max(maxX, c.position.x + (c.width ?? 120)); }
-    const byLane = new Map<number, number[]>();
-    for (const c of model.cards) { const p = positions.get(c.id); if (p) byLane.set(c.lane, [...(byLane.get(c.lane) ?? []), p.x + c.width / 2]); }
-    const laneNodes: LaneNode[] = [...byLane].map(([lane, xs]) => ({
-      id: `lane:${lane}`, type: "lane", position: { x: xs.reduce((a, b) => a + b, 0) / xs.length - 70, y: minY - 38 }, width: 140, height: 20,
-      draggable: false, selectable: false, connectable: false, data: { label: LANES[lane] },
-    }));
-    return { nodes: [...laneNodes, ...cards], extent: { w: maxX, h: maxY - minY + 44 } };
-  }, [positions, model, focus, only, rings, communities, cites, badges, picked]);
+    return [...laneNodes, ...cards];
+  }, [positions, model, laneNodes, focus, only, rings, communities, cites, badges, picked]);
 
   // the arcs are cheap to rebuild, so a hover may: a hovered card's arcs come forward, the rest fall back
   const edges = useMemo(() => {
@@ -271,32 +291,70 @@ function Inner(props: FlowProps) {
   }, [positions, model, focus, only, cuts, overCard]);
 
   // The chart fills the width it has, the way FalkorDB's canvas fills its box: a small graph is drawn larger than
-  // life, up to FIT_ZOOM, a wide one is shrunk to fit. The drawing area is then exactly as tall as that needs, so a
-  // path of five cards is a band of cards, not a strip across an empty box; the key and the hover line sit under it.
+  // life, up to fitZoom; a wide one is shrunk to fit, but never below `floor`, where its smallest type stops being
+  // legible: past that it keeps its size and pans. The drawing area is as tall as the drawing needs at that zoom,
+  // within its range, so a path of five cards is a band of cards, not a strip across an empty box.
   const range = props.heightRange;
-  const zoom = Math.min(fitZoom, (boxWidth - 40) / Math.max(extent.w, 1), range ? (range[1] - 64) / Math.max(extent.h, 1) : Infinity);
+  const fit = Math.min(fitZoom, (boxWidth - 2 * GUTTER) / Math.max(extent.w, 1), range ? (range[1] - 2 * GUTTER) / Math.max(extent.h, 1) : Infinity);
+  const zoom = Math.max(floor, fit);
+  // the zoom buttons may still go further out than the fit, so a wide graph can be seen whole
+  const minZoom = Math.max(0.15, Math.min(0.3, fit));
+  const drawnH = Math.round(extent.h * zoom);
   const areaHeight = height ?? (range
-    ? (positions ? Math.max(range[0], Math.min(range[1], Math.round(extent.h * zoom) + 64)) : range[0])
-    : positions ? Math.max(124, Math.min(640, Math.round(extent.h * zoom) + 44)) : 220);
+    ? (positions ? Math.max(range[0], Math.min(range[1], drawnH + TOP + GUTTER)) : range[0])
+    : positions ? Math.max(124, Math.min(640, drawnH + TOP + GUTTER)) : 220);
+  const wide = extent.w * zoom > boxWidth - 2 * GUTTER + 1;
+  const tall = drawnH > areaHeight - TOP - GUTTER + 1;
+  // the drawing sits centred in its box, under the zoom row; one wider or taller than the box starts at its top left
+  // corner, where the first lane and its caption are, and the rest is reached by dragging or with the zoom buttons
+  const arrange = useCallback((duration: number) => {
+    const x = (wide ? GUTTER : (boxWidth - extent.w * zoom) / 2) - extent.x * zoom;
+    const y = (tall ? TOP : TOP + (areaHeight - TOP - GUTTER - extent.h * zoom) / 2) - extent.y * zoom;
+    flow.setViewport({ x, y, zoom }, { duration });
+  }, [flow, wide, tall, boxWidth, areaHeight, extent, zoom]);
+  // a card the keyboard lands on is panned into view; the browser must not scroll the pane for it (overflow: clip, app.css)
+  const reveal = useCallback((id: string) => {
+    const c = model.cards.find((k) => k.id === id);
+    const p = positions?.get(id);
+    const area = box.current?.querySelector<HTMLElement>(".flow-area");
+    if (!c || !p || !area) return;
+    const vp = flow.getViewport();
+    const left = p.x * vp.zoom + vp.x, right = (p.x + c.width) * vp.zoom + vp.x, top = p.y * vp.zoom + vp.y, bottom = (p.y + c.height) * vp.zoom + vp.y;
+    const dx = left < GUTTER ? GUTTER - left : right > area.clientWidth - GUTTER ? area.clientWidth - GUTTER - right : 0;
+    const dy = top < TOP ? TOP - top : bottom > area.clientHeight - GUTTER ? area.clientHeight - GUTTER - bottom : 0;
+    if (dx || dy) flow.setViewport({ x: vp.x + dx, y: vp.y + dy, zoom: vp.zoom }, { duration: 150 });
+  }, [flow, model, positions]);
   useEffect(() => {
-    if (!nodes.length) return;
-    // the box takes its final height in the same commit the cards land in: fit once the browser has laid that out
+    if (!positions) return;
+    // the box takes its final height in the same commit the cards land in: arrange the drawing once the browser has laid that out
     let frame = window.requestAnimationFrame(() => {
-      frame = window.requestAnimationFrame(() => flow.fitView({ padding: FIT_PAD, maxZoom: fitZoom, duration: 0 }));
+      frame = window.requestAnimationFrame(() => arrange(0));
     });
     return () => window.cancelAnimationFrame(frame);
-  }, [nodes, areaHeight, flow, fitZoom]);
+  }, [positions, areaHeight, arrange]);
   const overNode = overCard ? model.cards.find((c) => c.id === overCard) : null;
   const overEdge = over && !overNode ? model.links.find((l) => String(l.id) === over) : null;
+  // the keyboard reaches what the pointer does: Tab moves between cards and arcs and reads each under the chart, Enter picks a card
+  const focused = (e: FocusEvent | KeyboardEvent) => {
+    const el = (e.target as HTMLElement).closest?.(".react-flow__node, .react-flow__edge");
+    return el ? { edge: el.classList.contains("react-flow__edge"), id: el.getAttribute("data-id") } : null;
+  };
+  const onFocus = (e: FocusEvent) => { const f = focused(e); if (f?.id && !f.id.startsWith("lane:")) { setOver(f.id); if (!f.edge) reveal(f.id); } };
+  const onBlur = (e: FocusEvent) => { if (!box.current?.contains(e.relatedTarget as globalThis.Node | null)) setOver(null); };
+  const onKeyDown = (e: KeyboardEvent) => {
+    if (e.key !== "Enter" && e.key !== " ") return;
+    const f = focused(e);
+    if (f && !f.edge && f.id && model.cards.some((c) => c.id === f.id)) { e.preventDefault(); onPick?.(picked === f.id ? null : f.id); }
+  };
   const anyPrivate = model.cards.some((c) => markOf(c.node) === "private");
   const anyGated = model.links.some((l) => edgeFacts(l).gated);
 
   return (
     <div className={`chart flowchart${positions ? "" : " laying-out"}${overNode ? " hovering" : ""}`} ref={box}>
-      <div className="flow-area" style={{ height: areaHeight }}>
+      <div className="flow-area" style={{ height: areaHeight }} onFocus={onFocus} onBlur={onBlur} onKeyDown={onKeyDown}>
       <ReactFlow
         nodes={nodes} edges={edges} nodeTypes={NODE_TYPES} edgeTypes={EDGE_TYPES}
-        fitView fitViewOptions={{ padding: FIT_PAD, maxZoom: fitZoom }} minZoom={0.3} maxZoom={3}
+        fitView fitViewOptions={{ padding: 0.05, maxZoom: fitZoom, minZoom: floor }} minZoom={minZoom} maxZoom={3}
         nodesDraggable={false} nodesConnectable={false} elementsSelectable={false} zoomOnScroll={false} zoomOnDoubleClick={false} preventScrolling={false} panOnScroll={false}
         proOptions={{ hideAttribution: true }} colorMode="dark"
         onNodeMouseEnter={(_, n) => n.type === "card" && setOver(n.id)} onNodeMouseLeave={() => setOver(null)}
@@ -308,11 +366,11 @@ function Inner(props: FlowProps) {
         <div className="zoom" role="group" aria-label="Zoom">
           <button onClick={() => flow.zoomIn({ duration: 200 })} title="Zoom in" aria-label="Zoom in">+</button>
           <button onClick={() => flow.zoomOut({ duration: 200 })} title="Zoom out" aria-label="Zoom out">−</button>
-          <button className="fit" onClick={() => flow.fitView({ padding: FIT_PAD, maxZoom: fitZoom, duration: 200 })} title="Fit the chart to the box" aria-label="Fit">⤢</button>
+          <button className="fit" onClick={() => arrange(200)} title="Fit the chart to the box" aria-label="Fit">⤢</button>
         </div>
       </ReactFlow>
       </div>
-      <div className="chart-key" aria-hidden>
+      <div className="chart-key" role="note" aria-label="Key">
         <span><i className="k-hot" />reached by untrusted text</span>
         {anyPrivate && <span><i className="k-private" />private data</span>}
         <span><i className="k-plain" />not reached</span>
@@ -331,7 +389,7 @@ function Inner(props: FlowProps) {
             {overNode.fact ? ` · ${overNode.fact}` : ""} · {plural(model.links.filter((l) => l.data.from_id === overNode.id || l.data.to_id === overNode.id).length, "arc", "arcs")}</>
         ) : overEdge ? (
           <><strong>{edgeWord(overEdge)}:</strong> <WithNames text={edgeFacts(overEdge).sentence} names={names} />{edgeFacts(overEdge).gated ? ` · blocked by ${overEdge.data.gate === "quarantine" ? "a quarantine" : "an approval gate"}` : ""}</>
-        ) : positions ? idle ?? "Hover a card to read it. Click it to pick it." : "Laying the chart out…"}
+        ) : positions ? idle ?? "Hover a card, or Tab to it, to read it. Click it, or press Enter, to pick it." : "Laying the chart out…"}
       </p>
     </div>
   );

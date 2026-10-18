@@ -2,10 +2,11 @@
 // high-impact actions those agents can take on the right, each a card with its figure, and the open paths
 // between them carrying tokens that run endlessly, the way text an outsider plants would. Drawn with React
 // Flow on a dotted ground, panned and zoomed like a map; a hovered path reads its finding, a click opens it,
-// a clicked card opens the Explorer on it. What a card says is FalkorDB's answer; the page only draws it.
-// Motion is off under prefers-reduced-motion: the tokens then sit still, one per path.
+// a clicked card opens the Explorer on it. The keyboard does the same: Tab reads, Enter opens. The map never
+// shrinks its cards below reading size; a graph too wide for the box is panned instead. What a card says is
+// FalkorDB's answer; the page only draws it. Motion is off under prefers-reduced-motion: the tokens then sit still.
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type FocusEvent, type KeyboardEvent } from "react";
 import {
   Background, BackgroundVariant, BaseEdge, Handle, Position, ReactFlow, ReactFlowProvider, getBezierPath, useReactFlow,
   type Edge, type EdgeProps, type Node, type NodeProps,
@@ -20,23 +21,33 @@ type CardData = {
   id: string; kind: "source" | "private" | "agent" | "action"; eyebrow: string; name: string; sub: string;
   figure: { label: string; value: string; unit: string } | null; letters?: string[]; badge?: string;
   tone: "hot" | "private" | "accent" | "plain"; worst: boolean; dim: boolean; col: number;
+  /** The card's height, which follows the type (see TYPE_MAX). */
+  h: number;
 };
 type RiverData = { finding: string; kind: Ribbon["kind"]; series: Series; tokens: number; dim: boolean; lit: boolean };
 type Card = Node<CardData, "rcard">;
 type River = Edge<RiverData, "river">;
-type LaneNode = Node<{ label: string }, "lane">;
+type LaneNode = Node<{ label: string; align?: "first" | "last" }, "lane">;
 
-const CARD_W = 222;
-const CARD_H = 196;
-const COL_GAP = 300;
+const CARD_W = 208;
+const CARD_H = 232;
+const COL_GAP = 256;
 const ROW_GAP = 26;
 const FIT_ZOOM = 1.15;
-const FIT_PAD = 0.08;
+/** The margin the map keeps from the edge of its box, and the band across the top where the zoom buttons stand. */
+const GUTTER = 12;
+const TOP = GUTTER + 34;
+/** The map is fitted to its width once. Down to LEGIBLE its labels, set at 12.5 px, still render at 11 px or more; fitted
+ *  below that, the cards set their type larger to make up the difference (--rf-type), by up to TYPE_MAX. MIN_ZOOM is
+ *  where that runs out: a map wider than the box at it starts at its left edge and pans. */
+const LEGIBLE = 0.88;
+const TYPE_MAX = 1.2;
+const MIN_ZOOM = LEGIBLE / TYPE_MAX;
 
 function CardView({ data }: NodeProps<Card>) {
   const cls = ["rcard", `rk-${data.kind}`, `t-${data.tone}`, data.worst ? "worst" : "", data.dim ? "dim" : ""].filter(Boolean).join(" ");
   return (
-    <div className={cls} data-id={data.id} title={data.id} style={{ width: CARD_W, height: CARD_H }}>
+    <div className={cls} data-id={data.id} title={data.id} style={{ width: CARD_W, height: data.h }}>
       <Handle type="target" position={Position.Left} className="fport" />
       <span className="rcard-eyebrow">{data.eyebrow}</span>
       <span className="rcard-name">{data.name}</span>
@@ -63,7 +74,7 @@ function CardView({ data }: NodeProps<Card>) {
 }
 
 function LaneView({ data }: NodeProps<LaneNode>) {
-  return <div className="lane"><span>{data.label}</span></div>;
+  return <div className={`lane${data.align ? ` ${data.align}` : ""}`}><span>{data.label}</span></div>;
 }
 
 const still = () => typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
@@ -116,12 +127,17 @@ function Inner({ view, posture, names, scenario }: RiskFlowProps) {
     const { sources, agents, actions } = view.columns;
     const blast = new Map((posture?.blast ?? []).map((b) => [b.id, b]));
     const targets = new Map((posture?.targets ?? []).map((t) => [t.id, t]));
-    const cardsOf = new Map<string, Omit<CardData, "dim">>();
+    const cardsOf = new Map<string, Omit<CardData, "dim" | "h">>();
     // how deep an agent sits: the furthest place it takes in any chain
     const depth = new Map<string, number>();
     for (const r of view.ribbons) r.agent_ids.forEach((a, i) => depth.set(a, Math.max(depth.get(a) ?? 1, i + 1)));
     const agentCols = Math.max(1, ...[...depth.values()]);
     const lastCol = agentCols + 1;
+    // the zoom follows from the width alone, so the type, and the card height with it, can follow the zoom
+    const width = lastCol * COL_GAP + CARD_W;
+    const zoom = Math.max(MIN_ZOOM, Math.min(FIT_ZOOM, (boxWidth - 2 * GUTTER) / width));
+    const typeScale = Math.min(TYPE_MAX, Math.max(1, LEGIBLE / zoom));
+    const cardH = Math.round(CARD_H * typeScale);
     for (const s of sources) {
       const b = blast.get(s.id);
       const routes = view.ribbons.filter((r) => r.source_id === s.id || r.untrusted_ids?.includes(s.id)).reduce((n, r) => n + Math.max(1, r.routes), 0);
@@ -182,17 +198,24 @@ function Inner({ view, posture, names, scenario }: RiskFlowProps) {
     const byCol = new Map<number, string[]>();
     for (const c of cardsOf.values()) byCol.set(c.col, [...(byCol.get(c.col) ?? []), c.id]);
     const rows = Math.max(1, ...[...byCol.values()].map((ids) => ids.length));
-    const tallest = rows * CARD_H + (rows - 1) * ROW_GAP;
+    const tallest = rows * cardH + (rows - 1) * ROW_GAP;
     const positions = new Map<string, { x: number; y: number }>();
     for (const [col, ids] of byCol) {
-      const height = ids.length * CARD_H + (ids.length - 1) * ROW_GAP;
-      ids.forEach((id, i) => positions.set(id, { x: col * COL_GAP, y: (tallest - height) / 2 + i * (CARD_H + ROW_GAP) }));
+      const height = ids.length * cardH + (ids.length - 1) * ROW_GAP;
+      ids.forEach((id, i) => positions.set(id, { x: col * COL_GAP, y: (tallest - height) / 2 + i * (cardH + ROW_GAP) }));
     }
-    const lanes = [...byCol.keys()].sort((a, b) => a - b).map((col) => ({
-      col, label: col === 0 ? "untrusted and private sources" : col === lastCol ? "high-impact actions and ways out" : agentCols === 1 ? "agents" : col === 1 ? "agents" : "delegates",
-    }));
-    return { cards: [...cardsOf.values()], rivers, positions, lanes, extent: { w: lastCol * COL_GAP + CARD_W, h: tallest + 44 } };
-  }, [view, posture, names]);
+    // one caption a column, each said once: what the sources are, how deep the agents stand, what the actions are
+    const hasPrivate = [...cardsOf.values()].some((c) => c.kind === "private");
+    const hasExternal = actions.some((t) => t.external), hasHigh = actions.some((t) => !t.external);
+    const caption = (col: number) =>
+      col === 0 ? (hasPrivate ? "untrusted and private sources" : "untrusted sources")
+        : col === lastCol ? (hasExternal && hasHigh ? "actions and ways out" : hasExternal ? "ways out" : "high-impact actions")
+          : col === 1 ? "agents" : col === 2 ? "delegates" : col === 3 ? "sub-delegates" : `delegates, ${col - 1} deep`;
+    // the first caption reads from its card's left edge and the last ends at its card's right edge, so neither leaves the map
+    const lanes = [...byCol.keys()].sort((a, b) => a - b).map((col) => ({ col, label: caption(col), align: col === 0 ? "first" as const : col === lastCol ? "last" as const : undefined }));
+    // the lanes stand 40 above the cards, so the drawing runs from -40 to the bottom of the tallest column
+    return { cards: [...cardsOf.values()], rivers, positions, lanes, zoom, typeScale, cardH, extent: { w: width, h: tallest + 40 } };
+  }, [view, posture, names, boxWidth]);
 
   const overFinding = over?.kind === "river" ? over.id : null;
   const overCard = over?.kind === "card" ? model.cards.find((c) => c.id === over.id) ?? null : null;
@@ -200,40 +223,84 @@ function Inner({ view, posture, names, scenario }: RiskFlowProps) {
 
   const nodes = useMemo((): (Card | LaneNode)[] => {
     const cards: Card[] = model.cards.map((c) => ({
-      id: c.id, type: "rcard", position: model.positions.get(c.id) ?? { x: 0, y: 0 }, width: CARD_W, height: CARD_H,
-      draggable: false, connectable: false, selectable: false, data: { ...c, dim: !!overFinding && !touched.has(c.id) },
+      id: c.id, type: "rcard", position: model.positions.get(c.id) ?? { x: 0, y: 0 }, width: CARD_W, height: model.cardH,
+      draggable: false, connectable: false, selectable: false, data: { ...c, h: model.cardH, dim: !!overFinding && !touched.has(c.id) },
     }));
     const lanes: LaneNode[] = model.lanes.map((l) => ({
-      id: `lane:${l.col}`, type: "lane", position: { x: l.col * COL_GAP + CARD_W / 2 - 110, y: -40 }, width: 220, height: 20,
-      draggable: false, selectable: false, connectable: false, data: { label: l.label },
+      id: `lane:${l.col}`, type: "lane", position: { x: l.col * COL_GAP, y: -40 }, width: CARD_W, height: 20,
+      draggable: false, selectable: false, connectable: false, focusable: false, data: { label: l.label, align: l.align },
     }));
     return [...lanes, ...cards];
   }, [model, overFinding, touched]);
 
   const edges = useMemo((): River[] => model.rivers.map((r, i) => ({
-    id: `r${i}`, type: "river", source: r.from, target: r.to, selectable: false, focusable: false,
+    id: `r${i}`, type: "river", source: r.from, target: r.to, selectable: false, focusable: true,
     data: { finding: r.finding, kind: r.kind, series: r.series, tokens: r.tokens, dim: !!overFinding && overFinding !== r.finding, lit: overFinding === r.finding },
     zIndex: overFinding === r.finding ? 2 : 1,
   })), [model, overFinding]);
 
-  const zoom = Math.min(FIT_ZOOM, (boxWidth - 40) / Math.max(model.extent.w, 1));
-  const areaHeight = model.cards.length ? Math.max(300, Math.min(640, Math.round(model.extent.h * zoom) + 56)) : 220;
+  // the map is fitted to its width once, down to MIN_ZOOM and no further: a map too wide for that is drawn at
+  // MIN_ZOOM from its left edge, where the sources are, and the rest is reached by panning
+  const zoom = model.zoom;
+  const drawnH = Math.round(model.extent.h * zoom);
+  const areaHeight = model.cards.length ? Math.max(300, Math.min(820, drawnH + TOP + GUTTER + 8)) : 220;
+  const wide = model.extent.w * zoom > boxWidth - 2 * GUTTER + 1;
+  const tall = drawnH > areaHeight - TOP - GUTTER + 1;
+  const overflowing = wide || tall;
+  // the map sits centred in its box, under the zoom row; one larger than the box starts at its top left corner, where
+  // the lane captions and the sources are
+  const fit = useCallback((duration: number) => {
+    const x = wide ? GUTTER : (boxWidth - model.extent.w * zoom) / 2;
+    const y = (tall ? TOP : TOP + (areaHeight - TOP - GUTTER - model.extent.h * zoom) / 2) + 40 * zoom;
+    flow.setViewport({ x, y, zoom }, { duration });
+  }, [flow, wide, tall, boxWidth, model.extent, areaHeight, zoom]);
+  // a card the keyboard lands on is panned into view; the browser must not scroll the pane for it (overflow: clip, app.css)
+  const reveal = useCallback((id: string) => {
+    const p = model.positions.get(id);
+    const area = box.current?.querySelector<HTMLElement>(".flow-area");
+    if (!p || !area) return;
+    const vp = flow.getViewport();
+    const left = p.x * vp.zoom + vp.x, right = (p.x + CARD_W) * vp.zoom + vp.x, top = p.y * vp.zoom + vp.y, bottom = (p.y + model.cardH) * vp.zoom + vp.y;
+    const dx = left < GUTTER ? GUTTER - left : right > area.clientWidth - GUTTER ? area.clientWidth - GUTTER - right : 0;
+    const dy = top < TOP ? TOP - top : bottom > area.clientHeight - GUTTER ? area.clientHeight - GUTTER - bottom : 0;
+    if (dx || dy) flow.setViewport({ x: vp.x + dx, y: vp.y + dy, zoom: vp.zoom }, { duration: 150 });
+  }, [flow, model]);
   useEffect(() => {
     if (!nodes.length) return;
     let frame = window.requestAnimationFrame(() => {
-      frame = window.requestAnimationFrame(() => flow.fitView({ padding: FIT_PAD, maxZoom: FIT_ZOOM, duration: 0 }));
+      frame = window.requestAnimationFrame(() => fit(0));
     });
     return () => window.cancelAnimationFrame(frame);
-  }, [nodes, areaHeight, flow]);
+  }, [nodes, fit]);
+
+  // the keyboard reaches what the pointer does: Tab moves between cards and paths and reads each under the map, Enter opens it
+  const focused = (e: FocusEvent | KeyboardEvent) => {
+    const el = (e.target as HTMLElement).closest?.(".react-flow__node, .react-flow__edge");
+    return el ? { edge: el.classList.contains("react-flow__edge"), id: el.getAttribute("data-id") } : null;
+  };
+  const findingOf = (edgeId: string) => model.rivers[Number(edgeId.slice(1))]?.finding ?? null;
+  const onFocus = (e: FocusEvent) => {
+    const f = focused(e);
+    if (!f?.id || f.id.startsWith("lane:")) return;
+    if (f.edge) { const id = findingOf(f.id); if (id) setOver({ kind: "river", id }); } else { setOver({ kind: "card", id: f.id }); reveal(f.id); }
+  };
+  const onBlur = (e: FocusEvent) => { if (!box.current?.contains(e.relatedTarget as globalThis.Node | null)) setOver(null); };
+  const onKeyDown = (e: KeyboardEvent) => {
+    if (e.key !== "Enter" && e.key !== " ") return;
+    const f = focused(e);
+    if (!f?.id || f.id.startsWith("lane:")) return;
+    e.preventDefault();
+    if (f.edge) { const id = findingOf(f.id); if (id) go(scenario, "finding", id); } else go(scenario, "graph", f.id);
+  };
 
   const ribbon = overFinding ? view.ribbons.find((r) => r.id === overFinding) : null;
   const folded = view.folded;
   return (
-    <div className={`chart riskflow${overFinding ? " reading" : ""}`} ref={box}>
-      <div className="flow-area" style={{ height: areaHeight }}>
+    <div className={`chart riskflow${overFinding ? " reading" : ""}`} ref={box} style={{ "--rf-type": model.typeScale } as CSSProperties}>
+      <div className="flow-area" style={{ height: areaHeight }} onFocus={onFocus} onBlur={onBlur} onKeyDown={onKeyDown}>
         <ReactFlow
           nodes={nodes} edges={edges} nodeTypes={NODE_TYPES} edgeTypes={EDGE_TYPES}
-          fitView fitViewOptions={{ padding: FIT_PAD, maxZoom: FIT_ZOOM }} minZoom={0.3} maxZoom={2.2}
+          fitView fitViewOptions={{ padding: 0.05, maxZoom: FIT_ZOOM, minZoom: MIN_ZOOM }} minZoom={0.5} maxZoom={2.2}
           nodesDraggable={false} nodesConnectable={false} elementsSelectable={false} zoomOnScroll={false} zoomOnDoubleClick={false} preventScrolling={false} panOnScroll={false}
           proOptions={{ hideAttribution: true }} colorMode="dark"
           onNodeMouseEnter={(_, n) => n.type === "rcard" && setOver({ kind: "card", id: n.id })} onNodeMouseLeave={() => setOver(null)}
@@ -245,12 +312,12 @@ function Inner({ view, posture, names, scenario }: RiskFlowProps) {
           <div className="zoom" role="group" aria-label="Zoom">
             <button onClick={() => flow.zoomIn({ duration: 200 })} title="Zoom in" aria-label="Zoom in">+</button>
             <button onClick={() => flow.zoomOut({ duration: 200 })} title="Zoom out" aria-label="Zoom out">−</button>
-            <button className="fit" onClick={() => flow.fitView({ padding: FIT_PAD, maxZoom: FIT_ZOOM, duration: 200 })} title="Fit the chart to the box" aria-label="Fit">⤢</button>
+            <button className="fit" onClick={() => fit(200)} title="Fit the chart to the box" aria-label="Fit">⤢</button>
           </div>
         </ReactFlow>
         {!model.cards.length && <p className="riskflow-empty">Nothing is drawn because nothing is open: no untrusted source reaches a high-impact action here.</p>}
       </div>
-      <div className="chart-key" aria-hidden>
+      <div className="chart-key" role="note" aria-label="Key">
         <span><i className="k-hot" />untrusted text, running the open paths</span>
         {model.rivers.some((r) => r.series === "private") && <span><i className="k-private" />private data</span>}
         {model.rivers.some((r) => r.series === "exit") && <span><i className="k-exit" />the way out</span>}
@@ -266,7 +333,7 @@ function Inner({ view, posture, names, scenario }: RiskFlowProps) {
             : <><strong>{name(ribbon.agent_ids[0])}</strong> holds untrusted input, private data and a way out · {ribbon.id} · click to open</>
         ) : overCard ? (
           <><strong>{overCard.name}</strong> <code>{overCard.id}</code>{overCard.eyebrow} · {overCard.sub}{overCard.figure && overCard.figure.value ? ` · ${overCard.figure.label} ${overCard.figure.value} ${overCard.figure.unit}` : overCard.figure ? ` · ${overCard.figure.unit}` : ""} · click to open it in the Explorer</>
-        ) : model.cards.length ? "Each path is one open finding. Hover it to read it, click it to open it; click a card to open it in the Explorer."
+        ) : model.cards.length ? `Each path is one open finding. Hover it to read it, click it to open it; click a card to open it in the Explorer.${overflowing ? " The map is larger than its box: drag it to pan, or zoom with + and −." : ""}`
           : "Nothing is drawn because nothing is open: no untrusted source reaches a high-impact action here."}
       </p>
     </div>

@@ -51,7 +51,7 @@ function toData(graph: Graph, names: Record<string, string>, focus: Focus | null
       return {
         id: l.id, relationship: edgeWord(l), color: f.series ? (f.series === "hot" ? p.hot : f.series === "private" ? p.amber : p.accent) : p.line,
         source: graph.nodes.find((n) => n.data.id === l.data.from_id)!.id, target: graph.nodes.find((n) => n.data.id === l.data.to_id)!.id,
-        visible: true, width: f.onFocus ? 2 : 1, fontSize: 5, data: { key: f.key, sentence: f.sentence, gated: f.gated, gate: f.gate, onFocus: f.onFocus },
+        visible: true, width: f.onFocus ? 2 : 1, fontSize: 11, data: { key: f.key, sentence: f.sentence, gated: f.gated, gate: f.gate, onFocus: f.onFocus },
       };
     }),
   };
