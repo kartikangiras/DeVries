@@ -1,4 +1,4 @@
-.PHONY: help up down wipe probe seed test ui serve dev app e2e mcp mcp-config queries-md queries-doc self-manifest agent-eval
+.PHONY: help up down wipe probe seed test ui serve dev app e2e mcp mcp-config queries-md queries-doc self-manifest agent-eval audit
 
 APP_URL ?= http://127.0.0.1:8000
 
@@ -17,6 +17,7 @@ help:
 	@echo "make queries-doc rewrite docs/QUERIES.md from the query catalog"
 	@echo "make self-manifest  rewrite manifests/devries.tools.json from this server's own tool list"
 	@echo "make agent-eval  compare the auditor with the baseline search on every scenario (RUNS=3; needs a model to say anything about the agent)"
+	@echo "make audit       one audit on a shared scenario (SCENARIO=acme_dev), with the model when a key is set; the app shows the run"
 	@echo "make down        stop FalkorDB (data volume kept)     make wipe   stop it and delete the volume"
 
 .env:
@@ -47,10 +48,10 @@ ui: ui/node_modules
 	cd ui && npm run build
 
 serve: up ui
-	uv run uvicorn devries.app:app --port 8000
+	uv run uvicorn devries.app:app --port 8000 --no-server-header
 
 dev: up ui/node_modules
-	(uv run uvicorn devries.app:app --port 8000 --reload --reload-dir devries & cd ui && npm run dev)
+	(trap 'kill 0' EXIT; uv run uvicorn devries.app:app --port 8000 --reload --reload-dir devries --no-server-header & cd ui && npm run dev)
 
 app: .env
 	docker compose up -d --wait --build
@@ -76,3 +77,7 @@ self-manifest:
 RUNS ?= 3
 agent-eval: up
 	uv run python -m devries.agent.evaluate --runs $(RUNS)
+
+SCENARIO ?= acme_dev
+audit: up
+	uv run python -m devries.agent --scenario $(SCENARIO)
