@@ -6,8 +6,10 @@ each, and reports where the scan disagrees with the file's `expect` block.
 
 --import takes the tools of a real install: `claude-desktop`, `cursor` or `vscode`
 (their config files), a JSON config with an `mcpServers` block, one stdio command
-in quotes, a streamable-HTTP URL, or a saved tools/list file. Each server is
-launched with your own environment, so only import what you would run anyway.
+in quotes, a streamable-HTTP URL, or a saved tools/list file. Each stdio server is
+launched with a small, named environment (PATH, HOME, the locale, the toolchain
+variables; never this app's own secrets), so still only import what you would run.
+--no-launch reads the tools/list files an earlier import saved instead, for CI.
 The draft it writes has every label `unknown`; label it (here with --label, or in
 the UI) before anything is a finding.
 """
@@ -75,6 +77,8 @@ if __name__ == "__main__":
     parser.add_argument("--missing-only", action="store_true", help="skip scenarios whose graph already exists")
     parser.add_argument("--fail-on", choices=["open"], help="exit 1 if any finding is open after the scan: a gate for CI")
     parser.add_argument("--import", dest="source", help="a client name, a config file, a command, a URL or a tools/list file")
+    parser.add_argument("--no-launch", action="store_true",
+                        help="with --import: never launch a stdio server; read the tools/list a previous import saved under manifests/, or skip it (for CI)")
     parser.add_argument("--name", help="the scenario name to write (default: import_<client>)")
     parser.add_argument("--label", action="append", default=[], metavar="ID=VALUE",
                         help="a label for the draft: src:<server>=untrusted|internal|private, res:<server>=high|medium|low, res:<server>.external=true|false")
@@ -84,9 +88,10 @@ if __name__ == "__main__":
 
         labels = dict(item.split("=", 1) for item in args.label if "=" in item)
         root = get_settings().scenarios_dir.parent
-        print(f"importing {args.source}: each stdio server is launched with your environment")
+        print(f"importing {args.source}: " + ("no server is launched; saved tools/list files are read" if args.no_launch
+                                                   else "each stdio server is launched with a small, named environment"))
         try:
-            result = asyncio.run(import_install(args.source, root, args.name, labels))
+            result = asyncio.run(import_install(args.source, root, args.name, labels, launch=not args.no_launch))
         except DeVriesError as e:
             print(f"FAILED: {e.message}")
             sys.exit(1)

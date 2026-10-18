@@ -109,7 +109,10 @@ def discover(source: str) -> tuple[str, list[ServerSource]]:
         return "client", [ServerSource(id=f"srv:{slug(source.split('//', 1)[1].split('/')[0])}", name=source.split("//", 1)[1].split("/")[0], url=source)]
     path = Path(source).expanduser()
     if path.is_file() and path.suffix == ".json":
-        data = json.loads(path.read_text(encoding="utf-8"))
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as e:
+            raise InvalidScenario(f"{path} is not a JSON file that can be read: {e}") from e
         if isinstance(data, dict) and ("mcpServers" in data or "servers" in data):
             return path.stem, _from_config(path)
         if isinstance(data, dict) and "tools" in data:
@@ -175,6 +178,14 @@ def _from_config_data(data, where: str) -> list[ServerSource]:
     return out
 
 
+def _cause(e: BaseException) -> str:
+    """The leaf of an exception group, named: what a person can act on, never "unhandled errors in a TaskGroup"."""
+    while isinstance(e, BaseExceptionGroup) and e.exceptions:
+        e = e.exceptions[0]
+    text = str(e).strip().splitlines()[0][:160] if str(e).strip() else ""
+    return f"{type(e).__name__}: {text}" if text else type(e).__name__
+
+
 async def fetch_tools(server: ServerSource, timeout: float = FETCH_TIMEOUT_S) -> Manifest:
     """The server's `tools/list`, as a manifest. A stdio server is launched with this user's environment."""
     if server.manifest_path:
@@ -182,8 +193,7 @@ async def fetch_tools(server: ServerSource, timeout: float = FETCH_TIMEOUT_S) ->
     if server.url:
         target: object = server.url
     else:
-        env = {**os.environ, **server.env}
-        target = StdioServerParameters(command=server.command or "", args=server.args, env=env)
+        target = StdioServerParameters(command=server.command or "", args=server.args, env=launch_env(server.env))
     try:
         async with asyncio.timeout(timeout):
             async with Client(target) as session:   # type: ignore[arg-type]
@@ -191,7 +201,9 @@ async def fetch_tools(server: ServerSource, timeout: float = FETCH_TIMEOUT_S) ->
     except TimeoutError as e:
         raise InvalidScenario(f"{server.name}: no tools/list within {timeout:g} s") from e
     except Exception as e:                           # a launch that fails surfaces as an exception group
-        raise InvalidScenario(f"{server.name}: {type(e).__name__}: {str(e)[:200]}") from e
+        hint = ("; a remote server that wants a login cannot be read this way: save its tools/list and import that file"
+                if server.url else "")
+        raise InvalidScenario(f"{server.name}: could not list its tools ({_cause(e)}){hint}") from e
     tools = []
     for t in listed:
         if not TOOL_NAME_RE.fullmatch(t.name):
@@ -200,6 +212,20 @@ async def fetch_tools(server: ServerSource, timeout: float = FETCH_TIMEOUT_S) ->
         annotations = t.annotations.model_dump(by_alias=True, exclude_none=True) if getattr(t, "annotations", None) else None
         tools.append(ManifestTool(name=t.name, description=t.description or "", inputSchema=t.input_schema or {}, annotations=annotations))
     return Manifest(tools=tools)
+
+
+# What a launched server may see of this process's environment: what a shell gives a program, never this app's own
+# secrets (ANTHROPIC_API_KEY, FALKORDB_PASSWORD, DEVRIES_MCP_TOKEN). The config's own `env` block is added whole.
+ENV_PASSTHROUGH = re.compile(
+    r"^(PATH|HOME|USER|LOGNAME|SHELL|LANG|LANGUAGE|LC_[A-Z_]+|TMPDIR|TEMP|TMP|TERM|COLORTERM|XDG_[A-Z_]+|SSL_CERT_[A-Z_]+|"
+    r"NODE_[A-Z_]+|NPM_CONFIG_[A-Z_]+|NVM_[A-Z_]+|PYTHON[A-Z_]*|UV_[A-Z_]+|VIRTUAL_ENV|JAVA_HOME|GOPATH|CARGO_HOME|"
+    r"SYSTEMROOT|WINDIR|APPDATA|LOCALAPPDATA|PROGRAMFILES(\(X86\))?|PROGRAMDATA|COMSPEC|PATHEXT|USERPROFILE|HOMEDRIVE|HOMEPATH)$",
+    re.IGNORECASE)
+
+
+def launch_env(server_env: dict[str, str]) -> dict[str, str]:
+    """The environment a stdio server is launched with."""
+    return {k: v for k, v in os.environ.items() if ENV_PASSTHROUGH.match(k)} | {str(k): str(v) for k, v in server_env.items()}
 
 
 def guess(server_name: str) -> dict:
@@ -265,7 +291,8 @@ def _settings_for(origin: Origin | None) -> list[Path]:
 # ---------------------------------------------------------------------- the draft
 
 def draft(name: str, client_name: str, source: str, servers: list[tuple[ServerSource, Manifest]],
-          labels: dict[str, str] | None = None, origin: Origin | None = None, rules: dict[str, list[str]] | None = None) -> str:
+          labels: dict[str, str] | None = None, origin: Origin | None = None, rules: dict[str, list[str]] | None = None,
+          manifest_paths: dict[str, str] | None = None) -> str:
     """The scenario file for an import: one agent, the client, holding every tool; one source and one resource
     per server; trust and impact unknown until labelled (or given in `labels` as id=value). With Claude Code rules,
     a denied tool is not granted and an asked-about one is granted behind a gate."""
@@ -285,7 +312,8 @@ def draft(name: str, client_name: str, source: str, servers: list[tuple[ServerSo
         lines.append(f"origin: {json.dumps(origin.to_dict())}")
     lines += ["", "servers:"]
     for server, _ in servers:
-        lines.append(f"  - {{id: {server.id}, name: {json.dumps(server.name)}, manifest: manifests/{server.id[4:]}.tools.json, synthetic: false, source_url: {json.dumps(server.origin)}}}")
+        manifest = (manifest_paths or {}).get(server.id, f"manifests/{server.id[4:]}.tools.json")
+        lines.append(f"  - {{id: {server.id}, name: {json.dumps(server.name)}, manifest: {manifest}, synthetic: false, source_url: {json.dumps(server.origin)}}}")
     lines += ["", "tools:"]
     for server, manifest in servers:
         tail = server.id[4:]
@@ -344,13 +372,29 @@ class ImportResult:
     origin: Origin | None = None
 
 
+def manifest_path(root: Path, name: str, server_id: str) -> Path:
+    """Where an import keeps a server's tools/list: `manifests/<server>.tools.json`, unless that file is one of the
+    bundled fixtures (written by no import), which an import must never overwrite: then `manifests/<scenario>.<server>.tools.json`."""
+    default = root / "manifests" / f"{server_id[4:]}.tools.json"
+    if default.is_file():
+        try:
+            own = "imported_at" in json.loads(default.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError, TypeError):
+            own = False
+        if not own:
+            return root / "manifests" / f"{name}.{server_id[4:]}.tools.json"
+    return default
+
+
 def _write_import(root: Path, name: str, client_name: str, source: str, fetched: list[tuple[ServerSource, Manifest]],
                   skipped: list[str], labels: dict[str, str] | None, origin: Origin | None, rules: dict[str, list[str]] | None) -> ImportResult:
     (root / "manifests").mkdir(parents=True, exist_ok=True)
     (root / "scenarios").mkdir(parents=True, exist_ok=True)
     written = []
+    paths: dict[str, str] = {}
     for server, manifest in fetched:
-        path = root / "manifests" / f"{server.id[4:]}.tools.json"
+        path = manifest_path(root, name, server.id)
+        paths[server.id] = f"manifests/{path.name}"
         path.write_text(json.dumps({
             "server": server.name, "synthetic": False, "source": server.origin, "imported_at": int(time.time() * 1000),
             "note": "Taken from the server's own tools/list by `devries.ingest --import`. Every string in it is untrusted text.",
@@ -358,7 +402,7 @@ def _write_import(root: Path, name: str, client_name: str, source: str, fetched:
         }, indent=2), encoding="utf-8")
         written.append(path)
     scenario_path = root / "scenarios" / f"{name}.yaml"
-    scenario_path.write_text(draft(name, client_name, source, fetched, labels, origin, rules), encoding="utf-8")
+    scenario_path.write_text(draft(name, client_name, source, fetched, labels, origin, rules, paths), encoding="utf-8")
     return ImportResult(scenario=name, scenario_path=scenario_path, manifests=written,
                         servers=[s.id for s, _ in fetched], skipped=skipped, tools=sum(len(m.tools) for _, m in fetched), origin=origin)
 
@@ -369,10 +413,21 @@ def _check_name(name: str) -> str:
     return name
 
 
-async def _fetch_all(found: list[ServerSource], timeout: float, max_tools: int | None = None) -> tuple[list[tuple[ServerSource, Manifest]], list[str]]:
+async def _fetch_all(found: list[ServerSource], timeout: float, max_tools: int | None = None, *, launch: bool = True,
+                     manifest_dir: Path | None = None, name: str | None = None) -> tuple[list[tuple[ServerSource, Manifest]], list[str]]:
     fetched: list[tuple[ServerSource, Manifest]] = []
     skipped: list[str] = []
     for server in found:
+        if not launch and server.command and not server.manifest_path:
+            candidates = [manifest_dir / f"{name}.{slug(server.name)}.tools.json"] if manifest_dir and name else []
+            candidates += [manifest_dir / f"{slug(server.name)}.tools.json"] if manifest_dir else []
+            saved = next((p for p in candidates if p.is_file()), None)
+            if saved is not None:
+                server.manifest_path = saved              # the tools/list an earlier import saved: nothing is launched
+            else:
+                skipped.append(f"{server.name}: not launched (--no-launch), and no saved tools/list at "
+                               f"manifests/{slug(server.name)}.tools.json; import once where it may run, then commit that file")
+                continue
         try:
             manifest = await fetch_tools(server, timeout)
         except InvalidScenario as e:
@@ -389,13 +444,14 @@ async def _fetch_all(found: list[ServerSource], timeout: float, max_tools: int |
 
 
 async def import_install(source: str, root: Path, name: str | None = None, labels: dict[str, str] | None = None,
-                         timeout: float = FETCH_TIMEOUT_S) -> ImportResult:
-    """Discover, fetch, draft and write. The caller loads the file afterwards (so that it can say what it found)."""
+                         timeout: float = FETCH_TIMEOUT_S, *, launch: bool = True) -> ImportResult:
+    """Discover, fetch, draft and write. The caller loads the file afterwards (so that it can say what it found).
+    With `launch` off (CI), a stdio server is read from the tools/list a previous import saved, or skipped."""
     client_name, found = discover(source)
     name = _check_name(name or f"import_{slug(client_name).replace('-', '_')}")
     origin = origin_of(source, client_name, found)
     rules = read_permissions(_settings_for(origin)) if origin.kind == "claude-code" else None
-    fetched, skipped = await _fetch_all(found, timeout)
+    fetched, skipped = await _fetch_all(found, timeout, launch=launch, manifest_dir=root / "manifests", name=name)
     if not fetched:
         raise InvalidScenario("nothing could be imported: " + "; ".join(skipped))
     return _write_import(root, name, client_name, source, fetched, skipped, labels, origin, rules)
