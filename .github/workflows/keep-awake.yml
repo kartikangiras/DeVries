@@ -1,0 +1,16 @@
+# Asks the public copy for its health every ten minutes, so a free container that would sleep when idle stays up
+# and the first visitor after a quiet spell does not wait for it to wake. The step never fails: a slow answer is
+# the thing it is there to prevent, not a fault to report. Run it by hand from the Actions tab to check the address.
+name: keep-awake
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ask the app for its health
+        run: |
+          curl -sS --max-time 60 --retry 5 --retry-delay 15 --retry-all-errors \
+            https://devries-production.up.railway.app/api/health | head -c 300 || echo "the app did not answer"
