@@ -25,10 +25,9 @@ ui/e2e/shots/
 .snapshots/
 .DS_Store
 
-# plans stay local; the README, the generated query list and the third-party notices ship
+# plans stay local; the README and the generated query list ship
 *.md
 !README.md
 !docs/QUERIES.md
-!ui/THIRD_PARTY_NOTICES.md
 # brand sources
 logos/
