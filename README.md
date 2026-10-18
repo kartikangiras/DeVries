@@ -2,7 +2,7 @@
 
 # DeVries
 
-[![ci](https://github.com/kartikangiras/cistern/actions/workflows/ci.yml/badge.svg)](https://github.com/kartikangiras/cistern/actions/workflows/ci.yml)
+[![ci](https://github.com/kartikangiras/DeVries/actions/workflows/ci.yml/badge.svg)](https://github.com/kartikangiras/DeVries/actions/workflows/ci.yml)
 
 DeVries audits a system of AI agents for the paths by which untrusted text can reach a high-impact action, and finds the smallest configuration change that closes each path without breaking the work the agents do. Agents, MCP tools, data sources and resources are one graph in [FalkorDB](https://www.falkordb.com/). Every finding is a graph query, every fix is tested in a throwaway copy of the graph, and nothing changes until a person approves.
 
@@ -86,25 +86,9 @@ The app opens on a front door at `#/scenarios`: every scenario as a card with it
 
 One FalkorDB graph per scenario (`scn:<name>`); one copy per visitor who changes something (`ses:<session>:<name>`); throwaway sandboxes (`sbx:<ms>:<id>`).
 
-```mermaid
-graph LR
-  subgraph Configuration
-    W[Workflow] -- RUN_BY --> A[Agent]
-    W -- NEEDS --> T[Tool]
-    W -- NEEDS_DATA --> D[DataSource]
-    A -- "CAN_CALL {gate}" --> T
-    A -- "DELEGATES_TO {gate}" --> A
-    T -- READS --> D
-    T -- WRITES --> R[Resource]
-    R -- FEEDS --> D
-    T -- PROVIDED_BY --> S[MCPServer]
-  end
-  subgraph Records
-    F[Finding] -- "VIA {i}" --> A
-    M[Mitigation] -- FIXES --> F
-    M -- DRAFTS --> X[Draft]
-  end
-```
+<p align="center"><img src="docs/devries-graph.gif" width="900" alt="The dev team's eleven-hop injection path, lit one hop at a time: GitHub issues, get_issue, the triage agent, the planner, the coder, push, the main branch, the repository, read_file, the release bot, deploy, production. Each hop names the rule that derived it."></p>
+
+One bug report reaches production in eleven hops. Every edge on that path is a `FLOWS_TO` edge, derived from one configuration edge by one of the seven rules below, and found with `algo.bfs`. The nodes and the relationships:
 
 | Node | Key properties |
 | --- | --- |
@@ -138,21 +122,6 @@ Verdict queries traverse `FLOWS_TO` only, so a gate or a quarantine stops a path
 ### How the auditor queries it
 
 The model, or the scripted search in its place, never reads a configuration file. It calls the MCP tools; each tool runs catalog queries on the graph and answers with ids, naming the queries it ran. A reason (`because`) that cites no id a tool returned is refused, so every decision traces back to a query.
-
-```mermaid
-sequenceDiagram
-  participant M as Model, or the scripted search
-  participant T as MCP tool
-  participant F as FalkorDB
-  M->>T: find_injection_paths(scenario, because)
-  T->>F: GRAPH.RO_QUERY reach.untrusted_to_high, find.trifecta, evidence.pair_paths
-  F-->>T: finding ids, node ids, paths
-  T-->>M: findings, with `queries` naming what ran
-  M->>T: propose_fix(plan, because="fnd:… is the most severe")
-  T->>F: GRAPH.COPY, fix.gate_call, projection.rebuild, the three verdicts, delete the copy
-  F-->>T: the verdict
-  T-->>M: mit:… proposed; a person decides
-```
 
 What each tool reads and writes, read off a run on `acme_support` (every name is a catalog entry; every tool also runs `graph.node_count` for the BFS depth and `node.names` for display names):
 
@@ -207,6 +176,8 @@ All 90 statements live in [`devries/graph/catalog.py`](devries/graph/catalog.py)
 ## Architecture
 
 One FastAPI process: REST + server-sent events, the MCP server at `/mcp` and over stdio, the auditor loop, and the built UI. The UI's routes and the MCP tools call the same functions in `devries/ops.py`; the auditor is an MCP client of the same server.
+
+<p align="center"><img src="docs/devries-architecture.gif" width="900" alt="One process, one graph. Outside the app: the browser, a person as the only approver, an MCP client, the Anthropic API, your MCP config, MCP servers and the scenario files. Inside: REST and events, ops.py, the MCP server, the auditor loop, the janitor and the importer. Below: the config file, apply for approved plans only, the query catalog, a graph per scenario, a visitor's copy and a sandbox GRAPH.COPY."></p>
 
 - **Approval** happens only through the API, by name. Every decision records a hash of the session that made it. There is no MCP tool for it.
 - **Cross-site requests are refused.** A POST with another `Origin`, with `Sec-Fetch-Site: cross-site`, or for a `Host` the app does not serve (this machine, plus `ALLOWED_HOSTS`) gets 403. `/mcp` checks the same hosts. Decisions require a JSON body. Every response carries a Content-Security-Policy that allows nothing from outside the app.
@@ -337,7 +308,7 @@ devries/apply.py      write an approved plan to its file from the command line
 ui/                   React and Vite; src/graph/ draws the charts; src/landing/ is the landing page; e2e/ the browser suites
 scenarios/            the nine scenario files
 manifests/            the tool manifests they point at
-docs/QUERIES.md       every query, generated; docs/eval.json the last eval with a model; docs/screenshots/
+docs/                 QUERIES.md, generated from the catalog; eval.json, the last eval with a model; the two pictures; screenshots/
 deploy/               compose overlay with Caddy, Caddyfile, uptime check, ci.yml
 tests/                probes, unit, golden, contracts, agent, api
 .github/workflows/    ci: lint, the suite against a FalkorDB service, the UI build
