@@ -1,12 +1,14 @@
-// The showcase in the hero: one finding on the support desk, from the scan to its closing, as a
-// fifteen-second loop that plays by itself while it is on screen; the visitor can approve the fix
-// early, or pause it. The hops, the verdicts and the receipts are what the app shows on acme_support.
+// The showcase in the hero: one finding on the support desk, from the scan to its closing. It starts
+// by itself a second after it is on screen, runs once, holds on the closing and starts over; the
+// visitor can approve the fix early, or replay it. Under 768px it is a still of its last frame.
+// The hops, the verdicts and the receipts are what the app shows on acme_support.
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { Arrow, Check, Cross, Spinner, useInView } from "./bits";
+import type { About } from "../api";
+import { Arrow, Check, Cross, Spinner, costOf, useInView } from "./bits";
 
+/** The finding the demo tells. Its id is read from the app (Landing.tsx) and arrives as a prop; the rest is its story. */
 const FINDING = {
-  id: "dce0910d42",
   scenario: "Acme support desk",
   title: "Customer tickets",
   em: "can reach Payments API.",
@@ -25,15 +27,17 @@ const HOPS: Hop[] = [
   { rule: 5, edge: "WRITES", words: "A tool acts on its resource", line: "issue_refund acts on Payments API, which is high impact" },
 ];
 
-type Candidate = { kind: string; short: string; title: string; change: string; cost: number; passed: boolean; reason: string };
+/** `fix` is the engine's name for the kind of fix, which is what its cost is keyed by; `kind` is the word on screen. */
+type Candidate = { kind: string; fix: string; short: string; title: string; change: string; passed: boolean; reason: string };
 const CANDIDATES: Candidate[] = [
-  { kind: "revoke", short: "revoke get_ticket", title: "Revoke get_ticket from Support bot", change: "DELETE (agent:support-bot)-[:CAN_CALL]->(tool:helpdesk.get_ticket)", cost: 2, passed: false, reason: "breaks wf:refund-request: nothing on its path can read src:customer-tickets any more" },
-  { kind: "revoke", short: "revoke issue_refund", title: "Revoke issue_refund from Support bot", change: "DELETE (agent:support-bot)-[:CAN_CALL]->(tool:payments.issue_refund)", cost: 2, passed: false, reason: "breaks wf:refund-request: it needs tool:payments.issue_refund" },
-  { kind: "drop_read", short: "stop reading tickets", title: "Stop get_ticket reading Customer tickets", change: "DELETE (tool:helpdesk.get_ticket)-[:READS]->(src:customer-tickets)", cost: 2, passed: false, reason: "breaks wf:refund-request: nothing on its path can read src:customer-tickets any more" },
-  { kind: "gate", short: "gate issue_refund", title: "Gate issue_refund behind a person", change: "SET (agent:support-bot)-[:CAN_CALL {gate: 'human_approval'}]->(tool:payments.issue_refund)", cost: 2, passed: true, reason: "the finding is gone, nothing new opened, wf:refund-request still has what it needs" },
-  { kind: "split", short: "split Support bot", title: "Split Support bot: a quarantined reader reads", change: "CREATE (agent:support-bot)-[:DELEGATES_TO {gate: 'quarantine'}]->(agent:support-bot-reader)", cost: 3, passed: true, reason: "the finding is gone, nothing new opened, wf:refund-request still has what it needs" },
+  { kind: "revoke", fix: "revoke_call", short: "revoke get_ticket", title: "Revoke get_ticket from Support bot", change: "DELETE (agent:support-bot)-[:CAN_CALL]->(tool:helpdesk.get_ticket)", passed: false, reason: "breaks wf:refund-request: nothing on its path can read src:customer-tickets any more" },
+  { kind: "revoke", fix: "revoke_call", short: "revoke issue_refund", title: "Revoke issue_refund from Support bot", change: "DELETE (agent:support-bot)-[:CAN_CALL]->(tool:payments.issue_refund)", passed: false, reason: "breaks wf:refund-request: it needs tool:payments.issue_refund" },
+  { kind: "drop_read", fix: "drop_read", short: "stop reading tickets", title: "Stop get_ticket reading Customer tickets", change: "DELETE (tool:helpdesk.get_ticket)-[:READS]->(src:customer-tickets)", passed: false, reason: "breaks wf:refund-request: nothing on its path can read src:customer-tickets any more" },
+  { kind: "gate", fix: "gate_call", short: "gate issue_refund", title: "Gate issue_refund behind a person", change: "SET (agent:support-bot)-[:CAN_CALL {gate: 'human_approval'}]->(tool:payments.issue_refund)", passed: true, reason: "the finding is gone, nothing new opened, wf:refund-request still has what it needs" },
+  { kind: "split", fix: "split_agent", short: "split Support bot", title: "Split Support bot: a quarantined reader reads", change: "CREATE (agent:support-bot)-[:DELEGATES_TO {gate: 'quarantine'}]->(agent:support-bot-reader)", passed: true, reason: "the finding is gone, nothing new opened, wf:refund-request still has what it needs" },
 ];
-const PASSED = CANDIDATES.filter((c) => c.passed);
+/** The plans that passed, cheapest first, which is the order the brief lists them in. */
+const passedPlans = (about: About | null) => CANDIDATES.filter((c) => c.passed).sort((a, b) => costOf(about, a.fix) - costOf(about, b.fix));
 
 type Step = { doing: string; done: string; title: string; target: string; ref: string };
 const APPLY: Step[] = [
@@ -42,9 +46,9 @@ const APPLY: Step[] = [
   { doing: "Rescanning", done: "Rescanned", title: "No path from an outsider to a payment.", target: "reach.untrusted_to_high · find.trifecta · 0 injection · 0 trifecta · 8 ms", ref: "scan:9c2e01f4" },
 ];
 
-const RECEIPTS: { label: string; text: string; ref: string }[] = [
+const receipts = (findingId: string): { label: string; text: string; ref: string }[] => [
   { label: "MITIGATION", text: "Gate issue_refund behind a person, approved by you and applied", ref: "mit:b68c44c5ab" },
-  { label: "FINDING", text: "Customer tickets can no longer reach Payments API: closed", ref: "fnd:dce0910d42" },
+  { label: "FINDING", text: "Customer tickets can no longer reach Payments API: closed", ref: `fnd:${findingId}` },
   { label: "WORKFLOW", text: "Refund request still has every tool and source it needs", ref: "wf:refund-request" },
 ];
 
@@ -52,13 +56,29 @@ const RECEIPTS: { label: string; text: string; ref: string }[] = [
 
 type Phase = "scan" | "explaining" | "testing" | "brief" | "applying" | "closed";
 const ORDER: Phase[] = ["scan", "explaining", "testing", "brief", "applying", "closed"];
-/** Seconds each phase takes: fifteen in all, then the loop starts over. The approval on the brief is taken for the
- *  visitor when they do not click it themselves. */
-const DUR: Record<Phase, number> = { scan: 1.2, explaining: 4, testing: 4.2, brief: 1.6, applying: 2.4, closed: 1.6 };
+/** Seconds each phase takes: thirteen to the closing, which then holds a few seconds before the loop starts over.
+ *  The approval on the brief is taken for the visitor when they do not click it themselves. */
+const DUR: Record<Phase, number> = { scan: 1.2, explaining: 4, testing: 4.2, brief: 1.6, applying: 2.4, closed: 4.4 };
 const LABEL: Record<Phase, string> = { scan: "Scanning", explaining: "Explaining", testing: "Testing fixes", brief: "Brief", applying: "Applying", closed: "Closed" };
 const TOTAL = ORDER.reduce((s, p) => s + DUR[p], 0);
+/** Seconds from the scan to the closing, which the footer quotes. */
+const RUN = TOTAL - DUR.closed;
+/** The demo starts this long after it is first on screen. */
+const START_DELAY = 1000;
+/** Under this width the demo is a still of its last frame. */
+const NARROW = "(max-width: 767px)";
 
-type Playback = "playing" | "paused";
+function useNarrow(): boolean {
+  const [narrow, setNarrow] = useState(() => typeof window !== "undefined" && window.matchMedia(NARROW).matches);
+  useEffect(() => {
+    const mq = window.matchMedia(NARROW);
+    const on = () => setNarrow(mq.matches);
+    on();
+    mq.addEventListener("change", on);
+    return () => mq.removeEventListener("change", on);
+  }, []);
+  return narrow;
+}
 
 function startOf(p: Phase): number {
   let acc = 0;
@@ -71,17 +91,26 @@ function startOf(p: Phase): number {
 
 const pad = (n: number) => String(n).padStart(2, "0");
 
-export function HeroDemo({ appHref }: { appHref: string }) {
+/** `findingId` is the id the app shows for this finding; `about` prices the fixes and counts the rules, or is null until it loads. */
+export function HeroDemo({ appHref, about, findingId }: { appHref: string; about: About | null; findingId: string }) {
   const [wrap, inView] = useInView<HTMLDivElement>({ amount: 0.15, once: false });
-  const [playback, setPlayback] = useState<Playback>("playing");
+  const still = useNarrow();
+  const [started, setStarted] = useState(false);
   const [phase, setPhase] = useState<Phase>("scan");
   const [elapsed, setElapsed] = useState(0);
-  // a jump (an early approval) restarts the clock from the phase it lands on
+  // a jump (an early approval, a replay) restarts the clock from the phase it lands on
   const [epoch, setEpoch] = useState(0);
 
-  // The clock runs while the demo plays and is on screen, and wraps at the end: the loop never stops on its own.
+  // It starts by itself, a second after it is first on screen.
   useEffect(() => {
-    if (playback !== "playing" || !inView) return;
+    if (started || !inView || still) return;
+    const id = window.setTimeout(() => setStarted(true), START_DELAY);
+    return () => window.clearTimeout(id);
+  }, [started, inView, still]);
+
+  // The clock runs while the demo is on screen and wraps at the end: one run, a hold on the closing, then again.
+  useEffect(() => {
+    if (!started || !inView || still) return;
     const t0 = performance.now();
     const from = startOf(phase) + elapsed;
     const id = window.setInterval(() => {
@@ -98,64 +127,72 @@ export function HeroDemo({ appHref }: { appHref: string }) {
     }, 100);
     return () => window.clearInterval(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [playback, inView, epoch]);
+  }, [started, inView, still, epoch]);
 
   const approve = () => {
     setPhase("applying");
     setElapsed(0);
     setEpoch((e) => e + 1);
   };
-  const toggle = () => {
-    setPlayback((p) => (p === "playing" ? "paused" : "playing"));
+  const replay = () => {
+    setStarted(true);
+    setPhase("scan");
+    setElapsed(0);
     setEpoch((e) => e + 1);
   };
 
+  // the still shows the closing, at the second the run reaches it
+  const shown: Phase = still ? "closed" : phase;
+  const at = still ? RUN : startOf(phase) + elapsed;
   const stamp = useMemo(() => {
     const base = 14 * 3600 + 21 * 60;
-    const total = base + Math.floor(startOf(phase) + elapsed);
+    const total = base + Math.floor(at);
     return `${pad(Math.floor(total / 3600) % 24)}:${pad(Math.floor((total % 3600) / 60))}:${pad(total % 60)} UTC`;
-  }, [phase, elapsed]);
+  }, [at]);
 
   const progress = (() => {
-    if (playback === "paused") return "Paused";
+    if (still) return "Finding closed";
+    if (!started) return "Starting…";
     if (phase === "explaining") return `Hop ${pad(Math.min(HOPS.length, Math.floor(elapsed / (DUR.explaining / HOPS.length)) + 1))} of ${pad(HOPS.length)}`;
     if (phase === "testing") return `Sandbox ${pad(Math.min(CANDIDATES.length, Math.floor(elapsed / (DUR.testing / CANDIDATES.length)) + 1))} of ${pad(CANDIDATES.length)}`;
     if (phase === "applying") return `Step ${pad(Math.min(APPLY.length, Math.floor(elapsed / (DUR.applying / APPLY.length)) + 1))} of ${pad(APPLY.length)}`;
     if (phase === "brief") return "Awaiting approval";
-    if (phase === "closed") return "Finding closed · 15 s, looping";
+    if (phase === "closed") return `Finding closed · ${Math.round(RUN)} s, looping`;
     return "Scanning…";
   })();
 
-  const tone = phase === "brief" ? " amber" : phase === "closed" ? " quiet" : " accent";
+  const tone = shown === "brief" ? " amber" : shown === "closed" ? " quiet" : " accent";
 
   return (
-    <div ref={wrap} className="ld">
+    <div ref={wrap} className={`ld${still ? " ld-still" : ""}`}>
       <header className="ld-head">
         <span className="ld-lights" aria-hidden><i /><i /><i /></span>
-        <span className="ld-id">FINDING&nbsp;{FINDING.id}</span>
+        <span className="ld-id">FINDING&nbsp;{findingId}</span>
         <span className="ld-dot" aria-hidden>·</span>
         <span className="ld-scn">{FINDING.scenario}</span>
-        <span className={`ld-phase${tone}`}>{LABEL[phase]}</span>
+        <span className={`ld-phase${tone}`}>{LABEL[shown]}</span>
       </header>
 
       <div className="ld-canvas">
         <div className="ld-content">
-          <div key={phase} className="ld-pane">
-            {phase === "scan" && <ScanCanvas elapsed={elapsed} />}
-            {phase === "explaining" && <ExplainingCanvas elapsed={elapsed} />}
-            {phase === "testing" && <TestingCanvas elapsed={elapsed} />}
-            {phase === "brief" && <BriefCanvas elapsed={elapsed} awaiting onApprove={approve} />}
-            {phase === "applying" && <ApplyingCanvas elapsed={elapsed} />}
-            {phase === "closed" && <ClosedCanvas appHref={appHref} />}
+          <div key={shown} className="ld-pane">
+            {shown === "scan" && <ScanCanvas elapsed={elapsed} findingId={findingId} rules={about?.rules ?? 7} />}
+            {shown === "explaining" && <ExplainingCanvas elapsed={elapsed} />}
+            {shown === "testing" && <TestingCanvas elapsed={elapsed} />}
+            {shown === "brief" && <BriefCanvas elapsed={elapsed} awaiting onApprove={approve} about={about} />}
+            {shown === "applying" && <ApplyingCanvas elapsed={elapsed} />}
+            {shown === "closed" && <ClosedCanvas appHref={appHref} findingId={findingId} />}
           </div>
         </div>
       </div>
 
       <footer className="ld-foot">
         <span className="ld-stamp">{stamp}</span>
-        <button type="button" className="ld-ctl" onClick={toggle} aria-label={playback === "playing" ? "Pause the demo" : "Play the demo"}>
-          <span aria-hidden>{playback === "playing" ? "❚❚" : "▶"}</span> {playback === "playing" ? "Pause" : "Play"}
-        </button>
+        {!still && (
+          <button type="button" className="ld-ctl" onClick={replay} aria-label="Replay the demo">
+            <span aria-hidden>↺</span> Replay
+          </button>
+        )}
         <span className="ld-progress">{progress}</span>
       </footer>
     </div>
@@ -234,14 +271,14 @@ function SandboxGlyph({ verdict }: { verdict: boolean | null }) {
 
 // ---- canvases, one per phase
 
-function ScanCanvas({ elapsed }: { elapsed: number }) {
+function ScanCanvas({ elapsed, findingId, rules }: { elapsed: number; findingId: string; rules: number }) {
   return (
     <div className="ld-center">
       <Eyebrow>Scan</Eyebrow>
       <h2 className="ld-h ld-in">The support desk was scanned.</h2>
       <div className="ld-row first ld-in d1">
         <Word label="Scenario" />
-        <span className="ld-mono">acme_support · 15 nodes · 14 config edges · 7 rules</span>
+        <span className="ld-mono">acme_support · 15 nodes · 14 config edges · {rules} rules</span>
       </div>
       <div className="ld-row ld-in d2">
         <Word label="Queries" />
@@ -251,7 +288,7 @@ function ScanCanvas({ elapsed }: { elapsed: number }) {
         <div className="ld-routed ld-in">
           <Eyebrow accent>↳ Found</Eyebrow>
           <span className="ld-serif">
-            Finding <span className="ld-mono-inline">fnd:{FINDING.id}</span> opened. Customer tickets can reach Payments API.
+            Finding <span className="ld-mono-inline">fnd:{findingId}</span> opened. Customer tickets can reach Payments API.
           </span>
         </div>
       )}
@@ -333,8 +370,9 @@ function TestingCanvas({ elapsed }: { elapsed: number }) {
   );
 }
 
-function BriefCanvas({ elapsed, awaiting, onApprove }: { elapsed: number; awaiting: boolean; onApprove: () => void }) {
+function BriefCanvas({ elapsed, awaiting, onApprove, about }: { elapsed: number; awaiting: boolean; onApprove: () => void; about: About | null }) {
   const settled = elapsed > DUR.brief * 0.5;
+  const passed = passedPlans(about);
   const [firing, setFiring] = useState(false);
   const click = () => {
     if (firing || !awaiting) return;
@@ -366,11 +404,11 @@ function BriefCanvas({ elapsed, awaiting, onApprove }: { elapsed: number; awaiti
       <div className="ld-col ld-col-rail">
         <Eyebrow>Plans that passed</Eyebrow>
         <ol className="ld-list ld-list-rules">
-          {PASSED.map((c, i) => (
+          {passed.map((c, i) => (
             <li key={c.kind} className="ld-item">
               <span className="ld-n">{i + 1}.</span>
               <div className="min0">
-                <Word label={`${c.kind} · cost ${c.cost}`} />
+                <Word label={`${c.kind} · cost ${costOf(about, c.fix)}`} />
                 <div className="ld-item-title">{c.title}</div>
                 <div className="ld-item-target">{c.change}</div>
               </div>
@@ -407,7 +445,7 @@ function ApplyingCanvas({ elapsed }: { elapsed: number }) {
   );
 }
 
-function ClosedCanvas({ appHref }: { appHref: string }) {
+function ClosedCanvas({ appHref, findingId }: { appHref: string; findingId: string }) {
   return (
     <div className="ld-grid ld-grid-closed">
       <div className="ld-col">
@@ -422,7 +460,7 @@ function ClosedCanvas({ appHref }: { appHref: string }) {
       <div className="ld-col ld-col-rail">
         <Eyebrow>Receipts</Eyebrow>
         <ol className="ld-receipts">
-          {RECEIPTS.map((r) => (
+          {receipts(findingId).map((r) => (
             <li key={r.ref}>
               <Word label={r.label} />
               <span className="ld-receipt-text">{r.text}</span>

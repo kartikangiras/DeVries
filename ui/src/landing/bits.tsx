@@ -3,7 +3,15 @@
 // MCP servers, and a few glyphs drawn here so no icon library is needed.
 
 import { createElement, useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import type { About } from "../api";
 import { byId } from "./servers";
+
+/** The engine's cost of each kind of fix, as shipped: what the landing prices with until /api/about answers. */
+export const ENGINE_COSTS: Record<string, number> = { revoke_call: 1, gate_call: 2, quarantine_delegation: 2, drop_read: 3, split_agent: 4 };
+/** The cost of a kind of fix: the server's figure, else the engine's. */
+export const costOf = (about: About | null, fix: string): number => about?.fix_costs[fix] ?? ENGINE_COSTS[fix] ?? 0;
+/** A finding's id without its prefix, as the landing writes it. */
+export const DEMO_FINDING = "dce0910d42";
 
 export function useInView<T extends HTMLElement>({ margin = "0px", amount = 0, once = true }: { margin?: string; amount?: number; once?: boolean } = {}) {
   const ref = useRef<T>(null);
@@ -173,23 +181,6 @@ export function Cross({ size = 12, width = 3 }: { size?: number; width?: number 
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={width} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
       <path d="M18 6 6 18" />
       <path d="m6 6 12 12" />
-    </svg>
-  );
-}
-
-export function PlayGlyph({ size = 28 }: { size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" aria-hidden style={{ transform: "translateX(2px)" }}>
-      <path d="M7 4.5v15l12-7.5z" />
-    </svg>
-  );
-}
-
-export function Replay({ size = 11 }: { size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-      <path d="M3 12a9 9 0 1 0 3-6.7" />
-      <path d="M3 3v6h6" />
     </svg>
   );
 }

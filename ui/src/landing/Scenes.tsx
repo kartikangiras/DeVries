@@ -99,7 +99,7 @@ const CARDS = [
   { n: 4, rule: 5, edge: "WRITES", text: "issue_refund acts on Payments API", x: 80, y: 78 },
 ];
 
-export function ExplainScene() {
+export function ExplainScene({ findingId }: { findingId: string }) {
   const [ref, inView] = useInView<HTMLDivElement>({ once: false, amount: 0.2 });
   const t = useLoop(inView, 4.9);
   const gather = t >= 0.3 && t < 3.1;
@@ -118,7 +118,7 @@ export function ExplainScene() {
         </div>
       ))}
       <div className={`lx-brief${brief ? " show" : ""}`}>
-        <div className="lx-brief-eyebrow">FINDING · fnd:dce0910d42</div>
+        <div className="lx-brief-eyebrow">FINDING · fnd:{findingId}</div>
         <div className="lx-brief-line"><span className="lx-brief-cites">[1][2][3][4]</span><span>4 hops, 4 rules, 1 path</span></div>
       </div>
       <div className={`lx-check${check ? " show" : ""}`}><Check size={14} width={3.5} /></div>
