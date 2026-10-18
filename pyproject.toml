@@ -1,9 +1,11 @@
 [project]
 name = "devries"
 version = "0.2.0"
-description = "Graph-backed security auditor for multi-agent LLM systems, built on FalkorDB"
+description = "Audits a system of AI agents for the paths by which untrusted text can reach a high-impact action, and finds the smallest configuration change that closes each; one graph in FalkorDB"
 readme = "README.md"
 requires-python = ">=3.12"
+authors = [{ name = "Kartik Angiras", email = "angiraskartik@gmail.com" }]
+keywords = ["security", "ai-agents", "mcp", "falkordb", "graph", "prompt-injection"]
 dependencies = [
     "anthropic>=1.13,<2",
     "falkordb>=1.7,<2",
@@ -15,11 +17,16 @@ dependencies = [
     "uvicorn>=0.32",
 ]
 
+[project.urls]
+Repository = "https://github.com/kartikangiras/cistern"
+Issues = "https://github.com/kartikangiras/cistern/issues"
+
 [dependency-groups]
 dev = [
     "httpx2>=2.13.1",
     "pytest>=8",
     "pytest-asyncio>=0.24",
+    "ruff>=0.17.1",
 ]
 
 [build-system]

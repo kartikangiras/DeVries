@@ -2,7 +2,7 @@
 
 **This has not been done.** Nothing here has run on a server. The overlay was brought up on a laptop with
 `SITE_ADDRESS=localhost` and checked through the proxy (the list at the end); the steps below are what that
-check implies for one small VM, which is option A of PLAN.md section 17. Where to host is still an open
+check implies for one small VM. Where to host is still an open
 decision (N2 in section 18).
 
 ## What is here
@@ -21,7 +21,7 @@ overlay, the one thing reachable from outside the machine is Caddy, on ports 80 
 1. A VM with Docker and the compose plugin, a DNS record for the host name pointing at it, and ports 80 and 443
    open. On a laptop, at rest with the nine scenarios loaded, the app container used about 100 MB and FalkorDB
    about 80 MB; a visitor's copy of a small scenario cost about 160 KB of FalkorDB memory when it was measured
-   (PLAN.md section 17). Under load nothing has been measured, so check on the VM before raising `SESSION_MAX`.
+   when it was measured. Under load nothing has been measured, so check on the VM before raising `SESSION_MAX`.
 2. Clone the repository there, then write `.env`:
 
    ```bash

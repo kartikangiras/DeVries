@@ -1,4 +1,4 @@
-.PHONY: help up down wipe probe seed test ui serve dev app e2e mcp mcp-config queries-md queries-doc self-manifest agent-eval audit
+.PHONY: help up down wipe probe seed test lint ui serve dev app e2e mcp mcp-config queries-md queries-doc self-manifest agent-eval audit
 
 APP_URL ?= http://127.0.0.1:8000
 
@@ -7,6 +7,7 @@ help:
 	@echo "make probe       check the FalkorDB behaviours the design depends on"
 	@echo "make seed        load every scenario in scenarios/ and scan it against its expect block"
 	@echo "make test        run the whole test suite"
+	@echo "make lint        ruff over the package and the tests"
 	@echo "make serve       build the UI and run the app from source: UI, API and /mcp on http://localhost:8000"
 	@echo "make dev         the same with reload, plus the Vite dev server on http://localhost:5173"
 	@echo "make app         run FalkorDB and the app in containers (docker compose), on http://localhost:8000"
@@ -40,6 +41,9 @@ seed: up
 
 test: up
 	uv run pytest
+
+lint:
+	uv run ruff check devries tests
 
 ui/node_modules: ui/package.json ui/package-lock.json
 	cd ui && npm ci --no-audit --no-fund && touch node_modules

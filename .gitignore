@@ -28,6 +28,7 @@ ui/e2e/shots/
 # plans stay local; the README and the generated query list ship
 *.md
 !README.md
+!SECURITY.md
 !docs/QUERIES.md
 # brand sources
 logos/
