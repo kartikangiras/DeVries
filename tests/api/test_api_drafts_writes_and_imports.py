@@ -189,12 +189,15 @@ async def test_on_a_public_site_an_import_is_pasted_only_private_and_rationed(ba
         assert (tmp_path / "imports").is_dir() and not (ROOT / "scenarios" / "mine.yaml").exists()
         third = await http.post("/api/import", json={"config": TOOLS_LIST, "name": "again"})
         assert third.status_code == 429 and third.json()["error"]["code"] == "rate_limited"
-        # a public visitor may read the draft of a plan, and never write it
-        await asyncio.sleep(0.5)
-        plans = (await http.get("/api/scenarios/mine/mitigations")).json()["mitigations"]
-        if plans:
-            drafted = (await http.get(f"/api/scenarios/mine/mitigations/{plans[0]['id']}/draft")).json()
-            assert drafted["can_write"] is False
+        # a public visitor may read the draft of a plan, and never write it: the import started an audit, so a plan comes
+        for _ in range(100):
+            plans = (await http.get("/api/scenarios/mine/mitigations")).json()["mitigations"]
+            if plans:
+                break
+            await asyncio.sleep(0.1)
+        assert plans, "the audit after the import should have proposed a plan"
+        drafted = (await http.get(f"/api/scenarios/mine/mitigations/{plans[0]['id']}/draft")).json()
+        assert drafted["can_write"] is False
         assert (await http.post("/api/session/reset")).json()["reset"] == ["mine"]
 
 
