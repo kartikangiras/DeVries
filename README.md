@@ -1,8 +1,10 @@
-<p align="center"><img src="ui/public/brand/wordmark.png" width="440" alt="DeVries"></p>
+<p align="center"><img src="docs/devries-wordmark.png" width="520" alt="DeVries"></p>
 
 # DeVries
 
 [![ci](https://github.com/kartikangiras/DeVries/actions/workflows/ci.yml/badge.svg)](https://github.com/kartikangiras/DeVries/actions/workflows/ci.yml)
+
+**Demo:** [youtube.com/watch?v=sBA9w_REArY](https://www.youtube.com/watch?v=sBA9w_REArY)
 
 DeVries audits a system of AI agents for the paths by which untrusted text can reach a high-impact action, and finds the smallest configuration change that closes each path without breaking the work the agents do. Agents, MCP tools, data sources and resources are one graph in [FalkorDB](https://www.falkordb.com/). Every finding is a graph query, every fix is tested in a throwaway copy of the graph, and nothing changes until a person approves.
 
