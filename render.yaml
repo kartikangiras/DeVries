@@ -1,41 +1,19 @@
-# A Render Blueprint: FalkorDB as a private service with a disk, and the app as a web service built from the
-# Dockerfile. Render → New → Blueprint → this repository, then Apply. Render generates the MCP token, asks for the
-# host names and the optional model key, and wires the two services over its private network, where FalkorDB
-# is reachable only from the app and needs no password. The app serves the UI too; the Vercel project in ui/
-# proxies /api and /mcp to the web service's address. See deploy/README.md.
+# A Render Blueprint for the free tier: one web service built from deploy/Dockerfile.single, which runs FalkorDB
+# and the app in the same container with no disk. The app loads any scenario graph that is missing at start and
+# runs its scripted pass, so a restart heals itself. A free instance sleeps after 15 min without a request and
+# wakes on the next one. Render → New → Blueprint → this repository, then Apply; Render asks for the two values
+# marked sync: false. See deploy/README.md.
 services:
-  - type: pserv
-    name: falkordb
-    runtime: image
-    image:
-      url: docker.io/falkordb/falkordb:6.0.2
-    plan: starter                      # a disk needs a paid instance
-    region: singapore
-    disk:
-      name: falkordb-data
-      mountPath: /var/lib/falkordb/data
-      sizeGB: 1
-    envVars:
-      - key: FALKORDB_ARGS               # the image default cuts reads off after 1 s and sets no timeout on writes
-        value: "TIMEOUT_MAX 10000 TIMEOUT_DEFAULT 5000 MAX_QUEUED_QUERIES 200 RESULTSET_SIZE 10000"
-
   - type: web
-    name: devries                      # the address is <name>.onrender.com when the name is free
+    name: devries                        # the address is <name>.onrender.com when the name is free
     runtime: docker
-    dockerfilePath: ./Dockerfile
-    plan: starter                      # the free instance sleeps after 15 min and wakes slowly
+    dockerfilePath: ./deploy/Dockerfile.single
+    plan: free
     region: singapore
     healthCheckPath: /api/health
     envVars:
       - key: PORT
-        value: "8000"                    # the Dockerfile listens here
-      - key: FALKORDB_HOST
-        fromService:
-          type: pserv
-          name: falkordb
-          property: host
-      - key: FALKORDB_PORT
-        value: "6379"
+        value: "8000"
       - key: DEVRIES_PUBLIC
         value: "true"                    # visitors never launch commands; imports are private; nothing is written to a file
       - key: COOKIE_SECURE
@@ -49,12 +27,10 @@ services:
       - key: ANTHROPIC_API_KEY
         sync: false                      # optional: paste the key for model-driven runs, or leave empty for scripted ones
       - key: LLM_DAILY_BUDGET_USD
-        value: "5"                       # past this, new runs are scripted
+        value: "5"
       - key: PRERUN_MODEL
         value: "false"                   # the start-up pass is scripted; the model is kept for visitors' runs
       - key: SESSION_MAX
-        value: "12"
+        value: "10"
       - key: FALKORDB_MEMORY_CEILING_MB
-        value: "350"                     # past this, the janitor drops the oldest idle copies
-      - key: STARTUP_DB_WAIT_S
-        value: "120"
+        value: "200"

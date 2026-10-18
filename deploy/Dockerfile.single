@@ -1,0 +1,31 @@
+# FalkorDB and the app in one image, for a host that gives one free container and no disk (Render's free web
+# service, a Hugging Face Space, Koyeb, a Railway trial). The repository's Dockerfile is the two-container build.
+#
+#   docker build -f deploy/Dockerfile.single -t devries-single .
+#   docker run -p 8000:8000 -e DEVRIES_PUBLIC=true -e DEVRIES_MCP_TOKEN=... -e ALLOWED_HOSTS=... devries-single
+
+FROM node:22-alpine AS ui
+WORKDIR /ui
+COPY ui/package.json ui/package-lock.json ./
+RUN npm ci --no-audit --no-fund
+COPY ui/ ./
+RUN npm run build
+
+FROM falkordb/falkordb:6.0.2 AS app
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates && rm -rf /var/lib/apt/lists/*
+COPY --from=ghcr.io/astral-sh/uv:0.11.23 /uv /usr/local/bin/uv
+WORKDIR /app
+ENV UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy UV_PYTHON_INSTALL_DIR=/app/.python PYTHONUNBUFFERED=1
+COPY pyproject.toml uv.lock README.md ./
+RUN uv python install 3.12 && uv sync --frozen --no-dev --no-install-project
+COPY devries/ devries/
+COPY scenarios/ scenarios/
+COPY manifests/ manifests/
+RUN uv sync --frozen --no-dev
+COPY --from=ui /ui/dist ui/dist
+COPY deploy/start-single.sh /app/start-single.sh
+RUN chmod +x /app/start-single.sh && mkdir -p /app/data
+# the database is this container's own: no password, never reachable from outside; small ceilings for a small box
+ENV FALKORDB_HOST=127.0.0.1 FALKORDB_PORT=6379 PORT=8000 SESSION_MAX=10 FALKORDB_MEMORY_CEILING_MB=200 STARTUP_DB_WAIT_S=120
+EXPOSE 8000
+ENTRYPOINT ["/app/start-single.sh"]
