@@ -16,12 +16,13 @@ DeVries audits a system of AI agents for the paths by which untrusted text can r
 ## Contents
 
 - [What it does](#what-it-does)
+- [The graph](#the-graph)
+- [The app](#the-app)
+- [Architecture](#architecture)
 - [Run it](#run-it)
 - [The pages](#the-pages)
-- [The graph](#the-graph)
 - [Findings and verdicts](#findings-and-verdicts)
 - [What FalkorDB does](#what-falkordb-does)
-- [Architecture](#architecture)
 - [The auditor](#the-auditor)
 - [MCP tools](#mcp-tools)
 - [Import your own config](#import-your-own-config)
@@ -36,51 +37,6 @@ DeVries audits a system of AI agents for the paths by which untrusted text can r
 3. **Propose.** Candidate fixes come from the edges the path crosses. Five kinds: gate a call, revoke a grant, quarantine a delegation, stop a tool reading a source, split an agent.
 4. **Test.** Each candidate is applied to a `GRAPH.COPY` of the graph and judged by the same queries. A plan passes if its targets are gone, nothing new opened, and no workflow lost what it needs.
 5. **Approve.** The cheapest passing plan waits for a person. No tool can approve, and no file is written for a plan nobody approved.
-
-## Run it
-
-Needs Docker and `make`. From source: [uv](https://docs.astral.sh/uv/), Node 20+, Google Chrome for the browser tests.
-
-```bash
-cp .env.example .env        # set FALKORDB_PASSWORD
-make app                    # FalkorDB 6.0.2 and the app in containers: http://localhost:8000
-```
-
-| Target | Does |
-| --- | --- |
-| `make up` | FalkorDB only, on `localhost:6380` (Browser on `:3000`) |
-| `make seed` | load the 9 scenarios and check each scan against its `expect` block |
-| `make test` | 338 tests against the running FalkorDB, about a minute |
-| `make serve` | build the UI, run the app from source on `:8000` |
-| `make dev` | the app with reload beside the Vite dev server on `:5173` |
-| `make e2e` | drive the app in headless Chrome: `ui/e2e/gate.mjs` then `views.mjs` |
-| `make mcp` / `make mcp-config` | the MCP server over stdio / the client config entry |
-| `make agent-eval` | compare the auditor with the baseline search (`RUNS=3`) |
-| `make audit SCENARIO=acme_dev` | one audit on the shared scenario, with the model when a key is set; the run shows on its Activity page |
-| `make lint` | ruff over the package and the tests |
-| `make queries-doc` | regenerate `docs/QUERIES.md` from the catalog |
-
-Settings (`.env.example` lists every one, and `make app` passes every one): `ANTHROPIC_API_KEY`, `LLM_MODEL` (default `claude-opus-5-5`), `LLM_DAILY_BUDGET_USD`, `DEVRIES_MCP_TOKEN`, `DEVRIES_PUBLIC`, `TRUST_PROXY`, `ALLOWED_HOSTS`, `SESSION_MAX` (30), `SESSION_TTL_MIN` (60), `PRERUN_AUDITS` (on), `PRERUN_MODEL` (on).
-
-At start the app loads any missing scenario graph, scans it, and runs an audit to its first proposal on every scenario with an open finding and no proposed plan: with the model when a key is set (about $0.15 a scenario, once per database), scripted otherwise or with `PRERUN_MODEL=false`. A janitor repeats that every 60 s for a graph reseeded from outside, and sweeps sandboxes older than 10 min and session copies idle for 60 min.
-
-## The pages
-
-The app opens on a front door at `#/scenarios`: every scenario as a card with its own icon, its description and its open count, the dev team first and recommended; Enter opens it. A top bar carries the brand, which leads back to the landing page, where you are, and two pills: the scope of the graph (shared, your sandbox copy, your import) and the model's standing (ready, drove the last run, or scripted with no key). The sidebar has three groups: **Findings** (Posture, Open, Closed), **System** (Explorer, Method), **Record** (Activity, Import). A visitor's changes land in their own copy of the scenario.
-
-| Page | Shows |
-| --- | --- |
-| Posture | A one-line verdict; five figures (open findings, high-impact actions reached, agents holding all three Rule of Two properties, how many run unattended, cheapest cut cost); the open paths as a live map; blast radius per untrusted source and exposure per action, as bars; choke points ranked by open routes; the cheapest cut by `algo.maxFlow` with a button to propose it; Rule of Two per agent; scan history once there are two scans; OWASP coverage. |
-| Open / Closed | One row per finding: kind, path in words, severity, status, next step. |
-| Finding | Five steps. **Summary**: headline, path in words, figures, cited brief. **Rule**: which rule fired and what satisfies each of its needs. **Path**: the one chart, on DeVries's renderer (React Flow + ELK) or FalkorDB's canvas (Tree by default), with each hop's rule and edge. **Fix**: the verdict in figures, the change with its literal edit, the path after as a sandbox reads it, the approval bar with the diff to the real file. **Options**: every plan tested, cheapest first, with what each closed, opened and broke. |
-| Explorer | The whole system, on either renderer. Lenses: open paths, communities (`algo.labelPropagation`), cheapest cut, most central (`algo.betweenness`), flow or config layer. Click a node to read what reaches it and what it reaches, test one more grant in a sandbox, or remove a server in a sandbox. Tables tab: every agent, tool, source, resource, server. |
-| Method | The rules, the flow layer, the fixes and the verdict, every figure's query, the OWASP table, and all 90 Cypher statements by name. |
-| Activity | Every scan, run, plan, decision, apply and write, newest first. Consecutive scans collapse to one line. A run opens to its trace. An ask box answers four kinds of question from the graph without a model. |
-| Import | Paste a client config or a `tools/list`; label what is untrusted and what matters; the audit runs to its first proposal. |
-
-<p align="center"><img src="docs/screenshots/posture.png" width="900" alt="Posture of the Acme dev team: two untrusted sources reach two high-impact resources through four agents; the open paths drawn as a map"></p>
-<p align="center"><img src="docs/screenshots/path.png" width="900" alt="A finding's Path step: six hops from GitHub issues to the main branch, each with its rule, and the evidence beside it"></p>
-<p align="center"><img src="docs/screenshots/fix.png" width="900" alt="A finding's Fix step: a gate on the coder's push, tested in a sandbox, waiting for a person to approve"></p>
 
 ## The graph
 
@@ -137,6 +93,69 @@ What each tool reads and writes, read off a run on `acme_support` (every name is
 | `propose_fix` | the same verdict on a copy, then `config.edges` and `config.nodes` for the hash the plan is bound to | a `Mitigation` node (`mitigation.record`) |
 | `apply_fix` | the plan's `fix.*` statements on the working graph, behind the `SET NX` lock, then `projection.rebuild` and a scan | the configuration, for an approved plan only |
 
+## The app
+
+Three screens of the public copy on the dev team scenario: where it stands, the path of one finding hop by hop with its evidence, and the fix that passed its sandbox and waits in the approval bar.
+
+<p align="center"><img src="docs/screenshots/posture.png" width="900" alt="Posture of the Acme dev team: two untrusted sources reach two high-impact resources through four agents; the open paths drawn as a map"></p>
+<p align="center"><img src="docs/screenshots/path.png" width="900" alt="A finding's Path step: six hops from GitHub issues to the main branch, each with its rule, and the evidence beside it"></p>
+<p align="center"><img src="docs/screenshots/fix.png" width="900" alt="A finding's Fix step: a gate on the coder's push, tested in a sandbox, waiting for a person to approve"></p>
+
+## Architecture
+
+One FastAPI process: REST + server-sent events, the MCP server at `/mcp` and over stdio, the auditor loop, and the built UI. The UI's routes and the MCP tools call the same functions in `devries/ops.py`; the auditor is an MCP client of the same server.
+
+<p align="center"><img src="docs/devries-architecture.gif" width="900" alt="One process, one graph. Outside the app: the browser, a person as the only approver, an MCP client, the Anthropic API, your MCP config, MCP servers and the scenario files. Inside: REST and events, ops.py, the MCP server, the auditor loop, the janitor and the importer. Below: the config file, apply for approved plans only, the query catalog, a graph per scenario, a visitor's copy and a sandbox GRAPH.COPY."></p>
+
+- **Approval** happens only through the API, by name. Every decision records a hash of the session that made it. There is no MCP tool for it.
+- **Cross-site requests are refused.** A POST with another `Origin`, with `Sec-Fetch-Site: cross-site`, or for a `Host` the app does not serve (this machine, plus `ALLOWED_HOSTS`) gets 403. `/mcp` checks the same hosts. Decisions require a JSON body. Every response carries a Content-Security-Policy that allows nothing from outside the app.
+- **Files** are written only by a person, only for an approved plan: the review panel's "Also write it", or `python -m devries.apply --yes`, which records the approval in the `--as` name. Never on a public site.
+- **Graph keys enforce writes.** Analysis queries cannot write; fix queries touch a scenario graph only through apply; what-if changes run only on sandboxes.
+- **Runs persist** as `Run` nodes on the graph they worked on and are read back after a restart.
+- **`/mcp`** needs a bearer token when `DEVRIES_MCP_TOKEN` is set. A public site refuses to start without one; otherwise the app warns at start.
+- **Self-check.** At start and on `/api/health`, the app scans a built-in graph with one known injection and one known trifecta, and `/api/health` reports a miss.
+
+## Run it
+
+Needs Docker and `make`. From source: [uv](https://docs.astral.sh/uv/), Node 20+, Google Chrome for the browser tests.
+
+```bash
+cp .env.example .env        # set FALKORDB_PASSWORD
+make app                    # FalkorDB 6.0.2 and the app in containers: http://localhost:8000
+```
+
+| Target | Does |
+| --- | --- |
+| `make up` | FalkorDB only, on `localhost:6380` (Browser on `:3000`) |
+| `make seed` | load the 9 scenarios and check each scan against its `expect` block |
+| `make test` | 338 tests against the running FalkorDB, about a minute |
+| `make serve` | build the UI, run the app from source on `:8000` |
+| `make dev` | the app with reload beside the Vite dev server on `:5173` |
+| `make e2e` | drive the app in headless Chrome: `ui/e2e/gate.mjs` then `views.mjs` |
+| `make mcp` / `make mcp-config` | the MCP server over stdio / the client config entry |
+| `make agent-eval` | compare the auditor with the baseline search (`RUNS=3`) |
+| `make audit SCENARIO=acme_dev` | one audit on the shared scenario, with the model when a key is set; the run shows on its Activity page |
+| `make lint` | ruff over the package and the tests |
+| `make queries-doc` | regenerate `docs/QUERIES.md` from the catalog |
+
+Settings (`.env.example` lists every one, and `make app` passes every one): `ANTHROPIC_API_KEY`, `LLM_MODEL` (default `claude-opus-5-5`), `LLM_DAILY_BUDGET_USD`, `DEVRIES_MCP_TOKEN`, `DEVRIES_PUBLIC`, `TRUST_PROXY`, `ALLOWED_HOSTS`, `SESSION_MAX` (30), `SESSION_TTL_MIN` (60), `PRERUN_AUDITS` (on), `PRERUN_MODEL` (on).
+
+At start the app loads any missing scenario graph, scans it, and runs an audit to its first proposal on every scenario with an open finding and no proposed plan: with the model when a key is set (about $0.15 a scenario, once per database), scripted otherwise or with `PRERUN_MODEL=false`. A janitor repeats that every 60 s for a graph reseeded from outside, and sweeps sandboxes older than 10 min and session copies idle for 60 min.
+
+## The pages
+
+The app opens on a front door at `#/scenarios`: every scenario as a card with its own icon, its description and its open count, the dev team first and recommended; Enter opens it. A top bar carries the brand, which leads back to the landing page, where you are, and two pills: the scope of the graph (shared, your sandbox copy, your import) and the model's standing (ready, drove the last run, or scripted with no key). The sidebar has three groups: **Findings** (Posture, Open, Closed), **System** (Explorer, Method), **Record** (Activity, Import). A visitor's changes land in their own copy of the scenario.
+
+| Page | Shows |
+| --- | --- |
+| Posture | A one-line verdict; five figures (open findings, high-impact actions reached, agents holding all three Rule of Two properties, how many run unattended, cheapest cut cost); the open paths as a live map; blast radius per untrusted source and exposure per action, as bars; choke points ranked by open routes; the cheapest cut by `algo.maxFlow` with a button to propose it; Rule of Two per agent; scan history once there are two scans; OWASP coverage. |
+| Open / Closed | One row per finding: kind, path in words, severity, status, next step. |
+| Finding | Five steps. **Summary**: headline, path in words, figures, cited brief. **Rule**: which rule fired and what satisfies each of its needs. **Path**: the one chart, on DeVries's renderer (React Flow + ELK) or FalkorDB's canvas (Tree by default), with each hop's rule and edge. **Fix**: the verdict in figures, the change with its literal edit, the path after as a sandbox reads it, the approval bar with the diff to the real file. **Options**: every plan tested, cheapest first, with what each closed, opened and broke. |
+| Explorer | The whole system, on either renderer. Lenses: open paths, communities (`algo.labelPropagation`), cheapest cut, most central (`algo.betweenness`), flow or config layer. Click a node to read what reaches it and what it reaches, test one more grant in a sandbox, or remove a server in a sandbox. Tables tab: every agent, tool, source, resource, server. |
+| Method | The rules, the flow layer, the fixes and the verdict, every figure's query, the OWASP table, and all 90 Cypher statements by name. |
+| Activity | Every scan, run, plan, decision, apply and write, newest first. Consecutive scans collapse to one line. A run opens to its trace. An ask box answers four kinds of question from the graph without a model. |
+| Import | Paste a client config or a `tools/list`; label what is untrusted and what matters; the audit runs to its first proposal. |
+
 ## Findings and verdicts
 
 Three read-only queries decide everything: `reach.untrusted_to_high`, `find.trifecta`, `wf.broken`. BFS depth is the count of nodes a path can visit, so no simple path is missed. `wf.broken` follows delegation to any depth. An autonomous workflow cannot use a gated grant; a supervised one can.
@@ -173,20 +192,6 @@ A plan is one to three fixes; each extra fix adds one point. The baseline search
 
 All 90 statements live in [`devries/graph/catalog.py`](devries/graph/catalog.py), run by name with parameters; no other Cypher exists. [`docs/QUERIES.md`](docs/QUERIES.md) is generated from it and a test fails when it is stale. Tested on FalkorDB 6.0.2 and v4.22.0.
 
-## Architecture
-
-One FastAPI process: REST + server-sent events, the MCP server at `/mcp` and over stdio, the auditor loop, and the built UI. The UI's routes and the MCP tools call the same functions in `devries/ops.py`; the auditor is an MCP client of the same server.
-
-<p align="center"><img src="docs/devries-architecture.gif" width="900" alt="One process, one graph. Outside the app: the browser, a person as the only approver, an MCP client, the Anthropic API, your MCP config, MCP servers and the scenario files. Inside: REST and events, ops.py, the MCP server, the auditor loop, the janitor and the importer. Below: the config file, apply for approved plans only, the query catalog, a graph per scenario, a visitor's copy and a sandbox GRAPH.COPY."></p>
-
-- **Approval** happens only through the API, by name. Every decision records a hash of the session that made it. There is no MCP tool for it.
-- **Cross-site requests are refused.** A POST with another `Origin`, with `Sec-Fetch-Site: cross-site`, or for a `Host` the app does not serve (this machine, plus `ALLOWED_HOSTS`) gets 403. `/mcp` checks the same hosts. Decisions require a JSON body. Every response carries a Content-Security-Policy that allows nothing from outside the app.
-- **Files** are written only by a person, only for an approved plan: the review panel's "Also write it", or `python -m devries.apply --yes`, which records the approval in the `--as` name. Never on a public site.
-- **Graph keys enforce writes.** Analysis queries cannot write; fix queries touch a scenario graph only through apply; what-if changes run only on sandboxes.
-- **Runs persist** as `Run` nodes on the graph they worked on and are read back after a restart.
-- **`/mcp`** needs a bearer token when `DEVRIES_MCP_TOKEN` is set. A public site refuses to start without one; otherwise the app warns at start.
-- **Self-check.** At start and on `/api/health`, the app scans a built-in graph with one known injection and one known trifecta, and `/api/health` reports a miss.
-
 ## The auditor
 
 Phases: scan, investigate, mitigate, approval, apply, report. The model is offered only the tools of its phase. The loop enforces:
@@ -197,7 +202,6 @@ Phases: scan, investigate, mitigate, approval, apply, report. The model is offer
 - 8 model steps per phase, 40 per run, 8 simulations per target, a daily spend ceiling.
 
 Without a key, or when the provider fails mid-run, the run continues scripted from that phase and every step says who decided it (`model`, `loop`, `scripted`, `person`).
-
 
 **Where a decision comes from.** A scripted audit of `acme_dev` on 18 October 2026, as the Activity page shows it: each step, the queries it ran on the graph, and what came back. The next step's reason rests on these ids and nothing else.
 
