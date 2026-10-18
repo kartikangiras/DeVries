@@ -8,8 +8,8 @@ passed off as an agent run: the run record and the UI both name the mode.
 import re
 from typing import Any
 
-from devries.mitigation.store import Mitigation
 from devries.mitigation.dsl import describe
+from devries.mitigation.store import Mitigation
 
 BECAUSE_INJECTION = "A scripted run starts with injection paths: they are the most severe kind of finding."
 BECAUSE_TRIFECTA = "No injection path is open, so a scripted run looks at trifecta agents next."
@@ -124,7 +124,7 @@ def report(record: dict[str, Any]) -> str:
             parts.append(f"{round_.get('decided_by') or 'A person'} rejected it"
                          + (f": {round_['decision_reason']}." if round_.get("decision_reason") else "."))
         elif decision == "pending":
-            parts.append("It waits for a person's nod; nothing has changed.")
+            parts.append("It waits for a person's approval; nothing has changed.")
         else:
             parts.append("Nobody decided on it in time; it is still waiting for approval.")
     still_open = record.get("open_at_end")

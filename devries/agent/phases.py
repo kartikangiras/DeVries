@@ -24,7 +24,8 @@ MAX_ROUNDS = 5                   # scan -> ... -> apply, repeated while findings
 
 BECAUSE = {
     "type": "string",
-    "description": "One sentence: which earlier result in this conversation makes this the next call.",
+    "description": "One sentence naming, by id, the earlier result in this conversation that makes this the next call: "
+                   "a finding (fnd:…), a node (agent:…, tool:…, src:…, res:…) or a plan (mit:…), exactly as a tool returned it.",
 }
 
 CHOOSE_TARGETS = ToolSpec(

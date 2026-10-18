@@ -14,6 +14,7 @@ Rules every tool follows:
 """
 
 import json
+import re
 from typing import Any, Awaitable, Callable, Literal
 
 import redis.exceptions as rex
@@ -24,7 +25,7 @@ from devries.analysis import canary, chokepoints, scorecard, zones
 from devries.analysis import findings as findings_mod
 from devries.analysis.models import Finding
 from devries.config import get_settings
-from devries.errors import DeVriesError, NotAvailable, NotFound, UnknownScenario
+from devries.errors import DeVriesError, NotFound, UnknownScenario
 from devries.graph import keys
 from devries.graph.client import GraphClient, get_client
 from devries.graph.projection import RULES
@@ -43,9 +44,13 @@ INSTRUCTIONS = (
 )
 
 
+_CLOSER = re.compile(r"<\s*/\s*untrusted\s*>", re.IGNORECASE)
+
+
 def untrusted(text: str | None, source: str) -> str:
-    """Wrap manifest text so a model can tell data from instructions."""
-    body = (text or "").replace("</untrusted>", "<\\/untrusted>")
+    """Wrap text that came from a file (a manifest, a scenario, a pasted config) so a model can tell data from instructions.
+    The closing tag cannot be forged inside it, whatever its case or spacing."""
+    body = _CLOSER.sub("<\\/untrusted>", text or "")
     return f'<untrusted source="{source}">{body}</untrusted>'
 
 
@@ -57,7 +62,8 @@ async def _working_graph(client: GraphClient, scenario: str) -> str:
 
 
 async def _names(client: GraphClient, key: str, ids: set[str]) -> dict[str, str]:
-    """Display names for ids. Tool names come from manifests, so they are wrapped."""
+    """Display names for ids. Every name came from a file somebody else wrote (a manifest, a scenario, a pasted config),
+    so every one is wrapped; a tool's names its manifest."""
     out = {}
     for row in await client.run("node.names", key):
         if row["id"] not in ids:
@@ -65,7 +71,7 @@ async def _names(client: GraphClient, key: str, ids: set[str]) -> dict[str, str]
         if row["label"] == "Tool":
             out[row["id"]] = untrusted(row["name"], f"manifest:{row['server_id']}")
         else:
-            out[row["id"]] = row["name"] or row["id"]
+            out[row["id"]] = untrusted(row["name"] or row["id"], "scenario")
     return out
 
 
@@ -176,7 +182,7 @@ async def rule_of_two_impl(client: GraphClient, scenario: str) -> dict:
     cards = await scorecard.rule_of_two(client, key)
     return {
         "scenario": keys.scenario_of(key),
-        "agents": [scorecard.card_view(c) for c in cards],
+        "agents": [scorecard.card_view(c) | {"name": untrusted(c.name, "scenario") if c.name else None} for c in cards],
         "rule": "Meta's Agents Rule of Two: an agent holds at most two of A (processes untrustworthy input), "
                 "B (has access to private data or sensitive systems), C (changes state or communicates externally). "
                 "One that needs all three should not run unattended. A with C alone is still an injection path.",

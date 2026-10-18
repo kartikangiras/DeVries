@@ -24,7 +24,17 @@ from mcp import Client
 from devries import ops, views
 from devries.agent import grounding, phases, prompts, scripted
 from devries.agent.llm import (
-    LLM, AssistantTurn, LLMError, Message, Step, ToolCall, ToolResult, ToolResults, ToolSpec, UserText, spend,
+    LLM,
+    AssistantTurn,
+    LLMError,
+    Message,
+    Step,
+    ToolCall,
+    ToolResult,
+    ToolResults,
+    ToolSpec,
+    UserText,
+    spend,
 )
 from devries.agent.runs import Run
 from devries.config import get_settings
@@ -70,6 +80,9 @@ class Auditor:
         self.no_model_reason = no_model_reason
         # an audit that runs by itself (at start, after an import) ends once a plan waits for a person, and does not wait
         self.stop_after_proposal = stop_after_proposal
+        # the app's semaphore on runs in flight, when it gave this run one of its slots: let go while a person decides
+        self.slot: asyncio.Semaphore | None = None
+        self.slot_held = False
 
     # ------------------------------------------------------------------ entry
 
@@ -143,7 +156,8 @@ class Auditor:
                 data = result.structured_content
             else:
                 data = json.loads(result.content[0].text)
-        except Exception as e:                            # the transport, not the tool
+        except Exception as e:  # noqa: BLE001 - the transport, not the tool: the SDK raises its own group here
+            log.warning("tool %s could not be called: %s: %s", name, type(e).__name__, str(e)[:200])
             data = _error("tool_unavailable", f"{name} could not be called ({type(e).__name__})")
         ms = int((time.monotonic() - t0) * 1000)
 
@@ -171,6 +185,9 @@ class Auditor:
             if unknown:
                 problem = _error("ungrounded", f"`because` cites ids that no tool returned in this run: "
                                                f"{', '.join(unknown)}. Cite only ids from tool results.")
+            elif ctx.known and not grounding.ids_in(because):
+                problem = _error("uncited", "`because` has to name the earlier result it rests on by id (a finding, a node, "
+                                            "a plan), exactly as a tool returned it. A sentence without an id is not a reason.")
         if problem:
             ctx.run.step(phase=phase, by="model", kind="tool", tool=call.name,
                          arguments={k: v for k, v in arguments.items() if k != "scenario"},
@@ -356,6 +373,9 @@ class Auditor:
                 problem = _error("because_missing", "Say why these findings come first.")
             elif unknown:
                 problem = _error("ungrounded", f"`because` cites ids that no tool returned: {', '.join(unknown)}.")
+            elif not grounding.ids_in(because):
+                problem = _error("uncited", "Say why these findings come first by naming what the tools returned: a finding, "
+                                            "a node or a plan, by id.")
             if problem:
                 run.step(phase="investigate", by="model", kind="tool", tool="choose_targets",
                          arguments={"finding_ids": ids}, because=because or None,
@@ -499,7 +519,15 @@ class Auditor:
                 run.step(phase="approval", by="loop", kind="note",
                          text=f"Waiting for a person to approve or reject {mitigation_id}. No tool can approve it.")
                 run.changed()
-                await decisions.get(timeout=get_settings().approval_timeout_s)
+                if self.slot is not None and self.slot_held:   # others may run while this one waits for a person
+                    self.slot.release()
+                    self.slot_held = False
+                try:
+                    await decisions.get(timeout=get_settings().approval_timeout_s)
+                finally:
+                    if self.slot is not None and not self.slot_held:
+                        await self.slot.acquire()
+                        self.slot_held = True
                 current = await store.get(self.client, run.graph, mitigation_id)
                 run.status = "running"
                 run.changed()
