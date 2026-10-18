@@ -12,6 +12,8 @@ Messages API requests. Its constraints shape the loop, so they are stated here:
 - a refusal is an ordinary outcome: `stop_reason` is checked before anything is read
 """
 
+import asyncio
+import logging
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Protocol
@@ -101,11 +103,18 @@ class LLM(Protocol):
 
 
 # USD per million tokens: (input, output, cache read, 5-minute cache write). List prices, October 2026.
+log = logging.getLogger("devries.llm")
+
 PRICES = {
     "claude-opus-5-5": (4.00, 20.00, 0.20, 5.00),
     "claude-opus-5": (5.00, 25.00, 0.50, 6.25),
 }
-_DEAREST = max(PRICES.values())      # an unknown model is costed at the dearest known rate, so a ceiling errs low
+_DEAREST = max(PRICES.values(), key=lambda p: p[1])   # an unknown model is costed at the dearest known output rate: a ceiling
+
+
+def priced(model: str | None) -> bool:
+    """Whether the estimate for this model is a price or a ceiling."""
+    return (model or "") in PRICES
 
 
 def cost_usd(model: str | None, uncached: int, output: int, cache_read: int, cache_write: int) -> float:
@@ -193,20 +202,54 @@ class ClaudeLLM:
 
 
 class Spend:
-    """What the model has cost today, in this process, against LLM_DAILY_BUDGET_USD."""
+    """What the model has cost today against LLM_DAILY_BUDGET_USD. The day's total lives in FalkorDB under one key, so the
+    app, a second app process and `make audit` share one budget and a restart forgets nothing; this object mirrors it.
+    Without a client attached (tests, a tool run outside the app) it counts in memory."""
+
+    KEY = "devries:spend:{day}"
+    KEEP_S = 2 * 86400
 
     def __init__(self) -> None:
         self._day = ""
         self._usd = 0.0
+        self._client: Any = None
 
     def _roll(self) -> None:
         today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
         if today != self._day:
             self._day, self._usd = today, 0.0
 
+    def attach(self, client: Any) -> None:
+        """Keep the day's total in this client's database from now on."""
+        self._client = client
+
+    async def load(self) -> float:
+        """Read today's total back from the database, if one is attached."""
+        self._roll()
+        if self._client is not None:
+            try:
+                value = await self._client.connection.get(self.KEY.format(day=self._day))
+                self._usd = float(value or 0.0)
+            except Exception as e:  # noqa: BLE001 - a database that is away: the mirror stands
+                log.debug("spend not read: %s", type(e).__name__)
+        return self._usd
+
+    async def _write(self, usd: float) -> None:
+        key = self.KEY.format(day=self._day)
+        try:
+            await self._client.connection.incrbyfloat(key, usd)
+            await self._client.connection.expire(key, self.KEEP_S)
+        except Exception as e:  # noqa: BLE001 - a lost increment is a logged fact; the mirror holds it
+            log.debug("spend not written: %s", type(e).__name__)
+
     def add(self, usd: float) -> None:
         self._roll()
         self._usd += usd
+        if self._client is not None and usd:
+            try:
+                asyncio.get_running_loop().create_task(self._write(usd))
+            except RuntimeError:
+                pass
 
     @property
     def today_usd(self) -> float:

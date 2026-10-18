@@ -47,6 +47,7 @@ class RunUsage(BaseModel):
     output_tokens: int = 0
     cache_read_tokens: int = 0
     cost_usd: float = 0.0
+    cost_is_ceiling: bool = False                         # the model is not in the price table: costed at the dearest rate
     simulations: int = 0
 
 
@@ -187,6 +188,13 @@ class RunRegistry:
         for run_id in [r.id for r in self._runs.values() if r.graph == graph and r.status in ("done", "failed")]:
             del self._runs[run_id]
         self._hydrated.discard(graph)
+
+    def active_count(self) -> int:
+        """Runs in flight or waiting for a person, across every graph."""
+        return sum(1 for r in self._runs.values() if r.status in ("running", "awaiting_approval"))
+
+    def is_hydrated(self, graph: str) -> bool:
+        return graph in self._hydrated
 
     async def hydrate(self, client, graph: str, again: bool = False) -> int:
         """Read the runs kept on a graph into memory, once per graph, or again to pick up what another process wrote

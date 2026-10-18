@@ -23,6 +23,7 @@ from mcp import Client
 
 from devries import ops, views
 from devries.agent import grounding, phases, prompts, scripted
+from devries.agent import llm as llm_mod
 from devries.agent.llm import (
     LLM,
     AssistantTurn,
@@ -96,6 +97,7 @@ class Auditor:
                 self._scripted(run, "today's model budget is spent")
             else:
                 run.model = self.llm.name
+                run.usage.cost_is_ceiling = not llm_mod.priced(self.llm.name)
                 run.changed()
             async with Client(self.server) as mcp:
                 try:
