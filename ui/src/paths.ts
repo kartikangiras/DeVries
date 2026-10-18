@@ -63,24 +63,6 @@ export function withReaders(focus: Focus, plan: Mitigation | null | undefined, g
   return added.length ? { ...focus, order: [...focus.order, ...added], nodes: new Set([...focus.nodes, ...added]) } : focus;
 }
 
-/** The hops a plan would cut, as "from>to" on the flow layer. */
-export function cutsOf(mitigation: Mitigation | null | undefined): Set<string> {
-  const cuts = new Set<string>();
-  for (const fix of mitigation?.plan.fixes ?? []) {
-    if (fix.kind === "gate_call") cuts.add(hopKey(fix.agent_id, fix.tool_id));
-    if (fix.kind === "revoke_call") {
-      cuts.add(hopKey(fix.agent_id, fix.tool_id));
-      cuts.add(hopKey(fix.tool_id, fix.agent_id));
-    }
-    // a quarantine stops what the delegate returns, so the hop it cuts runs from delegate to delegator
-    if (fix.kind === "quarantine_delegation") cuts.add(hopKey(fix.to_agent_id, fix.from_agent_id));
-    if (fix.kind === "drop_read") cuts.add(hopKey(fix.source_id, fix.tool_id));
-    // a split hands the reading tools to a reader: what they return no longer enters the agent
-    if (fix.kind === "split_agent") (fix.reader_tool_ids as string[]).forEach((tool) => cuts.add(hopKey(tool, fix.agent_id)));
-  }
-  return cuts;
-}
-
 /** The queries a finding rests on, in the order its page lists them. */
 export function findingQueries(finding: Finding): string[] {
   if (finding.kind === "drift") return ["drift.before", "finding.accept"];

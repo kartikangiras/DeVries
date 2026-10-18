@@ -55,7 +55,7 @@ export function MethodPage({ c, scenario, section, query }: { c: DeVries; scenar
           <section className="method-block">
             <Eyebrow>Rule 1 · an injection path</Eyebrow>
             <h2>Untrusted text reaches a high-impact action with no person in between.</h2>
-            <p>A data source is <em>untrusted</em> when people outside the organisation can write what the tools read. A resource is <em>high-impact</em> by its label. The rule fires when a breadth-first search over the flow layer, from each untrusted source, reaches such a resource; the search depth is the graph's node count, so no simple path is too long to find. A path means text <em>can</em> flow, not that it did.</p>
+            <p>A data source is <em>untrusted</em> when people outside the organisation can write what the tools read. A resource is <em>high-impact</em> by its label. The rule fires when a breadth-first search from each untrusted source over the flow layer, as deep as the graph has nodes, reaches such a resource. A path means text <em>can</em> flow, not that it did.</p>
             <Statement c={c} scenario={scenario} name="reach.untrusted_to_high" />
           </section>
           <section className="method-block">

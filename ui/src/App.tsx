@@ -1,21 +1,20 @@
 import { useEffect, useState } from "react";
+import type { Page } from "./route";
 import { ActivityPage } from "./pages/Activity";
 import { FindingPage } from "./pages/FindingPage";
-import { ExplorerPage } from "./pages/GraphPage";
+import { ExplorerPage } from "./pages/Explorer";
 import { ImportPage } from "./pages/Import";
 import { Inbox } from "./pages/Inbox";
 import { MethodPage } from "./pages/Method";
 import { PosturePage } from "./pages/Posture";
 import { Landing } from "./landing/Landing";
-import { go, href, readRoute } from "./route";
+import { go, href, legacyOf, placeOf, readRoute } from "./route";
 import { Shell } from "./Shell";
 import { useDeVries } from "./state";
 import { Empty, Loading, PageBody } from "./ui";
 
-const PLACE: Record<string, string> = {
-  posture: "Posture", inbox: "Open", done: "Closed", finding: "Finding", fixes: "Activity", whatif: "Explorer", graph: "Explorer", inventory: "Explorer", servers: "Explorer",
-  audit: "Activity", queries: "Method", method: "Method", import: "Import",
-};
+/** The window's title for each place; an older address takes the title of the row it lands on (route.ts, LEGACY). */
+const PLACE: Partial<Record<Page, string>> = { posture: "Posture", inbox: "Open", done: "Closed", finding: "Finding", graph: "Explorer", method: "Method", audit: "Activity", import: "Import" };
 
 export default function App() {
   const [route, setRoute] = useState(readRoute);
@@ -29,26 +28,21 @@ export default function App() {
   const { scenario, page, id, sub } = route;
 
   useEffect(() => {
-    document.title = scenario ? `${PLACE[page]} · ${c.titleOf(scenario)} · DeVries` : "DeVries";
-  }, [page, scenario, c.titleOf]);
+    document.title = scenario ? `${PLACE[placeOf(route, false)] ?? "DeVries"} · ${c.titleOf(scenario)} · DeVries` : "DeVries";
+  }, [route, scenario, c.titleOf]);
 
-  // older addresses land where their content now lives: a plan on its finding's fix step, what-ifs in the
-  // explorer's reader, the inventory and the servers in the explorer's tables, the queries on the method page
+  // older addresses land where their content now lives (route.ts, LEGACY); a plan's address waits for the plans to load
   useEffect(() => {
     if (!scenario) return;
-    if (page === "fixes") {
-      const plan = id ? c.mitigations[id] : undefined;
-      if (id && !plan && !c.findings) return;             // the plans are still loading
-      if (plan?.targets[0]) go(scenario, "finding", plan.targets[0], "fix");
-      else go(scenario, "audit");
-    } else if (page === "whatif") go(scenario, "graph");
-    else if (page === "servers") go(scenario, "graph", "tables", "servers");
-    else if (page === "inventory") go(scenario, "graph", "tables", id);
-    else if (page === "queries") go(scenario, "method", "queries", id);
+    const legacy = legacyOf(page);
+    if (!legacy) return;
+    const plan = id ? c.mitigations[id] : undefined;
+    if (page === "fixes" && id && !plan && !c.findings) return;
+    go(scenario, ...legacy.to(id, plan));
   }, [page, id, scenario, c.mitigations, c.findings]);
 
   // a bare address is the landing page; the app starts at a scenario
-  if (!scenario) return <Landing scenarios={c.scenarios} />;
+  if (!scenario) return <Landing scenarios={c.scenarios} queries={c.catalog.length} />;
 
   const all = c.findings ? [...c.findings.findings, ...c.findings.past] : [];
   const selected = page === "finding" && id ? all.find((f) => f.id === id) ?? null : null;
@@ -73,7 +67,7 @@ export default function App() {
         <ActivityPage c={c} scenario={scenario} runId={id} />
       ) : page === "import" ? (
         <ImportPage c={c} scenario={scenario} />
-      ) : page === "fixes" || page === "whatif" || page === "servers" || page === "inventory" || page === "queries" ? (
+      ) : legacyOf(page) ? (
         <PageBody><Loading label="Taking you to where this now lives" /></PageBody>
       ) : (
         <PosturePage c={c} scenario={scenario} />

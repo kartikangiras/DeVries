@@ -1,13 +1,11 @@
-// Questions answered in a sandbox, none of which changes the scenario: what one more grant or delegation
-// would open, close and break (asked from the Explorer's reader); and the cheapest set of hops that separates
-// every untrusted source from every high-impact resource, as rules a gateway or a client could enforce (on Posture).
+// A question answered in a sandbox, which changes nothing in the scenario: what one more grant or delegation
+// would open, close and break, asked from the Explorer's reader. (The cheapest cut is on Posture, in CutLine.)
 
-import { useEffect, useState } from "react";
-import { api, type Change, type Cut, type Policy, type WhatIf } from "../api";
-import { href } from "../route";
+import { useState } from "react";
+import { api, type Change, type WhatIf } from "../api";
 import type { DeVries } from "../state";
 import { KIND_WORDS, WithNames, capital, findingTitle, plural } from "../text";
-import { Button, Eyebrow, Fold, Loading } from "../ui";
+import { Button, Eyebrow } from "../ui";
 
 /** One change, asked as a question: what would it open, close and break? Answered from a sandbox. `head` is off where a fold already names it. */
 export function WhatIfLine({ c, scenario, agentId, head = true }: { c: DeVries; scenario: string; agentId?: string | null; head?: boolean }) {
@@ -78,71 +76,6 @@ export function WhatIfLine({ c, scenario, agentId, head = true }: { c: DeVries; 
           )}
           {answer.newly_broken.map((b) => <p className="whatif-error" key={b.workflow_id + b.why}><WithNames text={capital(b.why)} names={c.names} />.</p>)}
           <p className="rail-note">Measured in {answer.sandbox_ms} ms in a sandbox copy that has been deleted. The scenario is as it was.</p>
-        </div>
-      )}
-    </section>
-  );
-}
-
-/** What max flow found: the hops of the cheapest cut, each with the fix that would cut it, and the rules that would make it. */
-export function CutBlock({ c, scenario, compact = false, head = true }: { c: DeVries; scenario: string; compact?: boolean; head?: boolean }) {
-  const [cut, setCut] = useState<Cut | null>(null);
-  const [policy, setPolicy] = useState<Policy | null>(null);
-  useEffect(() => {
-    let wanted = true;
-    api.cut(scenario).then((found) => wanted && setCut(found)).catch(() => wanted && setCut(null));
-    api.cutPolicy(scenario).then((found) => wanted && setPolicy(found)).catch(() => wanted && setPolicy(null));
-    return () => { wanted = false; };
-  }, [scenario, c.flow]);
-  if (!cut || cut.scenario !== scenario) return <Loading label="Asking max flow for the cheapest cut" />;
-  const by = <>Worked out by <a href={href(scenario, "method", "queries", "choke.maxflow")}>choke.maxflow</a>, which runs FalkorDB's <code>algo.maxFlow</code> over the flow layer with each hop's capacity set to the cost of the cheapest fix that cuts it.</>;
-  const rules = policy && policy.scenario === scenario && (policy.docker_mcp_gateway.length > 0 || Object.keys(policy.claude_code.permissions).length > 0) ? policy : null;
-  const how = (
-    <Fold summary="How it was worked out" sub="choke.maxflow · algo.maxFlow">
-      <p className="chart-note">
-        {by} It is a guide, not a verdict: it knows nothing about which workflows need what, and a trifecta is not a cut.
-        A fix is real only once a sandbox has passed it; every plan that was tested is on its finding's options step.
-      </p>
-    </Fold>
-  );
-  return (
-    <section className="block cut-block">
-      {head && (
-        <div className="block-head">
-          <Eyebrow>The cheapest cut</Eyebrow>
-          <span>{cut.hops.length ? (cut.cuttable ? `cost ${cut.cost} · ${plural(cut.hops.length, "hop", "hops")}` : "no set of fixes separates them") : "nothing to cut"}</span>
-        </div>
-      )}
-      {!cut.hops.length ? (
-        <>
-          <p className="chart-note">No untrusted source reaches a high-impact resource in this graph, so the max flow between them is zero.</p>
-          {how}
-        </>
-      ) : (
-        <div className="chart-note cut-note">
-          <p>
-            <strong>{cut.cuttable ? `Cheapest cut: cost ${cut.cost}.` : "No set of fixes separates them."}</strong>{" "}
-            {cut.cuttable
-              ? `Taking away ${plural(cut.hops.length, "hop", "hops")} separates every untrusted source from every high-impact resource, and nothing cheaper does.`
-              : "The cheapest cut crosses a hop that no fix can cut."}
-          </p>
-          <ul className="cut-list">
-            {cut.hops.map((h) => (
-              <li key={`${h.from_id}>${h.to_id}`}>
-                <WithNames text={h.sentence.replace(/rule \d+: /, "")} names={c.names} />
-                <span> · rule {h.rule} · {h.fixes.length ? `${h.fixes.join(" or ")}, cost ${h.capacity}` : "cannot be cut"}</span>
-              </li>
-            ))}
-          </ul>
-          {rules && (
-            <details className="policy" open={!compact}>
-              <summary>The cut as rules: a Claude Code permissions block, and Docker MCP Gateway commands</summary>
-              <pre className="draft-diff">{rules.claude_code_text.trim()}</pre>
-              {rules.docker_mcp_gateway.length > 0 && <pre className="draft-diff">{rules.docker_mcp_gateway.join("\n")}</pre>}
-              <p>A guide like the cut itself: a rule is safe only once a sandbox has passed the plan it stands for.</p>
-            </details>
-          )}
-          {how}
         </div>
       )}
     </section>

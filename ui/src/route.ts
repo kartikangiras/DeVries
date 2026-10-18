@@ -15,13 +15,35 @@
 // servers on the explorer's tables, queries on the method page. The nav is three groups: Findings (Posture, Open,
 // Closed) · System (Explorer, Method) · Record (Activity, Import).
 
-export const PAGES = ["posture", "inbox", "done", "finding", "fixes", "whatif", "graph", "inventory", "servers", "audit", "queries", "method", "import"] as const;
+export const PAGES = ["posture", "inbox", "done", "finding", "graph", "audit", "method", "import"] as const;
 export type Page = (typeof PAGES)[number];
-export type Route = { scenario: string | null; page: Page; id: string | null; sub: string | null };
+/** The older addresses, each of which still lands somewhere. */
+const OLD = ["fixes", "whatif", "inventory", "servers", "queries"] as const;
+type Old = (typeof OLD)[number];
+export type Route = { scenario: string | null; page: Page | Old; id: string | null; sub: string | null };
+
+/** An older address: the nav row it belongs to, and where it lands now. A plan's address lands on its finding, so it needs the plan. */
+type Legacy = { place: Page; to: (id: string | null, plan?: { targets: string[] } | null) => [Page, string | null, string | null] };
+const LEGACY: Record<Old, Legacy> = {
+  fixes: { place: "audit", to: (_, plan) => (plan?.targets[0] ? ["finding", plan.targets[0], "fix"] : ["audit", null, null]) },
+  whatif: { place: "graph", to: () => ["graph", null, null] },
+  inventory: { place: "graph", to: (id) => ["graph", "tables", id] },
+  servers: { place: "graph", to: () => ["graph", "tables", "servers"] },
+  queries: { place: "method", to: (id) => ["method", "queries", id] },
+};
+const isOld = (page: string): page is Old => (OLD as readonly string[]).includes(page);
+/** Where an older address lands, or null for a page that is live. */
+export const legacyOf = (page: Page | Old): Legacy | null => (isOld(page) ? LEGACY[page] : null);
+
+/** The nav row a route belongs to: a finding belongs to the list it is in, an older address to the row it lands on. */
+export function placeOf(route: Route, closed: boolean): Page {
+  if (route.page === "finding") return closed ? "done" : "inbox";
+  return isOld(route.page) ? LEGACY[route.page].place : route.page;
+}
 
 export function readRoute(): Route {
   const [scenario, page, id, sub] = window.location.hash.replace(/^#\/?/, "").split("/").map(decodeURIComponent);
-  const known = (PAGES as readonly string[]).includes(page) ? (page as Page) : "posture";
+  const known = (PAGES as readonly string[]).includes(page) || isOld(page) ? (page as Page | Old) : "posture";
   return { scenario: scenario || null, page: known, id: id || null, sub: sub || null };
 }
 

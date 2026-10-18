@@ -1,5 +1,4 @@
-// The small pieces every page is made of. Their shapes and sizes follow Manthan's page, button and
-// badge components (see ui/THIRD_PARTY_NOTICES.md); the code and the icons are DeVries's own.
+// The small pieces every page is made of: eyebrows, buttons, badges, figures, blocks, folds and the icons.
 
 import { useState, type ButtonHTMLAttributes, type ReactNode } from "react";
 import type { Tone } from "./desk";
@@ -128,21 +127,13 @@ export function Tabs<T extends string>({ value, onChange, options, label }: { va
 const ICONS = {
   inbox: <><path d="M4 13.5 6.6 5.5h10.8L20 13.5V18a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1z" /><path d="M4 13.5h4.4a3.6 3.6 0 0 0 7.2 0H20" /></>,
   done: <><circle cx="12" cy="12" r="8.5" /><path d="m8.4 12.3 2.4 2.4 4.8-5.2" /></>,
-  fixes: <><path d="M6 4.5h12v15H6z" /><path d="M9 9h6M9 12.5h6M9 16h3.5" /></>,
   graph: <><circle cx="6" cy="7" r="2.2" /><circle cx="18" cy="7" r="2.2" /><circle cx="12" cy="17.5" r="2.2" /><path d="M8.2 7h7.6M7.1 8.9l3.8 6.7M16.9 8.9l-3.8 6.7" /></>,
   audit: <><circle cx="12" cy="12" r="8.5" /><path d="M12 7.5V12l3 2" /></>,
-  queries: <path d="M8.5 6 4 12l4.5 6M15.5 6 20 12l-4.5 6" />,
   switch: <path d="m8 10 4-4 4 4M8 14l4 4 4-4" />,
-  right: <path d="M5 12h14M13 6l6 6-6 6" />,
   reset: <path d="M4.5 12a7.5 7.5 0 1 0 2.4-5.5M4.5 4.5v4h4" />,
-  check: <path d="m5 12.5 4.5 4.5L19 7.5" />,
-  cross: <path d="M6.5 6.5l11 11M17.5 6.5l-11 11" />,
   search: <><circle cx="11" cy="11" r="6.5" /><path d="m20 20-4.3-4.3" /></>,
-  servers: <><rect x="4" y="4.5" width="16" height="6" rx="1.5" /><rect x="4" y="13.5" width="16" height="6" rx="1.5" /><path d="M7.5 7.5h.01M7.5 16.5h.01" /></>,
-  whatif: <><path d="M6 18V9a3 3 0 0 1 3-3h9" /><path d="m14 2.5 4 3.5-4 3.5" /><path d="M6 18h7" /><circle cx="6" cy="18" r="0.6" /></>,
   import: <><path d="M12 4v10" /><path d="m8 10.5 4 4 4-4" /><path d="M4 15.5V18a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-2.5" /></>,
   posture: <><path d="M4 17.5a8 8 0 0 1 16 0" /><path d="M12 17.5 15.5 11" /><circle cx="12" cy="17.5" r="1.2" /></>,
-  inventory: <><path d="M4.5 6.5h15M4.5 12h15M4.5 17.5h15" /><circle cx="4.5" cy="6.5" r="0.7" /><circle cx="4.5" cy="12" r="0.7" /><circle cx="4.5" cy="17.5" r="0.7" /></>,
   method: <><path d="M4 5.5h6a2 2 0 0 1 2 2v12a2 2 0 0 0-2-2H4z" /><path d="M20 5.5h-6a2 2 0 0 0-2 2v12a2 2 0 0 1 2-2h6z" /></>,
 } as const;
 export type IconName = keyof typeof ICONS;

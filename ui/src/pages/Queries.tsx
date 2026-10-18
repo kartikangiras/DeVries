@@ -1,6 +1,6 @@
 // The Cypher behind everything, one named query at a time: the catalogue down the side, the statement in the
 // middle, where it is used on the right. Nothing in the app runs a query that is not in this list. It sits on
-// the Method page; the three parts follow Manthan's policy page (see ui/THIRD_PARTY_NOTICES.md).
+// the Method page.
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import type { CatalogQuery } from "../api";

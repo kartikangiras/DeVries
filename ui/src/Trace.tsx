@@ -1,5 +1,4 @@
 // One audit run, step by step: when, in which phase, which tool, what came back, and who decided.
-// The row shape follows Manthan's audit log (see ui/THIRD_PARTY_NOTICES.md).
 
 import { useEffect, useState } from "react";
 import type { Mitigation, RunWithSteps, Step } from "./api";

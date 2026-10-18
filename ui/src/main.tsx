@@ -11,9 +11,6 @@ import "@fontsource/instrument-serif/latin-400-italic.css";
 import App from "./App";
 import "./styles/tokens.css";
 import "./styles/app.css";
-import "./styles/chart.css";
-import "./styles/app-v3.css";
-import "./styles/graph-v3.css";
 import "./styles/landing.css";
 import "./styles/landing-parts.css";
 

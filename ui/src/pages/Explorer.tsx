@@ -98,7 +98,7 @@ function Read({ id, graph, c, scenario }: { id: string | null; graph: Graph; c: 
 type Lens = "paths" | "all" | "zones" | "cut" | "central";
 
 /** An agent's Rule of Two letters, to print on its card. */
-export function badgesOf(c: DeVries): Map<string, string> {
+function badgesOf(c: DeVries): Map<string, string> {
   return new Map((c.scorecard?.agents ?? []).map((a) => [a.agent_id, ["A", "B", "C"].filter((p) => a.properties.includes(p)).join("·") || "·"]));
 }
 
@@ -120,8 +120,8 @@ export function ExplorerPage({ c, scenario, id, sub }: { c: DeVries; scenario: s
   const litFinding = id?.startsWith("fnd:") ? [...(c.findings?.findings ?? []), ...(c.findings?.past ?? [])].find((f) => f.id === id) ?? null : null;
   const picked = id && !id.startsWith("fnd:") ? id : null;
   const [lens, setLens] = useState<Lens>("paths");
-  const [renderer, setRenderer] = useRenderer();
-  const [canvasLayout, setCanvasLayout] = useState<"force" | "tree">("force");
+  const [renderer, setRenderer] = useRenderer("explorer");
+  const [canvasLayout, setCanvasLayout] = useState<"force" | "tree">("tree");
   const [layer, setLayer] = useState<Layer>("flow");
   const [central, setCentral] = useState<Central | null>(null);
   const [cutHops, setCutHops] = useState<Set<string> | null>(null);
@@ -174,13 +174,13 @@ export function ExplorerPage({ c, scenario, id, sub }: { c: DeVries; scenario: s
 
   const tables = id === "tables";
   const view = (
-    <>
+    <span className="control-group">
       <span className="control">View</span>
       <div className="pills" role="tablist" aria-label="View">
         <button role="tab" aria-selected={!tables} className={!tables ? "on" : ""} onClick={() => go(scenario, "graph")}>Map</button>
         <button role="tab" aria-selected={tables} className={tables ? "on" : ""} onClick={() => go(scenario, "graph", "tables")}>Tables</button>
       </div>
-    </>
+    </span>
   );
   if (tables) {
     return (
@@ -200,6 +200,7 @@ export function ExplorerPage({ c, scenario, id, sub }: { c: DeVries; scenario: s
       />
       <div className="chart-controls">
         {view}
+        <span className="control-group">
         <span className="control">Lens</span>
         <div className="pills" role="tablist" aria-label="Lens">
           <button role="tab" aria-selected={lens === "paths"} className={lens === "paths" ? "on" : ""} onClick={() => { setLens("paths"); setLayer("flow"); if (litFinding) pick(null); }} title="The open findings' paths lit over the whole system">Open paths{openCount ? ` · ${openCount}` : ""}</button>
@@ -211,11 +212,14 @@ export function ExplorerPage({ c, scenario, id, sub }: { c: DeVries; scenario: s
           <button role="tab" aria-selected={lens === "central"} className={lens === "central" ? "on" : ""} onClick={() => { setLens("central"); setLayer("flow"); if (litFinding) pick(null); }}
             title="The five agents and tools that the most flow passes through, by betweenness centrality">Most central</button>
         </div>
+        </span>
+        <span className="control-group">
         <span className="control">Layer</span>
         <div className="pills" role="tablist" aria-label="Layer">
           <button role="tab" aria-selected={flow} className={flow ? "on" : ""} onClick={() => setLayer("flow")}>Flow</button>
           <button role="tab" aria-selected={!flow} className={!flow ? "on" : ""} onClick={() => { setLayer("config"); if (lens !== "all" && lens !== "zones") setLens("all"); }}>Config</button>
         </div>
+        </span>
         <RendererSwitch value={renderer} onChange={setRenderer} layout={canvasLayout} onLayout={setCanvasLayout} />
       </div>
 
@@ -223,7 +227,7 @@ export function ExplorerPage({ c, scenario, id, sub }: { c: DeVries; scenario: s
         <figure className="figure">
           {graph ? (
             <Chart renderer={renderer} layout={canvasLayout} graph={graph} names={c.names} focus={focus} only={false} communities={lens === "zones"}
-              cuts={cutting ? cutHops ?? undefined : undefined} cutsMean="on the cheapest cut" rings={rings} badges={badges} picked={picked} onPick={pick} idle={idle} heightRange={[360, chartHeight]} fitZoom={2.1} />
+              cuts={cutting ? cutHops ?? undefined : undefined} cutsMean="on the cheapest cut" rings={rings} badges={badges} picked={picked} onPick={pick} idle={idle} heightRange={[360, chartHeight]} fitZoom={2.1} minZoom={0.9} />
           ) : <Loading label={c.ready ? "Reading the graph" : "Connecting"} />}
           {cutting && (
             <p className="chart-note"><strong>Cheapest cut.</strong> The marked hops; their cost and the rules they would become are on <a href={href(scenario)}>Posture</a>.</p>

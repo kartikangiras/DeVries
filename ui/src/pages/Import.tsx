@@ -107,6 +107,7 @@ export function ImportPage({ c, scenario }: { c: DeVries; scenario: string }) {
           <p className="tldr-text">
             <a href={href(result.scenario)}>{result.scenario}</a> is loaded. {result.findings.length ? `${result.findings.length} finding(s) already, from the labels given.` : "Nothing is a finding until you label what is untrusted and what matters, on its Inbox."}
             {result.run ? " The audit started by itself and will stop at its first proposal." : ""}
+            {result.unconstrained ? " No workflow is declared here, so nothing was checked for breakage." : ""}
           </p>
           {result.skipped.length > 0 && <ul className="cards">{result.skipped.map((s) => <li className="card" key={s}><p>{s}</p></li>)}</ul>}
         </section>
