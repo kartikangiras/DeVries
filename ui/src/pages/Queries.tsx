@@ -1,4 +1,4 @@
-// The Cypher behind everything, one named query at a time: the catalogue down the side, the statement in the
+// The Cypher behind everything, one named query at a time: the catalog down the side, the statement in the
 // middle, where it is used on the right. Nothing in the app runs a query that is not in this list. It sits on
 // the Method page.
 
@@ -13,10 +13,10 @@ const GROUPS: { label: string; prefixes: string[] }[] = [
   { label: "Verdicts and evidence", prefixes: ["reach", "find", "evidence", "wf", "graph"] },
   { label: "Graph algorithms", prefixes: ["zones", "choke"] },
   { label: "Fixes and what-ifs", prefixes: ["fix", "whatif"] },
-  { label: "Findings, plans and drafts", prefixes: ["finding", "mitigation", "draft", "config", "scan"] },
+  { label: "Findings, plans, drafts and runs", prefixes: ["finding", "mitigation", "draft", "config", "scan", "run"] },
   { label: "The flow layer", prefixes: ["projection", "flow"] },
   { label: "Reading for the page", prefixes: ["ui", "node", "scenario", "overview", "inventory", "server", "agent"] },
-  { label: "Loading a scenario", prefixes: ["ingest", "schema", "canary"] },
+  { label: "Loading a scenario", prefixes: ["ingest", "schema", "canary", "drift"] },
 ];
 const DEFAULT = "reach.untrusted_to_high";
 /** Where on screen a query's answer shows, by its prefix: the places, so a reader can find the figure it feeds. */
@@ -28,7 +28,7 @@ const USED_ON: [string, string][] = [
   ["choke.betweenness", "Posture's choke points · the Explorer's central lens"], ["choke.pagerank", "the Explorer's tables and reader"],
   ["zones.", "the Explorer's communities lens"], ["fix.", "a plan applied, or tested in a sandbox"], ["whatif.", "the Explorer's reader and tables"],
   ["finding.", "Open and Closed · Activity"], ["mitigation.", "a finding's Fix and Options steps · Activity"], ["scan.", "Posture's history · Activity"],
-  ["draft.", "the change under the approval bar · Activity"], ["ui.", "the Explorer"], ["overview.", "Posture"], ["server.", "the Explorer's tables"], ["inventory.", "the Explorer's tables"],
+  ["draft.", "the change under the approval bar · Activity"], ["run.", "Activity · a finding's Fix step"], ["ui.", "the Explorer"], ["overview.", "Posture"], ["server.", "the Explorer's tables"], ["inventory.", "the Explorer's tables"],
   ["projection.", "every scan"], ["flow.", "the Explorer · the cut"], ["ingest.", "loading a scenario"], ["schema.", "loading a scenario"], ["canary.", "the self-check at start"],
   ["config.", "the config hash a plan is tested against"], ["graph.", "every scan"], ["node.", "every page's names"], ["scenario.", "the scenario switch"], ["agent.", "Posture's tally"],
   ["drift.", "a manifest drift finding"],
@@ -53,7 +53,7 @@ export function Cypher({ text }: { text: string }) {
   return <pre className="cypher"><code>{out}</code></pre>;
 }
 
-/** One query's statement, read from the catalogue by name, for the Method page to quote. */
+/** One query's statement, read from the catalog by name, for the Method page to quote. */
 export function Statement({ c, scenario, name }: { c: DeVries; scenario: string; name: string }) {
   const q = c.catalog.find((x) => x.name === name);
   if (!q) return <Loading label={`Reading ${name}`} />;
@@ -65,8 +65,8 @@ export function Statement({ c, scenario, name }: { c: DeVries; scenario: string;
   );
 }
 
-/** The catalogue: the list down the side, the statement in the middle, what it is for and who used it on the right. */
-export function QueryCatalogue({ c, scenario, name }: { c: DeVries; scenario: string; name: string | null }) {
+/** The catalog: the list down the side, the statement in the middle, what it is for and who used it on the right. */
+export function QueryCatalog({ c, scenario, name }: { c: DeVries; scenario: string; name: string | null }) {
   const [find, setFind] = useState("");
   const byName = useMemo(() => new Map(c.catalog.map((q) => [q.name, q])), [c.catalog]);
   const selected = byName.get(name ?? DEFAULT) ?? c.catalog[0] ?? null;
@@ -81,12 +81,12 @@ export function QueryCatalogue({ c, scenario, name }: { c: DeVries; scenario: st
     const rest = c.catalog.filter((q) => !placed.has(q.name));
     return rest.length ? [...groups, { label: "Other", list: rest }] : groups;
   }, [c.catalog]);
-  // the selected query is in view, however far down the catalogue it sits
+  // the selected query is in view, however far down the catalog it sits
   useEffect(() => {
     document.querySelector(".catalog-list a.on")?.scrollIntoView({ block: "nearest" });
   }, [selected?.name]);
 
-  if (!c.catalog.length) return <Loading label="Reading the query catalogue" />;
+  if (!c.catalog.length) return <Loading label="Reading the query catalog" />;
   const params = selected ? [...new Set(selected.cypher.match(/\$\w+/g) ?? [])] : [];
   const algos = selected ? [...new Set(selected.cypher.match(/algo\.\w+/g) ?? [])] : [];
   const users = selected && c.run ? c.run.steps.filter((s) => s.queries.includes(selected.name)) : [];

@@ -1,7 +1,7 @@
 // One audit run, step by step: when, in which phase, which tool, what came back, and who decided.
 
-import { useEffect, useState } from "react";
-import type { Mitigation, RunWithSteps, Step } from "./api";
+import { useEffect, useState, type ReactNode } from "react";
+import type { Mitigation, RunUsage, RunWithSteps, Step } from "./api";
 import type { Tone } from "./desk";
 import { href } from "./route";
 import { OUTCOME_SENTENCE, citeRun, mainLine, runState, verdictsOf } from "./runs";
@@ -75,10 +75,17 @@ function StepRow({ step, lit, names, mitigations, scenario }: Shared & { step: S
   );
 }
 
+export const CEILING_NOTE = "the model is not in the price table, so this is the dearest known rate";
+/** What a run cost in dollars; a ceiling, when the model's own rate is not known, is marked as one. */
+export function Cost({ usage, digits = 2 }: { usage: RunUsage; digits?: number }) {
+  const amount = `$${usage.cost_usd.toFixed(digits)}`;
+  return usage.cost_is_ceiling ? <span className="cost-ceiling" title={CEILING_NOTE}>≤ {amount}</span> : <>{amount}</>;
+}
+
 /** How a run was driven, said plainly: by a model, or by the scripted search when no model could be used. */
-function driver(run: RunWithSteps): string {
+function driver(run: RunWithSteps): ReactNode {
   if (run.mode === "scripted") return `scripted, not a model: ${run.scripted_reason ?? "no model was used"}`;
-  return `model ${run.model ?? "unknown"} · ${run.usage.model_steps} model ${run.usage.model_steps === 1 ? "step" : "steps"} · $${run.usage.cost_usd.toFixed(2)}`;
+  return <>model {run.model ?? "unknown"} · {run.usage.model_steps} model {run.usage.model_steps === 1 ? "step" : "steps"} · <Cost usage={run.usage} /></>;
 }
 
 export function RunTrace({ run, ...shared }: Shared & { run: RunWithSteps }) {

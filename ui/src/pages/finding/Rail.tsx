@@ -6,6 +6,7 @@ import { isLive, type Desk } from "../../desk";
 import { KIND_OF, findingQueries, nodeFacts, nodeIndex, pathsOf } from "../../paths";
 import { href } from "../../route";
 import type { DeVries } from "../../state";
+import { Cost } from "../../Trace";
 import { KIND_WORDS, WithNames, clock, plural } from "../../text";
 import { Eyebrow, KV } from "../../ui";
 import type { Step } from "./shared";
@@ -174,7 +175,7 @@ export function Rail({ step, finding, plan, desk, cites, picked, onPick, c, scen
         <KV k="Status">{c.run.status.replace("_", " ")}</KV>
         <KV k="Steps">{c.run.steps.length}</KV>
         <KV k="Sandboxes">{c.run.usage.simulations}</KV>
-        {c.run.usage.cost_usd > 0 && <KV k="Model cost">${c.run.usage.cost_usd.toFixed(3)}</KV>}
+        {c.run.usage.cost_usd > 0 && <KV k="Model cost"><Cost usage={c.run.usage} digits={3} /></KV>}
         <KV k="Started">{clock(c.run.started_at)}</KV>
       </dl>
       <p className="rail-note">Its trace, step by step, is under <a href={href(scenario, "audit", c.run.id)}>Activity</a>.</p>

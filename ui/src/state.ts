@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ApiError, api, openEvents, outage,
-  type CatalogQuery, type Findings, type Graph, type Health, type ImportAnswer, type Layer, type Mitigation, type Overview, type Run, type RunWithSteps, type Scenario, type Scorecard, type Session, type StreamEvent,
+  type About, type CatalogQuery, type Findings, type Graph, type Health, type ImportAnswer, type Layer, type Mitigation, type Overview, type Run, type RunWithSteps, type Scenario, type Scorecard, type Session, type StreamEvent,
 } from "./api";
 import { go } from "./route";
 import { scenarioName } from "./text";
@@ -24,6 +24,7 @@ export function useDeVries(scenario: string | null) {
   const [runList, setRunList] = useState<Run[]>([]);
   const [health, setHealth] = useState<Health | null>(null);
   const [catalog, setCatalog] = useState<CatalogQuery[]>([]);
+  const [about, setAbout] = useState<About | null>(null);
   const [scannedAt, setScannedAt] = useState<number | null>(null);
   const [scorecard, setScorecard] = useState<Scorecard | null>(null);
   const [overview, setOverview] = useState<Overview | null>(null);
@@ -117,6 +118,7 @@ export function useDeVries(scenario: string | null) {
           wasConnected = ok;
         });
         api.queries().then(setCatalog).catch(() => {});
+        api.about().then(setAbout).catch(() => {});
       })
       .catch(fail);
     // and a slow heartbeat, so a lost event never leaves a page stale for long
@@ -309,7 +311,7 @@ export function useDeVries(scenario: string | null) {
 
   return {
     ready, connected, dbDown, busy, problem, dismiss: () => setProblem(null),
-    session, health, scenarios, current, titleOf, catalog, scannedAt, scorecard: fresh ? scorecard : null, overview: fresh ? overview : null,
+    session, health, scenarios, current, titleOf, catalog, about, scannedAt, scorecard: fresh ? scorecard : null, overview: fresh ? overview : null,
     flow, config: fresh ? graphs.config : undefined, needConfig,
     findings: fresh ? findings : null, openIds, names, mitigations: fresh ? mitigations : {}, plans, configHash: fresh ? configHash : null,
     run: fresh ? run : null, runList: fresh ? runList : [], showRun,

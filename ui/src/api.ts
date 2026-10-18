@@ -70,12 +70,14 @@ export type Step = {
   result: Record<string, unknown> | null; error: string | null; cited_ids: string[]; queries: string[];
   ms: number | null; text: string | null; at: number;
 };
+/** What a run used. `cost_is_ceiling` says the model is not in the price table, so `cost_usd` is the dearest known rate. */
+export type RunUsage = { model_steps: number; input_tokens: number; output_tokens: number; cost_usd: number; cost_is_ceiling?: boolean; simulations: number };
 export type Run = {
   id: string; kind: "audit" | "ask"; scenario: string; status: "running" | "awaiting_approval" | "done" | "failed";
   phase: string; mode: "agent" | "scripted"; scripted_reason: string | null; model: string | null;
   question: string | null; answer: string | null; answer_by: "model" | "template" | null;
   mitigation_id: string | null; outcome: string | null; error: string | null;
-  usage: { model_steps: number; input_tokens: number; output_tokens: number; cost_usd: number; simulations: number };
+  usage: RunUsage;
   started_at: number; finished_at: number | null;
 };
 export type RunWithSteps = Run & { steps: Step[] };
@@ -85,6 +87,18 @@ export type Session = {
   model: { configured: boolean; name: string | null; budget_spent: boolean; runs_left: number; questions_left: number };
   /** A public site: nothing is launched, nothing is written to a file, an import is private to this session. */
   public?: boolean; can_write?: boolean; can_launch?: boolean;
+};
+
+/** One scenario of the model eval: the plan the search finds, the sandboxes each driver needed, and how often the model matched. */
+export type EvalScenario = {
+  scenario: string; baseline: string; baseline_cost: number; search_to_first_pass: number; search_total: number;
+  model_sandboxes: string; model_steps: string; usd: string; matched: number; runs: number;
+};
+export type Eval = { measured_at: string; model: string; runs_per_scenario: number; scenarios: EvalScenario[]; matched: number; runs: number };
+/** What this build is: the counts the landing quotes, the engine's cost of each kind of fix, the model, and the eval when one was measured. */
+export type About = {
+  version: string; rules: number; fix_costs: Record<string, number>; mcp_tools: number; queries: number; scenarios: number;
+  model: string | null; model_default: string; eval: Eval | null;
 };
 
 export type Health = { ok: boolean; falkordb: boolean; falkordb_version?: string | null; falkordb_mb?: number | null; canary: { ok: boolean; detail: string; ms: number } | null; public?: boolean };
@@ -274,6 +288,7 @@ export const api = {
   /** Health answers 503 with the same body when something is wrong; the body is what we want either way. */
   health: () => fetch("/api/health", { credentials: "same-origin" }).then((r) => r.json() as Promise<Health>),
   queries: () => call<{ queries: CatalogQuery[] }>("GET", "/api/queries").then((r) => r.queries),
+  about: () => call<About>("GET", "/api/about"),
   reset: () => call<{ reset: string[] }>("POST", "/api/session/reset"),
   scenarios: () => call<{ scenarios: Scenario[] }>("GET", "/api/scenarios").then((r) => r.scenarios),
   graph: (scenario: string, layer: "flow" | "config") => call<Graph>("GET", `${at(scenario)}/graph?layer=${layer}`),

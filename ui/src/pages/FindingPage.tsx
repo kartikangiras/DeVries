@@ -71,7 +71,7 @@ function FindingBody({ c, scenario, finding, step }: { c: DeVries; scenario: str
 
   const steps: { id: Step; n: string; label: string; sub: string }[] = [
     { id: "summary", n: "1", label: "Summary", sub: "the finding in brief" },
-    { id: "rule", n: "2", label: "Rule", sub: finding.kind === "injection" ? "rule 1 · an injection path" : "rule 2 · a trifecta" },
+    { id: "rule", n: "2", label: "Rule", sub: finding.kind === "injection" ? "check 1 · an injection path" : "check 2 · a trifecta" },
     { id: "path", n: "3", label: "Path", sub: "how the text travels" },
     { id: "fix", n: "4", label: "Fix", sub: desk.applied ? "applied" : desk.proposal ? "awaiting your approval" : desk.tone === "info" ? "being tested" : "none yet" },
     { id: "options", n: "5", label: "Options", sub: `${plural(desk.tested.length, "plan", "plans")} tested` },
@@ -156,8 +156,8 @@ function FindingBody({ c, scenario, finding, step }: { c: DeVries; scenario: str
               <Eyebrow>The rule</Eyebrow>
               <h1 className="brief-title">
                 {finding.kind === "injection"
-                  ? <>Rule 1 <em>untrusted text reaches a high-impact action with no person in between.</em></>
-                  : <>Rule 2 <em>one agent holds untrusted input, private data and a way out.</em></>}
+                  ? <>Check 1 <em>untrusted text reaches a high-impact action with no person in between.</em></>
+                  : <>Check 2 <em>one agent holds untrusted input, private data and a way out.</em></>}
               </h1>
               <p className="claim-sub">
                 {worst && <>{name(worst.agent_id)} holds {worst.count === 3 ? "all three" : worst.count ? words(worst.properties) : "none of the three"}. </>}

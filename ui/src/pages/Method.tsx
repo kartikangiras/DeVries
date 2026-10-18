@@ -5,7 +5,7 @@
 import { href, go } from "../route";
 import type { DeVries } from "../state";
 import { Eyebrow, PageBody, PageHeader, Tabs } from "../ui";
-import { QueryCatalogue, Statement } from "./Queries";
+import { QueryCatalog, Statement } from "./Queries";
 
 type Section = "rules" | "flow" | "fixes" | "analytics" | "queries";
 const SECTIONS: Section[] = ["rules", "flow", "fixes", "analytics", "queries"];
@@ -53,19 +53,19 @@ export function MethodPage({ c, scenario, section, query }: { c: DeVries; scenar
       {shown === "rules" && (
         <div className="method">
           <section className="method-block">
-            <Eyebrow>Rule 1 · an injection path</Eyebrow>
+            <Eyebrow>Check 1 · an injection path</Eyebrow>
             <h2>Untrusted text reaches a high-impact action with no person in between.</h2>
-            <p>A data source is <em>untrusted</em> when people outside the organisation can write what the tools read. A resource is <em>high-impact</em> by its label. The rule fires when a breadth-first search from each untrusted source over the flow layer, as deep as the graph has nodes, reaches such a resource. A path means text <em>can</em> flow, not that it did.</p>
+            <p>A data source is <em>untrusted</em> when people outside the organisation can write what the tools read. A resource is <em>high-impact</em> by its label. The check fires when a breadth-first search from each untrusted source over the flow layer, as deep as the graph has nodes, reaches such a resource. A path means text <em>can</em> flow, not that it did.</p>
             <Statement c={c} scenario={scenario} name="reach.untrusted_to_high" />
           </section>
           <section className="method-block">
-            <Eyebrow>Rule 2 · a lethal trifecta</Eyebrow>
+            <Eyebrow>Check 2 · a lethal trifecta</Eyebrow>
             <h2>One agent holds untrusted input, private data and a way out.</h2>
-            <p>Meta's Agents Rule of Two names three properties: [A] the agent processes untrustworthy input, [B] it has access to sensitive systems or private data, [C] it can change state or communicate externally. DeVries reads A as "an untrusted source reaches it", B as "a private source reaches it", C as "it can reach a resource that leaves the organisation", each by one search over the flow layer. An agent with all three is a finding; one that also runs an unattended workflow is the worst case, since, in Meta's words, such an agent should not be permitted to operate autonomously.</p>
+            <p>Meta's Agents Rule of Two names three properties: [A] the agent processes untrustworthy input, [B] it has access to sensitive systems or private data, [C] it can change state or communicate externally. DeVries reads A as "an untrusted source reaches it", B as "a private source reaches it", C as "it can act on a resource", any resource, whether or not it leaves the organisation, each by one search over the flow layer. The finding is the sharpest case: an agent that holds A and B and can act on a resource that leaves the organisation, a way out, so whoever writes the text can have the data sent. One that also runs an unattended workflow is the worst case, since, in Meta's words, such an agent should not be permitted to operate autonomously.</p>
             <Statement c={c} scenario={scenario} name="find.trifecta" />
           </section>
           <section className="method-block">
-            <Eyebrow>Rules 3 and 4 · standing findings</Eyebrow>
+            <Eyebrow>Checks 3 and 4 · standing findings</Eyebrow>
             <h2>A server's tool definitions changed, or a description reads as instructions.</h2>
             <p><strong>Manifest drift.</strong> Every tool definition is hashed part by part when its manifest is loaded; a reload that finds a server's manifest changed opens a finding naming the tools and the parts that changed. <strong>Poisoned description.</strong> A tool description that reads as an instruction to the model, hides text in invisible characters or comments, or names another server's tool is a finding, high when the tool sits on an open finding's path. Neither is fixed by the graph; both stand until a person accepts them, and no tool can do that.</p>
           </section>
@@ -101,7 +101,7 @@ export function MethodPage({ c, scenario, section, query }: { c: DeVries; scenar
           <section className="method-block">
             <Eyebrow>Two sides of a tool</Eyebrow>
             <h2>What a tool returns and what it does are kept apart.</h2>
-            <p>A tool that writes has two nodes on the flow layer: its reading side, which flows toward its callers, and an acting side that only flows toward its resource. With one node, an agent's context would flow through a tool into every other agent that calls it, which is not something that happens. Every query that reads the layer names the acting side by its tool, so a path still reads agent → tool → resource. Each flow edge also carries a <em>capacity</em>: the cost of the cheapest fix that can cut it, or 1000 where none can, which is what max flow runs on.</p>
+            <p>A tool that writes has two nodes on the flow layer: its reading side, which flows toward its callers, and an acting side that only flows toward its resource. With one node, an agent's context would flow through a tool into every other agent that calls it, which is not something that happens. Every query that reads the layer names the acting side by its tool, so a path still reads agent → tool → resource. Each flow edge also carries a <em>capacity</em>: the cost of the cheapest fix that can cut it without breaking a workflow that needs the hop, or 1000 where none can, which is what max flow runs on.</p>
             <Statement c={c} scenario={scenario} name="flow.edges" />
           </section>
         </div>
@@ -142,14 +142,14 @@ export function MethodPage({ c, scenario, section, query }: { c: DeVries; scenar
             <Eyebrow>Posture</Eyebrow>
             <h2>Five figures, a flow, two bar charts, the choke points, the history.</h2>
             <ul className="method-list">
-              <li><strong>Open findings</strong>: the findings that hold right now, by the two rules.</li>
+              <li><strong>Open findings</strong>: the findings that hold right now, by the two checks.</li>
               <li><strong>High-impact actions reached</strong>: how many high-impact resources any untrusted source reaches, by <Q scenario={scenario} name="reach.untrusted_to_high" />.</li>
               <li><strong>Agents holding all three</strong>, and how many of them run unattended: Meta's Rule of Two, read by three searches, <Q scenario={scenario} name="reach.agents_from_sources" /> twice and <Q scenario={scenario} name="agent.acts_on" />.</li>
               <li><strong>Where the risk runs</strong>: the open findings' paths between the untrusted and private sources, the agents and the high-impact actions, as a map; the tokens run the paths for as long as they are open. A card's figure is a search answer: what a source's text reaches, how many untrusted sources reach an action, which of the three properties an agent holds.</li>
               <li><strong>Blast radius</strong>: everything each untrusted source's text can reach, one search per source, <Q scenario={scenario} name="reach.from" />; the lit part of the bar is the high-impact resources and the ways out among them.</li>
               <li><strong>Exposure</strong>: for each high-impact resource or way out, how many untrusted sources reach it, one search from every node, <Q scenario={scenario} name="reach.into" />.</li>
               <li><strong>Choke points</strong>: the agents and tools the most open routes pass through, counted over the findings' evidence paths; where one change would cut the most.</li>
-              <li><strong>The cheapest cut</strong>: the least set of hops that separates every untrusted source from every high-impact resource, by FalkorDB's max flow with each hop's capacity set to the cost of the cheapest fix that cuts it, <Q scenario={scenario} name="choke.maxflow" />. A guide, not a verdict: it knows nothing about workflows, and a trifecta is not a cut. "Propose it as one plan" sends it through the sandbox like any other plan.</li>
+              <li><strong>The cheapest cut</strong>: the least set of hops that separates every untrusted source from every high-impact resource, by FalkorDB's max flow, <Q scenario={scenario} name="choke.maxflow" />. Each hop's capacity is the cost of the cheapest fix that cuts it without breaking a workflow that needs the hop: a revoke of a tool a workflow needs, a gate on a call an autonomous workflow makes, or a dropped read of data a workflow needs count as uncuttable, so the cut lands on a plan a sandbox can pass. A guide, not a verdict: the sandbox has the last word, and a trifecta is not a cut. "Propose it as one plan" sends it through the sandbox like any other plan.</li>
               <li><strong>Over time</strong>: one record per scan, <Q scenario={scenario} name="scan.history" />, so a fix shows as the next bar's drop.</li>
             </ul>
           </section>
@@ -182,8 +182,8 @@ export function MethodPage({ c, scenario, section, query }: { c: DeVries; scenar
 
       {shown === "queries" && (
         <div className="method method-queries">
-          <p className="method-lede">Every Cypher statement the product runs is a named entry in one catalogue, sent with parameters and never built from strings. Reads go with <code>GRAPH.RO_QUERY</code>, so the server itself refuses a write in them; the fix statements are guarded, running on a working graph only for a plan a person approved.</p>
-          <QueryCatalogue c={c} scenario={scenario} name={query} />
+          <p className="method-lede">Every Cypher statement the product runs is a named entry in one catalog, sent with parameters and never built from strings. Reads go with <code>GRAPH.RO_QUERY</code>, so the server itself refuses a write in them; the fix statements are guarded, running on a working graph only for a plan a person approved.</p>
+          <QueryCatalog c={c} scenario={scenario} name={query} />
         </div>
       )}
     </PageBody>
