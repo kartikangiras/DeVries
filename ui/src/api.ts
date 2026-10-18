@@ -24,14 +24,14 @@ export type GraphLink = {
     fixes?: string[];
   };
 };
-export type Workflow = { id: string; name: string; description: string | null; mode: string; run_by: string; needs: string[]; reads: string[] };
+type Workflow = { id: string; name: string; description: string | null; mode: string; run_by: string; needs: string[]; reads: string[] };
 export type Graph = {
   scenario: string; layer: "flow" | "config"; own_copy: boolean;
   nodes: GraphNode[]; links: GraphLink[]; workflows: Workflow[]; queries: string[];
 };
 
 export type Path = { node_ids: string[]; rules: number[]; hops: string[] };
-export type Taxonomy = { code: string; name: string };
+type Taxonomy = { code: string; name: string };
 export type Finding = {
   id: string; kind: "injection" | "trifecta" | "drift" | "poisoned_description"; severity: "critical" | "high" | "medium"; status: "open" | "mitigated" | "accepted" | "closed";
   /** OWASP Top 10 for Agentic Applications: the classes this kind of finding belongs to. */
@@ -46,7 +46,7 @@ export type Finding = {
   legs?: { untrusted_in: Path | null; private_in: Path | null; exit_out: Path | null };
   note?: string;
 };
-export type LastScan = { scan_id: string; at: number; duration_ms: number; injection: number; trifecta: number; partial: boolean };
+type LastScan = { scan_id: string; at: number; duration_ms: number; injection: number; trifecta: number; partial: boolean };
 export type Findings = {
   scenario: string; own_copy: boolean; findings: Finding[]; past: Finding[]; names: Record<string, string>;
   /** When this graph was last scanned, or null if it never was. */
@@ -55,6 +55,8 @@ export type Findings = {
 
 export type Mitigation = {
   id: string; status: "proposed" | "approved" | "applied" | "rejected" | "failed"; passed: boolean; cost: number; source: string;
+  /** The graph declares no workflow, so the sandbox could not check what the plan breaks. Older servers leave it out. */
+  unconstrained?: boolean;
   plan: { fixes: Record<string, any>[] }; summary: string[]; patch: Record<string, unknown>[]; targets: string[];
   reason: string | null; rationale: string | null; approved_by: string | null; decision_reason: string | null;
   created_at: number; applied_at: number | null; config_hash?: string; sandbox_ms?: number | null;
@@ -93,7 +95,9 @@ export type Ribbon = {
   hops: number; routes: number; severity: string; untrusted_ids?: string[]; private_ids?: string[]; exit_ids?: string[];
 };
 export type Overview = {
-  scenario: string; own_copy: boolean; partial: boolean; sentence: string;
+  scenario: string; own_copy: boolean; partial: boolean;
+  /** One short clause; `sentence_more` is the second clause (the trifecta count), when there is one. */
+  sentence: string; sentence_more?: string | null;
   counts: { untrusted_sources: number; private_sources: number; sources: number; agents: number; tools: number; high_resources: number; external_resources: number; resources: number; workflows: number; open_findings: number; cut_cost: number | null };
   columns: {
     sources: { id: string; name: string; trust: string | null }[];
@@ -105,16 +109,20 @@ export type Overview = {
 };
 
 /** A plan as the change to the configuration it came from: the text that would be written, a diff, a note. */
-export type Draft = {
+type Draft = {
   id: string; kind: string; path: string | null; after: string; diff: string; note: string; commands: string[];
   writable: boolean; edited: boolean; before_hash: string; after_hash: string; changes: boolean;
+  /** False when `after` is redacted (secrets shown as •••): it is read-only and must not be sent back on write. Missing means true. */
+  editable?: boolean;
 };
-export type Origin = { kind: string; path: string | null; settings_path: string | null; hash: string | null; servers: Record<string, string> };
+type Origin = { kind: string; path: string | null; settings_path: string | null; hash: string | null; servers: Record<string, string> };
 export type DraftAnswer = { scenario: string; mitigation_id: string; draft: Draft; can_write: boolean; origin: Origin | null };
-export type Receipt = { draft_id: string; path: string; backup: string; before_hash: string; after_hash: string; written_at: number; written_by: string; open_after: string[]; closed: string[]; reloaded: boolean };
+type Receipt = { draft_id: string; path: string; backup: string; before_hash: string; after_hash: string; written_at: number; written_by: string; open_after: string[]; closed: string[]; reloaded: boolean };
 export type ImportAnswer = {
   scenario: string; private: boolean; servers: { id: string; name: string; trust: string | null; impact: string | null; external: boolean }[];
   tools: number; skipped: string[]; origin: Origin | null; findings: Finding[]; run: Run | null;
+  /** The import declares no workflow, so a fix's sandbox cannot check what it breaks. Older servers leave it out. */
+  unconstrained?: boolean;
 };
 export type Policy = { scenario: string; cost: number | null; hops: Cut["hops"]; claude_code: { permissions: Record<string, string[]> }; claude_code_text: string; docker_mcp_gateway: string[]; named: string[] };
 
@@ -125,7 +133,7 @@ export type Change =
   | { kind: "drop_read"; tool_id: string; source_id: string }
   | { kind: "drop_server"; server_id: string }
   | { kind: "split_agent"; agent_id: string; reader_tool_ids: string[] };
-export type FindingRef = { id: string; kind: "injection" | "trifecta"; source_id?: string; target_id?: string; agent_id?: string; path_ids?: string[] };
+type FindingRef = { id: string; kind: "injection" | "trifecta"; source_id?: string; target_id?: string; agent_id?: string; path_ids?: string[] };
 /** What a set of changes would do, measured in a sandbox that no longer exists. */
 export type WhatIf = {
   scenario: string; changes: string[]; resolved: string[]; introduced: FindingRef[];
@@ -136,7 +144,7 @@ export type Preview = Pick<Graph, "layer" | "nodes" | "links" | "workflows"> & {
 /** The cheapest cut between untrusted sources and high-impact resources, as max flow found it. */
 export type Cut = {
   scenario: string; cost: number; cuttable: boolean; queries: string[];
-  hops: { from_id: string; to_id: string; rule: number; sentence: string; capacity: number; fixes: string[]; config: { rel: string; from_id: string; to_id: string } }[];
+  hops: { from_id: string; to_id: string; rule: number; sentence: string; capacity: number; fixes: string[]; fix?: string | null; config: { rel: string; from_id: string; to_id: string } }[];
 };
 /** Each MCP server: its tools, who holds them, and the findings whose paths run through them. */
 export type Servers = {
@@ -154,7 +162,9 @@ export type Central = { scenario: string; nodes: { id: string; name: string | nu
 export type ScanRow = { scan_id: string; at: number; duration_ms: number; injection: number; trifecta: number; open: number; partial: boolean };
 /** The system's standing, all of it read from FalkorDB: where untrusted text can go, what stands in its way, how it has moved. */
 export type Posture = {
-  scenario: string; own_copy: boolean; partial: boolean; sentence: string;
+  scenario: string; own_copy: boolean; partial: boolean;
+  /** One short clause; `sentence_more` is the second clause (the trifecta count), when there is one. */
+  sentence: string; sentence_more?: string | null;
   counts: Overview["counts"];
   facts: { nodes: number; flows: number; workflows: number; last_scan: { at: number; duration_ms: number } | null };
   exposure: { high_reached: number; high_total: number; external_reached: number; external_total: number; agents_reached: number; agents_total: number };
@@ -196,13 +206,46 @@ export class ApiError extends Error {
   }
 }
 
-async function call<T>(method: string, path: string, body?: unknown): Promise<T> {
-  const response = await fetch(path, {
-    method,
-    credentials: "same-origin",
-    headers: body === undefined ? undefined : { "Content-Type": "application/json" },
-    body: body === undefined ? undefined : JSON.stringify(body),
-  });
+/** Whether the database is answering. A 503 with graph_unavailable, or a request to /api that fails or times out,
+ *  says it is not; a retried read that answers, or the health line (state.ts), says it is. The shell shows one banner
+ *  while it is down, and reads retry meanwhile. */
+type Watcher = (down: boolean) => void;
+const watchers = new Set<Watcher>();
+let isDown = false;
+export const outage = {
+  get down() { return isDown; },
+  watch(w: Watcher): () => void { watchers.add(w); return () => { watchers.delete(w); }; },
+  set(down: boolean) {
+    if (down === isDown) return;
+    isDown = down;
+    watchers.forEach((w) => w(down));
+  },
+};
+const RETRY_MS = 4000;
+const RETRIES = 30;                 // a read is asked again every few seconds for two minutes before it gives up
+const READ_TIMEOUT_MS = 30000;
+const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+async function call<T>(method: string, path: string, body?: unknown, attempt = 0): Promise<T> {
+  // a POST or a PUT always carries a JSON body, {} at the least: the server requires one
+  const sent = body === undefined && method !== "GET" ? {} : body;
+  const read = method === "GET";
+  // a read that finds the database gone is asked again every few seconds; a write is not, since it may have landed
+  const again = async () => { await sleep(RETRY_MS); return call<T>(method, path, body, attempt + 1); };
+  let response: Response;
+  try {
+    response = await fetch(path, {
+      method,
+      credentials: "same-origin",
+      headers: sent === undefined ? undefined : { "Content-Type": "application/json" },
+      body: sent === undefined ? undefined : JSON.stringify(sent),
+      signal: read ? AbortSignal.timeout(READ_TIMEOUT_MS) : undefined,
+    });
+  } catch {
+    outage.set(true);
+    if (read && attempt < RETRIES) return again();
+    throw new ApiError("unreachable", "FalkorDB is not answering.");
+  }
   const text = await response.text();
   let payload: any = null;
   try {
@@ -212,8 +255,15 @@ async function call<T>(method: string, path: string, body?: unknown): Promise<T>
   }
   if (!response.ok) {
     const error = payload?.error;
+    if (response.status === 503 && error?.code === "graph_unavailable") {
+      outage.set(true);
+      if (read && attempt < RETRIES) return again();
+    }
     throw new ApiError(error?.code ?? `http_${response.status}`, error?.message ?? `The server answered ${response.status}.`);
   }
+  // only a read that had failed and now answers says the database is back: a read that never failed says nothing,
+  // or the shell's own reads, which do not touch the graph, would call it back every time a scenario read fails
+  if (attempt > 0) outage.set(false);
   return payload as T;
 }
 

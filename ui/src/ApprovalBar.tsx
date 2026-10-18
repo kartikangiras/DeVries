@@ -35,8 +35,7 @@ function DiffLines({ text }: { text: string }) {
 /**
  * Docked under the page while a plan waits for a person, and only then. Its button is the one thing
  * on the page no tool can do. Under the line it shows the plan as the change to the real configuration:
- * the diff, which the person can edit, and whether it will be written when they approve. The shape
- * follows Manthan's approval bar (see ui/THIRD_PARTY_NOTICES.md).
+ * the diff, which the person can edit, and whether it will be written when they approve.
  */
 export function ApprovalBar({ mitigation, names, busy, scenario, canWrite, onApprove, onReject }: Props) {
   const [approver, setApprover] = useState(() => localStorage.getItem("devries.approver") ?? "");
@@ -66,7 +65,9 @@ export function ApprovalBar({ mitigation, names, busy, scenario, canWrite, onApp
   const changes = mitigation.summary.length;
   const d = draft?.draft ?? null;
   const can = canWrite && !!draft?.can_write && !!d?.writable;
-  const edited = !!d && after !== d.after;
+  // a draft whose secrets are redacted is read-only: the text shown is not the text written, so it is never sent back
+  const editable = d?.editable !== false;
+  const edited = editable && !!d && after !== d.after;
   const fileName = d?.path ? d.path.split("/").slice(-2).join("/") : null;
   const approve = () => {
     remember();
@@ -121,12 +122,14 @@ export function ApprovalBar({ mitigation, names, busy, scenario, canWrite, onApp
             <span className="eyebrow">Change to your config</span>
             <span className="draft-path">{d.path ?? (d.commands.length ? "commands to run" : "a brief, no file")}</span>
             {d.path && !d.commands.length && (
-              editing
-                ? <button className="link" onClick={() => setEditing(false)}>done editing</button>
-                : <button className="link" onClick={() => setEditing(true)}>edit the text</button>
+              !editable
+                ? <span className="draft-locked">secrets are shown as •••, so this text is read-only; the file is written from the original</span>
+                : editing
+                  ? <button className="link" onClick={() => setEditing(false)}>done editing</button>
+                  : <button className="link" onClick={() => setEditing(true)}>edit the text</button>
             )}
           </div>
-          {editing ? (
+          {editing && editable ? (
             <textarea className="draft-edit" value={after} onChange={(e) => setAfter(e.target.value)} rows={14} spellCheck={false} aria-label="The text that would be written" />
           ) : d.commands.length ? (
             <pre className="draft-diff">{d.commands.join("\n")}</pre>

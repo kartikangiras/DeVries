@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  ApiError, api, openEvents,
+  ApiError, api, openEvents, outage,
   type CatalogQuery, type Findings, type Graph, type Health, type ImportAnswer, type Layer, type Mitigation, type Overview, type Run, type RunWithSteps, type Scenario, type Scorecard, type Session, type StreamEvent,
 } from "./api";
 import { go } from "./route";
@@ -30,6 +30,7 @@ export function useDeVries(scenario: string | null) {
   /** Which scenario the loaded state belongs to. Between a switch and its load the pages see nothing, not the old one. */
   const [owner, setOwner] = useState<string | null>(null);
   const [connected, setConnected] = useState(true);
+  const [dbDown, setDbDown] = useState(outage.down);
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
@@ -84,6 +85,22 @@ export function useDeVries(scenario: string | null) {
     }, 120);
   }, [fail, loadScenario, loadShell]);
 
+  // The database going quiet is noticed by whichever call finds it so (api.ts): the shell shows one banner, the failed
+  // reads ask again by themselves, and a slow poll of the health line catches the moment it is back, when everything is read again.
+  useEffect(() => outage.watch((down) => {
+    setDbDown(down);
+    if (!down) refreshSoon();
+  }), [refreshSoon]);
+  useEffect(() => {
+    if (!dbDown) return;
+    const poll = window.setInterval(() => {
+      fetch("/api/health", { credentials: "same-origin" })
+        .then((r) => r.json().then((h: Health) => { if (r.ok && h.falkordb !== false) outage.set(false); }))
+        .catch(() => {});
+    }, 4000);
+    return () => window.clearInterval(poll);
+  }, [dbDown]);
+
   // One request first, alone: it takes the session cookie. Everything else, the stream included, comes after.
   useEffect(() => {
     let close = () => {};
@@ -104,7 +121,7 @@ export function useDeVries(scenario: string | null) {
       .catch(fail);
     // and a slow heartbeat, so a lost event never leaves a page stale for long
     const heartbeat = window.setInterval(() => {
-      if (document.visibilityState === "visible" && live.current.scenario) refreshSoon();
+      if (document.visibilityState === "visible" && live.current.scenario && !outage.down) refreshSoon();
     }, 20000);
 
     function onEvent(event: StreamEvent) {
@@ -291,7 +308,7 @@ export function useDeVries(scenario: string | null) {
   }, [scenarios]);
 
   return {
-    ready, connected, busy, problem, dismiss: () => setProblem(null),
+    ready, connected, dbDown, busy, problem, dismiss: () => setProblem(null),
     session, health, scenarios, current, titleOf, catalog, scannedAt, scorecard: fresh ? scorecard : null, overview: fresh ? overview : null,
     flow, config: fresh ? graphs.config : undefined, needConfig,
     findings: fresh ? findings : null, openIds, names, mitigations: fresh ? mitigations : {}, plans, configHash: fresh ? configHash : null,
