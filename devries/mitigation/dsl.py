@@ -149,6 +149,7 @@ class Verdict(BaseModel):
     remaining: list[str]                    # targets still open after the plan
     diff: Diff
     reason: str | None = None               # why it failed, in words
+    unconstrained: bool = False             # the graph declares no workflow, so nothing could be checked for breakage
 
 
 def mitigation_id(plan: FixPlan, targets: list[str]) -> str:
@@ -168,7 +169,6 @@ def describe(change) -> str:
                                   + ", ".join(sorted(c.reader_tool_ids))),
         "grant_call": lambda c: f"grant {c.tool_id} to {c.agent_id}",
         "add_delegation": lambda c: f"let {c.from_agent_id} delegate to {c.to_agent_id}",
-        "drop_server": lambda c: f"no agent holds a grant to any tool of {c.server_id}",
         "drop_server": lambda c: f"remove {c.server_id} and every grant to its tools",
     }[change.kind](change)
 

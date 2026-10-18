@@ -2,6 +2,11 @@
 
 It is the scripted fallback, the data behind the Mitigations view, and the
 yardstick the agent is measured against. It is not what the agent runs.
+
+The search does not stop at the first passing plan: the Options step shows every
+plan a sandbox was asked about, and a person who rejects the recommendation is
+offered the next one. So its `sandbox_runs` is not the number it would take to
+find a fix; `to_first_pass` is, and that is the count an agent is compared with.
 """
 
 from itertools import combinations
@@ -26,6 +31,7 @@ class SearchResult(BaseModel):
     passing: list[store.Mitigation]         # best first
     failed: list[store.Mitigation]          # every plan that was tried and did not pass, with its reason
     sandbox_runs: int
+    to_first_pass: int | None = None        # sandboxes spent before the first passing plan: the fair count against an agent
 
 
 def default_target(findings: list[Finding]) -> list[Finding]:
@@ -82,9 +88,11 @@ async def search(client: GraphClient, working_key: str, finding_ids: list[str] |
     # cheapest first, then the plan that closes more; ties go by the plan itself, so the same graph gives the same answer
     passing = sorted((mv for mv in by_plan.values() if mv[1].passed),
                      key=lambda mv: (mv[1].plan.cost, -len(mv[1].diff.resolved), mv[1].plan.canonical()))
+    first_pass = next((i + 1 for i, v in enumerate(verdicts) if v.passed), None)
     return SearchResult(
         targets=[f.id for f in targets],
         passing=[m for m, _ in passing][:want],
         failed=[m for m, v in by_plan.values() if not v.passed],
         sandbox_runs=len(verdicts),
+        to_first_pass=first_pass,
     )

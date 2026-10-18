@@ -45,6 +45,7 @@ class Baseline:
     plan: str | None = None
     cost: int | None = None
     sandboxes: int = 0
+    to_first_pass: int | None = None   # the search keeps going after a pass so the options are complete; this is the fair count
 
 
 @dataclass
@@ -85,7 +86,8 @@ async def measure_baseline(client: GraphClient, scenario: str) -> Baseline:
     try:
         await ops.scan(client, key)
         result = await ops.search(client, key)
-        out = Baseline(scenario=scenario, target=result.targets[0] if result.targets else None, sandboxes=result.sandbox_runs)
+        out = Baseline(scenario=scenario, target=result.targets[0] if result.targets else None, sandboxes=result.sandbox_runs,
+                       to_first_pass=result.to_first_pass)
         if result.passing:
             best = result.passing[0]
             out.plan, out.cost = words(best.plan), best.cost
@@ -127,10 +129,14 @@ async def measure_agent(client: GraphClient, llm: LLM, scenario: str, n: int) ->
 
 
 def table(baselines: list[Baseline], agent_runs: list[AgentRun], model: str | None) -> str:
-    lines = ["| Scenario | Target | Baseline plan | Cost | Sandboxes |", "| --- | --- | --- | ---: | ---: |"]
+    lines = ["| Scenario | Target | Baseline plan | Cost | Sandboxes to first pass | Sandboxes in all |",
+             "| --- | --- | --- | ---: | ---: | ---: |"]
     for b in baselines:
         plan = b.plan or ("nothing is open" if b.target is None else "no plan passed")
-        lines.append(f"| `{b.scenario}` | {f'`{b.target}`' if b.target else ''} | {plan} | {b.cost if b.cost is not None else ''} | {b.sandboxes} |")
+        lines.append(f"| `{b.scenario}` | {f'`{b.target}`' if b.target else ''} | {plan} | {b.cost if b.cost is not None else ''} | "
+                     f"{b.to_first_pass if b.to_first_pass is not None else ''} | {b.sandboxes} |")
+    lines += ["", "The search tests every candidate so the Options step is complete; \"to first pass\" is the count to compare "
+                  "an agent's sandboxes with."]
     if model is None:
         lines += ["", "No model is configured (`ANTHROPIC_API_KEY` is not set), so no agent run was made. "
                       "The baseline above is the search's own result; nothing here measures the agent."]

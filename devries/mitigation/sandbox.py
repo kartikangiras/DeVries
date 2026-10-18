@@ -201,8 +201,11 @@ async def verify(client: GraphClient, working_key: str, plan: FixPlan, targets: 
         raise NotFound("not an open finding in this scenario: " + ", ".join(finding_id(fp) for fp in unknown))
     remaining = sorted(set(targets) & set(d.open_after))
     passed = not remaining and not d.introduced and not d.newly_broken
+    # with no workflow declared, "breaks nothing" is vacuous: the verdict carries that so a page can say it
+    counts = await client.run("overview.counts", working_key)
+    unconstrained = not counts or not counts[0].get("workflows")
     return Verdict(plan=plan, targets=sorted(targets), passed=passed, remaining=remaining, diff=d,
-                   reason=None if passed else explain_failure(remaining, d))
+                   reason=None if passed else explain_failure(remaining, d), unconstrained=unconstrained)
 
 
 async def config_hash(client: GraphClient, graph_key: str) -> str:
